@@ -14,11 +14,20 @@ const Td = 1e-21
 
 function initParams(model::MCMODEL=MCMODEL())
 
-    params = MCPARAMS()
+    ebins = [0.,(10. .^(-3:0.1:1.5))...]
+    tbins = collect(LinRange(0,model.t_f,100))
 
-    buildFreq!(model,params) #TODO
-    buildDensity!(model.n0,params)
-    buildField!(model.n0,model.En0,params)
+    params = MCPARAMS(
+        ebins=ebins,
+        tbins=tbins,
+        n0=buildDensity(model.n0),
+        a=buildField(model.En0),
+        total_freq=buildFreq(model,ebins)
+        )
+
+    # buildFreq!(model,params) #TODO
+    # buildDensity!(model.n0,params)
+    # buildField!(model.n0,model.En0,params)
     return params
 end
 
@@ -31,16 +40,19 @@ end
 
 #### Frequency ####
 
-function buildFreq!(model,params)
+function buildFreq(model,ebins)
 
-    params.total_freq = zeros(length(params.ebins))
-    en_spacing = params.ebins[2]-params.ebins[1]
-    for i in 1:length(params.total_freq)
-        params.total_freq[i] = maximum([sum([cs(en)*sqrt(2*en*q/me) for (cs,type) in splatCS(model)]) for en in LinRange(params.ebins[i],params.ebins[i]+en_spacing,100)])*1e-20
+    total_freq = zeros(length(ebins))
+    en_spacing = ebins[end]-ebins[end-1]
+    for i in 1:length(total_freq)-1
+        total_freq[i] = maximum([sum([cs(en)*sqrt(2*en*q/me) for (cs,type) in splatCS(model)]) for en in LinRange(ebins[i]+0.000001,ebins[i+1],1000)])*1e-20
         
+        # if total_freq[i] == Inf || isnan(total_freq[i]) total_freq[i] = 1e10 end
         #TODO: Might be a problem with infinity here
         #TODO: Spactially dependent freq?
     end
+    total_freq[end] = maximum([sum([cs(en)*sqrt(2*en*q/me) for (cs,type) in splatCS(model)]) for en in LinRange(ebins[end],ebins[end]+en_spacing,1000)])*1e-20
+    return total_freq
 end
 
 @xport function splatCS(model)
@@ -49,14 +61,14 @@ end
 
 #### Density ####
 
-function buildDensity!(n0::UniformDensity,params)
-    params.n0 = n0.val
+function buildDensity(n0::UniformDensity)
+    n0.val
 end
 
 #### Electric Field ####
 
-function buildField!(n0::UniformDensity,En0::UniformField,params)
-    params.a = SVector(0.,0.,q*Td*En0.val*n0.val/me)
+function buildField(En0::UniformField)
+    SVector(0.,0.,q*Td*En0.val/me)
 end
 
 
@@ -68,14 +80,14 @@ function MCModels.PART(model,params)
     particle = PART()
     particle.r = initPartr(model.r_0,params)
     particle.v = initPartv(model.v_0,params)
-    particle.ebin = findMinInd(params.ebins,getEnergy(particle))
+    particle.ebin = findMinInd(params.ebins,getEnergy(particle.v))
 
     return particle
 
 end
 
-function getEnergy(particle)
-    0.5*me*dot(particle.v,particle.v)/q
+function getEnergy(v)
+    0.5*me*dot(v,v)/q
 end
 
 function getVelocity(ε)

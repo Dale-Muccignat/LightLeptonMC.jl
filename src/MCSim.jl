@@ -9,7 +9,8 @@ This package takes gases from Gases.jl and performs a Monte Carlo simulation.
 module MCSim
 
 
-using Reexport
+using Reexport, Distributed
+@reexport using Gases
 @reexport using MCModels
 export mc, MCINIT, MCPARAMS
 
@@ -19,19 +20,22 @@ include("Init.jl")
 include("MC.jl")
 @reexport using .MC
 
+include("Measurements.jl")
+@reexport using .Measurements
+
 function mc(model=MCMODEL(),params=initParams(MCMODEL());verbose=false)
 
     meas = initMeas(params)
 
-    for n in 1:model.n
-    # n=1
-        if n%(model.n*0.1) == 0.
+    meas = @distributed (+) for n in 1:model.n
+        if n%(model.n*0.01) == 0.
             @info "Progress: "*string(100*n/model.n)*"%"
         end
-        meas += flight(PART(model,params),model,params,verbose)
 
+        flight(PART(model,params),model,params,verbose)
     end
-    return meas
+    @show meas
+    return process(meas,params,model);
     
 
 end
@@ -50,8 +54,10 @@ end
 	expr
 end
 Base.:+(x::MEAST,y::MEAST) = GenericAddition(x,y)::MEAST
+# Base.:+(x::MEAS,y::MEAS) = GenericAddition(x,y)::MEAS
 Base.:+(x::MEASS,y::MEASS) = GenericAddition(x,y)::MEASS
 Base.:+(x::MEASC,y::MEASC) = GenericAddition(x,y)::MEASC
+Base.:+(x::COLLCOUNT,y::COLLCOUNT) = GenericAddition(x,y)::COLLCOUNT
 function Base.:+(x::MEAS,y::MEAS)
     return MEAS(GenericAddition(x.measg,y.measg),GenericAddition(x.meast,y.meast),GenericAddition(x.meass,y.meass),GenericAddition(x.measc,y.measc))
 end
