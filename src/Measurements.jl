@@ -9,10 +9,15 @@ const k = ustrip(float(BoltzmannConstant))
 const ħ = ustrip(float(ReducedPlanckConstant))
 const Td = 1e-21
 
-@xport function process(meas,params,model)
+@xport function process(type::SWARM,meas,params,model)
     weights!(meas)
     swarmMeas = swarmMeasurements(meas,params,model)
     meas, swarmMeas
+end
+
+@xport function process(type::LμJ,meas,params,model)
+    meas.measLμJ.EELS ./= model.n
+    meas, SWARMMEAS()
 end
 
 function weights!(meas)

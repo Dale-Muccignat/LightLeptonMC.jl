@@ -25,17 +25,20 @@ include("Measurements.jl")
 
 function mc(model=MCMODEL(),params=initParams(MCMODEL());verbose=false)
 
-    meas = initMeas(params)
+    meas = initMeas(model,params)
 
-    meas = @distributed (+) for n in 1:model.n
-        if n%(model.n*0.01) == 0.
+    # @show params.rbins
+    # meas = @distributed (+) for n in 1:model.n
+    for n in 1:model.n
+
+        if n%(model.n*0.1) == 0.
             @info "Progress: "*string(100*n/model.n)*"%"
         end
 
-        flight(PART(model,params),model,params,verbose)
+        meas += flight(PART(model.type,model,params),model,params,verbose)
     end
-    @show meas
-    return process(meas,params,model);
+    # @show params.rbins
+    return process(model.type,meas,params,model);
     
 
 end
@@ -53,13 +56,16 @@ end
 
 	expr
 end
+Base.:+(x::Nothing,y::Nothing) = nothing
+Base.:*(x::Nothing,y::Float64) = nothing
+Base.:/(x::Nothing,y::Float64) = nothing
 Base.:+(x::MEAST,y::MEAST) = GenericAddition(x,y)::MEAST
-# Base.:+(x::MEAS,y::MEAS) = GenericAddition(x,y)::MEAS
-Base.:+(x::MEASS,y::MEASS) = GenericAddition(x,y)::MEASS
+Base.:+(x::MEASLμJ,y::MEASLμJ) = GenericAddition(x,y)::MEASLμJ
 Base.:+(x::MEASC,y::MEASC) = GenericAddition(x,y)::MEASC
+Base.:+(x::MEASS,y::MEASS) = GenericAddition(x,y)::MEASS
 Base.:+(x::COLLCOUNT,y::COLLCOUNT) = GenericAddition(x,y)::COLLCOUNT
 function Base.:+(x::MEAS,y::MEAS)
-    return MEAS(GenericAddition(x.measg,y.measg),GenericAddition(x.meast,y.meast),GenericAddition(x.meass,y.meass),GenericAddition(x.measc,y.measc))
+    return MEAS(GenericAddition(x.measLμJ,y.measLμJ),GenericAddition(x.measg,y.measg),GenericAddition(x.meast,y.meast),GenericAddition(x.meass,y.meass),GenericAddition(x.measc,y.measc))
 end
 
 

@@ -1,7 +1,7 @@
 module Init
 
 using MCModels
-using PhysicalConstants.CODATA2018, Unitful, LinearAlgebra, StaticArrays, AndExport
+using PhysicalConstants.CODATA2018, Unitful, LinearAlgebra, StaticArrays, AndExport, Gases, LXCatParser
 
 export initParams, initMeas, PART, getEnergy
 
@@ -12,59 +12,132 @@ const k = ustrip(float(BoltzmannConstant))
 const ħ = ustrip(float(ReducedPlanckConstant))
 const Td = 1e-21
 
-function initParams(model::MCMODEL=MCMODEL())
+function initParams(type::SWARM,gas=MaxwellModel,model::MCMODEL=MCMODEL())
 
     ebins = [0.,(10. .^(-3:0.1:1.5))...]
     tbins = collect(LinRange(0,model.t_f,100))
+    n0=buildDensity(model.n0)
+    a=buildField(model.En0)
+
+    length_scale = model.n0.val*1e-20
+    time_scale = model.n0.val*1e-20*sqrt(2*q/me)
+    energy_scale = (length_scale/time_scale)^2
+    splat_gas=splatCS(input_gas,energy_scale)
+    total_freq=buildFreq(model,input_gas,ebins,energy_scale)
 
     params = MCPARAMS(
         ebins=ebins,
+        gas=input_gas,
+        splat_gas=splat_gas,
         tbins=tbins,
-        n0=buildDensity(model.n0),
-        a=buildField(model.En0),
-        total_freq=buildFreq(model,ebins)
+        n0=n0,
+        a=a,
+        total_freq=total_freq,
+        length_scale = length_scale,
+        time_scale = time_scale,
+        energy_scale = energy_scale
         )
 
-    # buildFreq!(model,params) #TODO
-    # buildDensity!(model.n0,params)
-    # buildField!(model.n0,model.En0,params)
+    return scale(params,length_scale,time_scale,energy_scale);
+end
+
+@xport function scale(params,ls,ts,es)
+    
+    params.ebins *= es
+    params.ebinsLμJ *= es
+    # params.total_freq /= ts/ls^3
+    params.a *= ls/ts^2
+    params.n0 /= ls^3
+    params.rbins *= ls^2
+    params.xbins *= ls
+    params.ybins *= ls
+    params.zbins *= ls
+    params.tbins *= ts
+
     return params
 end
 
-function initMeas(params::MCPARAMS = MCPARAMS())
 
-    MEAS(params)
+function initParams(type::LμJ,input_gas,model::MCMODEL=MCMODEL())
 
+    ebins = [0.,(10. .^(-3:0.1:log10(model.v_0.ε)+0.1))...]
+    rbins = buildRBins(type,model.n0)
+    n0=buildDensity(model.n0,rbins)
+    a=buildField(model.En0)
+
+    length_scale = model.n0.val*1e-20
+    time_scale = model.n0.val*1e-20*sqrt(2*q/me)
+    energy_scale = (length_scale/time_scale)^2
+
+    splat_gas=splatCS(input_gas,energy_scale)
+    total_freq=buildFreq(model,splat_gas,ebins,energy_scale)
+
+    params = MCPARAMS(
+        ebins=ebins,
+        ebinsLμJ=collect(0:model.type.Δε_detector:(model.v_0.ε+5.)),
+        gas=input_gas,
+        splat_gas=splat_gas,
+        rbins=rbins,
+        n0=n0,
+        a=a,
+        total_freq=total_freq,
+        length_scale = length_scale,
+        time_scale = time_scale,
+        energy_scale = energy_scale
+        )
+
+    return scale(params,length_scale,time_scale,energy_scale);
+end
+function initMeas(model,params::MCPARAMS = MCPARAMS())
+
+    MEAS(model.type,model,params)
 
 end
 
 #### Frequency ####
 
-function buildFreq(model,ebins)
+function buildFreq(model,gas,ebins,energy_scale)
 
     total_freq = zeros(length(ebins))
     en_spacing = ebins[end]-ebins[end-1]
     for i in 1:length(total_freq)-1
-        total_freq[i] = maximum([sum([cs(en)*sqrt(2*en*q/me) for (cs,type) in splatCS(model)]) for en in LinRange(ebins[i]+0.000001,ebins[i+1],1000)])*1e-20
+        total_freq[i] = maximum([sum([cs(en)*sqrt(2*en*q/me) for (cs,type,thresh) in gas]) for en in LinRange(ebins[i]+0.000001,ebins[i+1],1000)])*1e-20
         
         # if total_freq[i] == Inf || isnan(total_freq[i]) total_freq[i] = 1e10 end
         #TODO: Might be a problem with infinity here
         #TODO: Spactially dependent freq?
     end
-    total_freq[end] = maximum([sum([cs(en)*sqrt(2*en*q/me) for (cs,type) in splatCS(model)]) for en in LinRange(ebins[end],ebins[end]+en_spacing,1000)])*1e-20
+    total_freq[end] = maximum([sum([cs(en)*sqrt(2*en*q/me) for (cs,type,thresh) in gas]) for en in LinRange(ebins[end],ebins[end]+en_spacing,1000)])*1e-20
     return total_freq
 end
 
-@xport function splatCS(model)
-    zip((model.gas.elastic...,model.gas.excitation...,model.gas.ionisation...,model.gas.attachment...),((:ELASTIC for i in 1:length(model.gas.elastic))...,(:EXCITATION for i in 1:length(model.gas.excitation))...,(:IONIZATION for i in 1:length(model.gas.ionisation))...,(:ATTACHMENT for i in 1:length(model.gas.attachment))...))
+@xport function splatCS(gas,energy_scale)
+    gases = (gas.elastic...,gas.excitation...,gas.ionisation...,gas.attachment...)
+    types = ([:ELASTIC for i in 1:length(gas.elastic)]...,[:EXCITATION for i in 1:length(gas.excitation)]...,[:IONIZATION for i in 1:length(gas.ionisation)]...,[:ATTACHMENT for i in 1:length(gas.attachment)]...)
+    threshes = ([0. for thresh in gas.elastic]...,[thresh for thresh in gas.exlosses]...,[thresh for thresh in gas.iolosses]...).*energy_scale .*q
+    @show threshes
+
+    zip(gases,types,threshes)
 end
 
+#### * RBins
+
+function buildRBins(type::SWARM,n0::UniformDensity)
+    return nothing
+end
+
+function buildRBins(type::LμJ,n0::LμJDensity)
+    return [0.,(type.jet_width/2)^2,1e20]
+end
 #### Density ####
 
-function buildDensity(n0::UniformDensity)
+function buildDensity(n0::UniformDensity,rbins)
     n0.val
 end
 
+function buildDensity(n0::LμJDensity,rbins)
+    [n0.val,0.,0.]
+end
 #### Electric Field ####
 
 function buildField(En0::UniformField)
@@ -73,14 +146,25 @@ end
 
 
 
-#### PARTICLE ####
+#### * PARTICLE
 
-function MCModels.PART(model,params)
+function MCModels.PART(type::SWARM,model,params)
 
     particle = PART()
-    particle.r = initPartr(model.r_0,params)
-    particle.v = initPartv(model.v_0,params)
+    particle.r = initPartr(model.r_0,params).*params.length_scale
+    particle.v = initPartv(model.v_0,params).*params.length_scale ./params.time_scale
     particle.ebin = findMinInd(params.ebins,getEnergy(particle.v))
+
+    return particle
+
+end
+function MCModels.PART(type::LμJ,model,params)
+
+    particle = PART()
+    particle.r = initPartr(model.r_0,params).*params.length_scale
+    particle.v = initPartv(model.v_0,params).*params.length_scale ./params.time_scale
+    particle.ebin = findMinInd(params.ebins,getEnergy(particle.v))
+    particle.rbin = findMinInd(params.rbins,dot(particle.r,particle.r))
 
     return particle
 
@@ -98,6 +182,9 @@ end
 function initPartr(r_0::ZeroSpacial,params)
     [0.,0.,0.]
 end
+function initPartr(r_0::InitSpacial,params)
+    r_0.axis .* r_0.val
+end
 function initPartv(v_0::ZeroVelocity,params)
     [0.,0.,0.]
 end
@@ -105,5 +192,36 @@ end
 function initPartv(v_0::InitVelocity,params)
     v_0.axis .* getVelocity(v_0.ε)
 end
+
+function initPartv(v_0::GaussianVelocity,params)
+    SD = v_0.Δε_source/(2*sqrt(2*log(2)))
+    electron_v2eV = 0.5 * me / q
+
+    ea = v_0.ε
+
+    R=randn()
+    while ea < -SD*R
+        R=randn()
+    end
+    new_ea=ea+SD*R
+
+    sqrt.(new_ea*v_0.axis/electron_v2eV)
+end
+
+# @xport function getGas(input_gas,ebins)
+#     CSs::Vector{CrossSection} = []
+#     for gas in input_gas.elastic
+#         push!(CSs,CrossSection(:ELASTIC,"",me/input_gas.Mₑₗ[1],0.,1.,ebins,gas.(ebins)))
+#     end
+#     for gas in input_gas.excitation
+#         push!(CSs,CrossSection(:EXCITATION,"",me/input_gas.Mₑₗ[1],find_loss(gas),1.,ebins,gas.(ebins)))
+#     end
+#     for gas in input_gas.ionisation
+#         push!(CSs,CrossSection(:IONIZATION,"",me/input_gas.Mₑₗ[1],find_loss(gas),1.,ebins,gas.(ebins)))
+#     end
+    
+#     return CSs
+
+# end
 
 end
