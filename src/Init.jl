@@ -45,7 +45,7 @@ end
     
     params.ebins *= es
     params.ebinsLμJ *= es
-    # params.total_freq /= ts/ls^3
+    params.total_freq /= ts#/ls^3
     params.a *= ls/ts^2
     params.n0 /= ls^3
     params.rbins *= ls^2
@@ -74,7 +74,7 @@ function initParams(type::LμJ,input_gas,model::MCMODEL=MCMODEL())
 
     params = MCPARAMS(
         ebins=ebins,
-        ebinsLμJ=collect(0:model.type.Δε_detector:(model.v_0.ε+5.)),
+        ebinsLμJ=collect(model.type.thresh:model.type.Δε_detector:(model.v_0.ε+5.)),
         gas=input_gas,
         splat_gas=splat_gas,
         rbins=rbins,

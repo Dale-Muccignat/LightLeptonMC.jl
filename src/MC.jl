@@ -133,7 +133,9 @@ function getCollType(particle,model,params,verbose)
     en = getEnergy(particle.v)/params.energy_scale
 
     for (cs,type,thresh) in params.splat_gas
-        CS += cs(en)*1e-20 * sqrt(2*q*en/me) 
+        CS += cs(en)*1e-20 * sqrt(2*q*en/me) /params.time_scale
+        # @info cs(en)*1e-20 * sqrt(2*q*en/me) /params.time_scale
+        # @info getTotalFreq(particle,model,params,verbose)
         if R < CS/getTotalFreq(particle,model,params,verbose)
             return type, thresh
         end
@@ -169,13 +171,10 @@ function excitationColl!(thresh,g,particle,model,params,meas,verbose)
     
 end
 
-function ionisationColl!(thresh,ion_type::UniformIonisation,g,particle,model,params,meas,verbose)
+function ionisationColl!(thresh,ion_type,g,particle,model,params,meas,verbose)
     verbose && @info "Elastic Collision"
 
-    total_energy = getEnergy(particle.v)*q - thresh
-    other_part_energy = total_energy * rand()
-
-    part_energy = total_energy - other_part_energy 
+    part_energy, other_part_energy = getIonisationEnergy(thresh,ion_type,g)
 
     coschi, sinchi, phi = scatteringAngle(g,particle,model,params,verbose)
 
@@ -183,10 +182,29 @@ function ionisationColl!(thresh,ion_type::UniformIonisation,g,particle,model,par
     v2 = shift(v2,g)
     v2 = (me*particle.v + params.gas.Mₑₗ[1]*amu * (g-particle.v + v2)) /(me + params.gas.Mₑₗ[1]*amu)
 
+    particle.weight *= 2.
     meas.measg.coschi += dot(particle.v,v2)/(norm(v2)*norm(particle.v))
     meas.measg.coll_count.ionisation += 1
     particle.v = v2
 end
+
+function getIonisationEnergy(thresh,ion_type::UniformIonisation,g)
+    total_energy = getEnergy(g)*q - thresh
+    other_part_energy = total_energy * rand()
+    part_energy = total_energy - other_part_energy 
+    return part_energy, other_part_energy
+end
+function getIonisationEnergy(thresh,ion_type::RatioIonisation,g)
+    total_energy = getEnergy(g)*q - thresh
+    if rand() > 0.5 
+        other_part_energy = total_energy * ion_type.ratio
+    else
+        other_part_energy = total_energy * (1-ion_type.ratio)
+    end
+    part_energy = total_energy - other_part_energy 
+    return part_energy, other_part_energy
+end
+
 
 function updateEbin!(particle,params)
     ea = getEnergy(particle.v)
@@ -364,7 +382,7 @@ end
 end
 @xport function getDt(type::LμJ,particle,model,params,verbose)
     verbose && @info "Current time: " particle.t
-    dt_coll = dt_EVENT(randexp()/(getTotalFreq(particle,model,params,verbose)*getDensity(particle,model.n0,params,verbose)*params.length_scale),:dt_collision,:Up)
+    dt_coll = dt_EVENT(randexp()/(getTotalFreq(particle,model,params,verbose)*getDensity(particle,model.n0,params,verbose)*params.length_scale^3)::Float64,:dt_collision,:Up)
     dt_rbin = getRDt(particle,params)
     dts = (dt_coll,dt_rbin)
     verbose && @info dts
