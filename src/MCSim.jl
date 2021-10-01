@@ -26,6 +26,9 @@ Finally, run the Monte Carlo simulation:
 """
 module MCSim
 
+#TODO: Add Attachment, super-eleastic, liquid
+#TODO: Add Potential
+#TODO: Add Density Gradient (this is probably best solved through Danny's code though)
 
 using Reexport, Distributed
 @reexport using Gases
