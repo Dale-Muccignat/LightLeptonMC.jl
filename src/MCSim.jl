@@ -1,9 +1,27 @@
 """
 MCSim
 
-This package takes gases from Gases.jl and performs a Monte Carlo simulation.
+This package takes gases from Gases.jl and performs a Monte Carlo simulation in either a swarm or LμJ configuration. An example workflow is included below.
 
-`MC(::Gas,::Params)`
+First, initilise the chosen model:
+
+```
+    MCMODEL()                                      # creates a default swarm configuration
+    MCMODEL(type={SWARM(),LμJ()},v_0,r_0,n0,En0)   # creates a custom configuration
+```
+
+Then, initilise the params object with the chose Gas:
+
+```
+    MCPARAMS()                                     # creates parameters with a Maxwell gas
+    MCPARAMS({SWARM,LμJ},::Gas,::MCMODEL)          # creates custom parameters with a gas from Gases.jl
+```
+
+Finally, run the Monte Carlo simulation:
+
+```
+    mc(::MCMODEL,::MCPARAMS)                       # runs a Monte Carlo simluation using the provided model and configuration
+```
 
 """
 module MCSim
@@ -11,8 +29,10 @@ module MCSim
 
 using Reexport, Distributed
 @reexport using Gases
-@reexport using MCModels
 export mc, MCINIT, MCPARAMS
+
+include("Structs.jl")
+@reexport using .Structs
 
 include("Init.jl")
 @reexport using .Init
@@ -26,6 +46,7 @@ include("Measurements.jl")
 function mc(model=MCMODEL(),params=initParams(MCMODEL());verbose=false)
 
     meas = initMeas(model,params)
+    scale!(params)
 
     # @show params.rbins
     # meas = @distributed (+) for n in 1:model.n
@@ -38,6 +59,8 @@ function mc(model=MCMODEL(),params=initParams(MCMODEL());verbose=false)
         meas += flight(PART(model.type,model,params),model,params,verbose)
     end
     # @show params.rbins
+    unscale!(params)
+    unscale!(model.type,params,meas)
     return process(model.type,meas,params,model);
     
 

@@ -231,12 +231,6 @@ version = "0.3.3"
 [[Logging]]
 uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"
 
-[[MCModels]]
-deps = ["AndExport", "AutoParameters", "Gases", "PhysicalConstants", "StaticArrays"]
-path = "../MCModels"
-uuid = "ef0579af-23f7-4b4f-ad3e-10f206e669a4"
-version = "0.1.0"
-
 [[MacroTools]]
 deps = ["Markdown", "Random"]
 git-tree-sha1 = "5a5bc6bf062f0f95e62d0fe0a2d99699fed82dd9"

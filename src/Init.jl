@@ -1,6 +1,6 @@
 module Init
 
-using MCModels
+using ..Structs
 using PhysicalConstants.CODATA2018, Unitful, LinearAlgebra, StaticArrays, AndExport, Gases, LXCatParser
 
 export initParams, initMeas, PART, getEnergy
@@ -12,18 +12,18 @@ const k = ustrip(float(BoltzmannConstant))
 const ħ = ustrip(float(ReducedPlanckConstant))
 const Td = 1e-21
 
-function initParams(type::SWARM,gas=MaxwellModel,model::MCMODEL=MCMODEL())
+function initParams(type::SWARM,input_gas=MaxwellModel,model::MCMODEL=MCMODEL())
 
-    ebins = [0.,(10. .^(-3:0.1:1.5))...]
-    tbins = collect(LinRange(0,model.t_f,100))
-    n0=buildDensity(model.n0)
+    ebins = [0.,(10. .^(-3:0.1:2.))...]
+    tbins = collect(LinRange(0,type.t_f,100))
+    n0=buildDensity(model.n0,tbins)
     a=buildField(model.En0)
 
     length_scale = model.n0.val*1e-20
     time_scale = model.n0.val*1e-20*sqrt(2*q/me)
     energy_scale = (length_scale/time_scale)^2
     splat_gas=splatCS(input_gas,energy_scale)
-    total_freq=buildFreq(model,input_gas,ebins,energy_scale)
+    total_freq=buildFreq(model,splat_gas,ebins,energy_scale)
 
     params = MCPARAMS(
         ebins=ebins,
@@ -38,15 +38,18 @@ function initParams(type::SWARM,gas=MaxwellModel,model::MCMODEL=MCMODEL())
         energy_scale = energy_scale
         )
 
-    return scale(params,length_scale,time_scale,energy_scale);
+    return params
 end
 
-@xport function scale(params,ls,ts,es)
+@xport function scale!(params)
+    ls = params.length_scale
+    ts = params.time_scale
+    es = params.energy_scale
     
     params.ebins *= es
     params.ebinsLμJ *= es
     params.total_freq /= ts#/ls^3
-    params.a *= ls/ts^2
+    params.a *= ls^4/ts^2 
     params.n0 /= ls^3
     params.rbins *= ls^2
     params.xbins *= ls
@@ -57,6 +60,42 @@ end
     return params
 end
 
+@xport function unscale!(params)
+    ls = 1/params.length_scale
+    ts = 1/params.time_scale
+    es = 1/params.energy_scale
+    
+    params.ebins *= es
+    params.ebinsLμJ *= es
+    params.total_freq /= ts#/ls^3
+    params.a *= ls^4/ts^2
+    params.n0 /= ls^3
+    params.rbins *= ls^2
+    params.xbins *= ls
+    params.ybins *= ls
+    params.zbins *= ls
+    params.tbins *= ts
+
+    return params
+end
+
+@xport function unscale!(type::SWARM,params,meas::MEAS)
+    ls = 1/params.length_scale
+    ts = 1/params.time_scale
+    es = 1/params.energy_scale
+    meas.meast.εᵢ .*= es
+    meas.meast.v² .*= es
+    meas.meast.r² .*= ls^2
+    meas.meast.r .*= ls
+    meas.meast.v .*= ls/ts
+    meas.meast.rv .*= ls^2/ts
+end
+
+@xport function unscale!(type::LμJ,params,meas::MEAS)
+    ls = 1/params.length_scale
+    ts = 1/params.time_scale
+    es = 1/params.energy_scale
+end
 
 function initParams(type::LμJ,input_gas,model::MCMODEL=MCMODEL())
 
@@ -86,7 +125,7 @@ function initParams(type::LμJ,input_gas,model::MCMODEL=MCMODEL())
         energy_scale = energy_scale
         )
 
-    return scale(params,length_scale,time_scale,energy_scale);
+    return params
 end
 function initMeas(model,params::MCPARAMS = MCPARAMS())
 
@@ -102,10 +141,8 @@ function buildFreq(model,gas,ebins,energy_scale)
     en_spacing = ebins[end]-ebins[end-1]
     for i in 1:length(total_freq)-1
         total_freq[i] = maximum([sum([cs(en)*sqrt(2*en*q/me) for (cs,type,thresh) in gas]) for en in LinRange(ebins[i]+0.000001,ebins[i+1],1000)])*1e-20
-        
-        # if total_freq[i] == Inf || isnan(total_freq[i]) total_freq[i] = 1e10 end
-        #TODO: Might be a problem with infinity here
-        #TODO: Spactially dependent freq?
+        # total_freq[i] = maximum([sum([cs(en) for (cs,type,thresh) in gas]) for en in LinRange(ebins[i]+0.000001,ebins[i+1],1000)])*1e-20
+        #NOTE: This is no longer a frequency
     end
     total_freq[end] = maximum([sum([cs(en)*sqrt(2*en*q/me) for (cs,type,thresh) in gas]) for en in LinRange(ebins[end],ebins[end]+en_spacing,1000)])*1e-20
     return total_freq
@@ -148,7 +185,7 @@ end
 
 #### * PARTICLE
 
-function MCModels.PART(type::SWARM,model,params)
+function Structs.PART(type::SWARM,model,params)
 
     particle = PART()
     particle.r = initPartr(model.r_0,params).*params.length_scale
@@ -158,7 +195,7 @@ function MCModels.PART(type::SWARM,model,params)
     return particle
 
 end
-function MCModels.PART(type::LμJ,model,params)
+function Structs.PART(type::LμJ,model,params)
 
     particle = PART()
     particle.r = initPartr(model.r_0,params).*params.length_scale

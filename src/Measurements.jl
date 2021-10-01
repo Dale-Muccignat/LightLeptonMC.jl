@@ -1,6 +1,7 @@
 module Measurements
 
-using AndExport, PhysicalConstants.CODATA2018, Unitful, Statistics, MCModels
+using AndExport, PhysicalConstants.CODATA2018, Unitful, Statistics
+using ..Structs
 
 const amu = ustrip(float(AtomicMassConstant))
 const q = ustrip(float(ElementaryCharge))
@@ -21,7 +22,6 @@ end
 end
 
 function weights!(meas)
-    @show meas
     for i in 1:length(meas.meast.w)
         meas.meast.εᵢ[i] *= 0.5*me/meas.meast.w[i]/q
         meas.meast.v²[i,:] ./= meas.meast.w[i] 

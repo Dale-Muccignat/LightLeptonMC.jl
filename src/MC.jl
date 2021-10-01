@@ -1,6 +1,6 @@
 module MC
 
-using MCModels
+using ..Structs
 using ..Init
 using PhysicalConstants.CODATA2018, Unitful, AutoParameters, Random, StaticArrays, LinearAlgebra, AndExport
 
@@ -32,7 +32,7 @@ function flight(particle,model,params,verbose)
 
     alive = true
     while alive
-        # verbose && @info "Particle energy before: " getEnergy(particle.v)/params.energy_scale
+        verbose && @info "Particle energy before: " getEnergy(particle.v)/params.energy_scale
         # if verbose @info "Particle velocity before: " particle.v end
         # if verbose @info "Particle position before: " particle.r end
         # @info "Frequency: " getTotalFreq(particle,model,params,verbose)
@@ -53,7 +53,7 @@ function flight(particle,model,params,verbose)
 end
 
 function checkAlive(type::SWARM,particle,model,params,verbose)
-    return particle.t < model.type.t_f
+    return particle.t < model.type.t_f*params.time_scale
 end
 
 function checkAlive(type::LμJ,particle,model,params,verbose)
@@ -66,6 +66,7 @@ function checkAlive(type::LμJ,particle,model,params,verbose)
 end
 
 function event!(dt,particle,model,params,meas,verbose)
+    verbose && @info "==================================="
     if dt.type == :dt_collision
         verbose && @info "Collision"
         eventCollision!(dt,particle,model,params,meas,verbose)
@@ -104,6 +105,7 @@ function eventCollision!(dt::dt_EVENT,particle,model,params,meas,verbose)
 
     verbose && @info coll_type
 
+    verbose && @info "Energy Before: " getEnergy(particle.v)/params.energy_scale
     if coll_type == :Null
     elseif coll_type == :ELASTIC
         elasticColl!(getRelVel(particle,model),particle,model,params,meas,verbose)
@@ -113,6 +115,7 @@ function eventCollision!(dt::dt_EVENT,particle,model,params,meas,verbose)
         ionisationColl!(thresh,model.ion_type,getRelVel(particle,model),particle,model,params,meas,verbose)
     elseif coll_type == :ATTACHMENT
     end
+    verbose && @info "Energy After: " getEnergy(particle.v)/params.energy_scale
 
     updateEbin!(particle,params)
 end
@@ -144,7 +147,6 @@ function getCollType(particle,model,params,verbose)
 end
 
 function elasticColl!(g,particle,model,params,meas,verbose)
-    verbose && @info "Elastic Collision"
     coschi, sinchi, phi = scatteringAngle(g,particle,model,params,verbose)
     v2 = sqrt(dot(g,g)) * SArray{Tuple{3},Float64,1,3}(cos(phi)*sinchi,sin(phi)*sinchi,coschi)
     v2 = shift(v2,g)
@@ -156,7 +158,6 @@ function elasticColl!(g,particle,model,params,meas,verbose)
 end
 
 function excitationColl!(thresh,g,particle,model,params,meas,verbose)
-    verbose && @info "Excitation Collision"
     #TODO: Add Thresholds to cross sections
 
     if dot(g,g)-2*thresh/me > 0.
@@ -172,7 +173,6 @@ function excitationColl!(thresh,g,particle,model,params,meas,verbose)
 end
 
 function ionisationColl!(thresh,ion_type,g,particle,model,params,meas,verbose)
-    verbose && @info "Elastic Collision"
 
     part_energy, other_part_energy = getIonisationEnergy(thresh,ion_type,g)
 
@@ -253,14 +253,14 @@ function getDtEBinsPos(En0::UniformField,n0::UniformDensity,particle,model,param
 		#The second condition is to ensure that the energy can go down considering the perpindicular velocity... or something along those lines. It just makes sure the squareroot doesn't return an imaginary number
 		vf_z = sqrt(params.ebins[particle.ebin]/electron_v2eV - v_perp)
 		# vf_z is the velocity the particle will need to reach the lower boundry of the energy bin
-		return dt_EVENT(-(particle.v[3]+vf_z) /(params.a[3] * n0.val),:dt_energy, :Down)
+		return dt_EVENT(-(particle.v[3]+vf_z) /(params.a[3] * params.n0),:dt_energy, :Down)
 		#Just finding the time until the particles velocity reaches vf_z
 	else#if (particle.ebin_no < length(vars.ebins))
 		# here the vz is positive, and also making sure we aren't at the max bin value
 		#Don't need to check the second  condition above as the particle can only increase in energy
 		vf_z = sqrt(params.ebins[particle.ebin+1]/electron_v2eV - v_perp)
 		#same as before except with the lower boundry of the next bin up
-		return dt_EVENT(-(particle.v[3]-vf_z) /(params.a[3] * n0.val), :dt_energy,:Up)
+		return dt_EVENT(-(particle.v[3]-vf_z) /(params.a[3] * params.n0), :dt_energy,:Up)
 	end
     return dt_ENERGY(Inf, Up())
 end
@@ -373,16 +373,18 @@ end
 
 @xport function getDt(type::SWARM,particle,model,params,verbose)
     verbose && @info "Current time: " particle.t
-    dt_coll = dt_EVENT(randexp()/(getTotalFreq(particle,model,params,verbose)*getDensity(particle,model.n0,params,verbose)*params.length_scale^3),:dt_collision,:Up)
+    dt_coll = getCDt(particle,model,params,verbose)
     dt_energy = getDtEBinsPos(model.En0,model.n0,particle,model,params)
     dt_tbin = dt_EVENT(params.tbins[particle.tbin+1] - particle.t, :dt_tbin,:Up)
     dts = (dt_coll,dt_energy,dt_tbin)
+    verbose && @info dts
     dt_times = (dt_coll.time,dt_energy.time,dt_tbin.time)
     return dts[findMinTime(dt_times,verbose=verbose)]
 end
+
 @xport function getDt(type::LμJ,particle,model,params,verbose)
     verbose && @info "Current time: " particle.t
-    dt_coll = dt_EVENT(randexp()/(getTotalFreq(particle,model,params,verbose)*getDensity(particle,model.n0,params,verbose)*params.length_scale^3)::Float64,:dt_collision,:Up)
+    dt_coll = getCDt(particle,model,params,verbose)
     dt_rbin = getRDt(particle,params)
     dts = (dt_coll,dt_rbin)
     verbose && @info dts
@@ -403,6 +405,12 @@ function findMinTime(times;verbose)
     return 1
 
 end
+
+function getCDt(particle,model,params,verbose)
+    # dt_coll = dt_EVENT(randexp()/(getTotalFreq(particle,model,params,verbose)*getDensity(particle,model.n0,params,verbose)*sqrt(2*params.ebins[particle.ebin+1]*q/me)*params.length_scale^2)::Float64,:dt_collision,:Up)
+    dt_coll = dt_EVENT(randexp()/(getTotalFreq(particle,model,params,verbose)*getDensity(particle,model.n0,params,verbose)*params.length_scale^3)::Float64,:dt_collision,:Up)
+end
+
 
 
 end
