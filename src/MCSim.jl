@@ -35,6 +35,9 @@ function mc(gas::Gas;S=0.,E=1.,T=0.,N=1000,verbose=false)
     mc(model,initParams(model.type,gas,model),verbose=verbose)
 end
 
+function mc(model::MCMODEL,gas::Gas;verbose=false)
+    mc(model,initParams(model.type,gas,model))
+end
 
 function mc(model=MCMODEL(),params=initParams(MCMODEL());verbose=false)
 
