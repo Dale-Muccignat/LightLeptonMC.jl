@@ -12,7 +12,7 @@ gas = MaxwellModel()
 
 and then run:
 ```julia
-meas, swarm_meas = mc(::Gas,E=1.,T=0.)
+meas, swarm_meas = mc(gas,E=1.,T=0.)
 ```
 
 where `E` is the applied electric field in Townsend units and `T` is the gas Temperature in Kelvin units. `swarm_meas` contains common transport coefficients such as:
@@ -21,10 +21,6 @@ where `E` is the applied electric field in Townsend units and `T` is the gas Tem
 - bW: bulk drift velocity in m/s
 - bDl: bulk longnitude diffusion
 - bDt: bulk transverse diffusion
-
-```julia
-
-```
 
 ## Liquid Micro-Jet
 
