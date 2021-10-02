@@ -4,7 +4,7 @@ A flexible Monte Carlo simulation package for swarm and Liquid Micro-Jet applica
 
 ## Swarm
 
-To use, initiate a Gas struct from Gases.jl:
+To use, initiate a `Gas` struct from `Gases.jl`:
 
 ```julia
 gas = MaxwellModel()
@@ -15,7 +15,16 @@ and then run:
 meas, swarm_meas = mc(::Gas,E=1.,T=0.)
 ```
 
-where `E` is the applied electric field in Townsend units and `T` is the gas Temperature in Kelvin units.
+where `E` is the applied electric field in Townsend units and `T` is the gas Temperature in Kelvin units. `swarm_meas` contains common transport coefficients such as:
+
+- bε: mean energy in eV
+- bW: bulk drift velocity in m/s
+- bDl: bulk longnitude diffusion
+- bDt: bulk transverse diffusion
+
+```julia
+
+```
 
 ## Liquid Micro-Jet
 
@@ -31,3 +40,4 @@ Then run:
 ```julia
 meas, swarm = mc(model,gas)
 ```
+
