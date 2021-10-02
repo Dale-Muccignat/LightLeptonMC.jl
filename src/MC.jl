@@ -103,25 +103,25 @@ function eventCollision!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
 
     if cs_ind == 0
     elseif params.splat_gas.type[cs_ind] == :ELASTIC
-        elasticColl!(cs_ind,getRelVel(particle,model),particle,model,params,meas_inner,verbose)
+        elasticColl!(cs_ind,getRelVel(cs_ind,particle,model,params),particle,model,params,meas_inner,verbose)
     elseif params.splat_gas.type[cs_ind] == :EXCITATION
-        excitationColl!(cs_ind,getRelVel(particle,model),particle,model,params,meas_inner,verbose)
+        excitationColl!(cs_ind,getRelVel(cs_ind,particle,model,params),particle,model,params,meas_inner,verbose)
     elseif params.splat_gas.type[cs_ind] == :IONIZATION
-        ionisationColl!(cs_ind,model.ion_type,getRelVel(particle,model),particle,model,params,meas_inner,verbose)
+        ionisationColl!(cs_ind,model.ion_type,getRelVel(cs_ind,particle,model,params),particle,model,params,meas_inner,verbose)
     elseif params.splat_gas.type[cs_ind] == :ATTACHMENT
-        attachmentColl!(cs_ind,getRelVel(particle,model),particle,model,params,meas_inner,verbose)
+        attachmentColl!(cs_ind,getRelVel(cs_ind,particle,model,params),particle,model,params,meas_inner,verbose)
     end
 
     updateEbin!(particle,params)
 end
 
-function getRelVel(particle,model)
-    if model.T != 0.
-        # u, g = findu(particle,vars,consts,g,u,w,electron_v2eV) #TODO findu
+function getRelVel(cs_no,particle,model,params)
+    if model.T == 0.
+        g = copy(particle.v)
     else
-        # g = copy(particle.v)
+        g = findu(cs_no,particle,model,params) #TODO findu
     end
-    return g = copy(particle.v)
+    return g 
 end
 
 
@@ -408,6 +408,37 @@ function getCDt(particle,model,params,verbose)
     dt_coll = dt_EVENT(randexp()/(getTotalFreq(particle,model,params,verbose)*getDensity(particle,model.n0,params,verbose)*params.length_scale^3)::Float64,:dt_collision,:Up)
 end
 
+# * Temperature
+
+
+@fastmath function findu(cs_ind,particle,model,params)
+    #TODO: make generic function based on inputs
+	w = sqrt(2*k*model.T.val/params.splat_gas.m[cs_ind])
+    v = particle.v*params.length_scale/params.time_scale
+
+	he = electron_v2eV * (norm(v) + 5. *w)^2 
+	le = max( 1e-25 , electron_v2eV * (norm(v) - 5. *w).^2 )
+
+    #TODO: get actual CF from CS
+	@inbounds hcf = params.splat_gas.cs[cs_ind](he) * sqrt(he/electron_v2eV)
+	@inbounds lcf = params.splat_gas.cs[cs_ind](le) * sqrt(le/electron_v2eV)
+
+
+    g = copy(particle.v)
+	mcf = max(hcf,lcf)
+	while true
+		# usually it only goes through one while loop iteration
+		u = SArray{Tuple{3},Float64,1,3}(randn(3))*w./sqrt(2.) # could only run this
+		g = particle.v .- u
+		eg = electron_v2eV * dot(g,g) 
+		@inbounds ccf = params.splat_gas.cs[cs_ind](eg) *norm(g)
+
+		if rand() < ccf/mcf
+			break
+		end
+	end
+	return g
+end
 
 
 end
