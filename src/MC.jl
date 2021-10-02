@@ -28,7 +28,7 @@ end
 
 
 function flight(particle,model,params,verbose)
-    meas = initMeas(model,params)
+    meas_inner = initMeas(model,params)
 
     alive = true
     while alive
@@ -41,7 +41,7 @@ function flight(particle,model,params,verbose)
 
         updateParticle!(dt.time,particle,model.En0,model.n0,params,verbose)
 
-        event!(dt,particle,model,params,meas,verbose)
+        event!(dt,particle,model,params,meas_inner,verbose)
 
         verbose && @info "Particle energy after: " getEnergy(particle.v)/params.energy_scale
         # if verbose @info "Particle velocity after: " particle.v end
@@ -49,7 +49,7 @@ function flight(particle,model,params,verbose)
 
         alive = checkAlive(model.type,particle,model,params,verbose)
     end
-    return meas
+    return meas_inner
 end
 
 function checkAlive(type::SWARM,particle,model,params,verbose)
@@ -65,55 +65,56 @@ function checkAlive(type::LμJ,particle,model,params,verbose)
     particle.rbin != length(params.rbins) && getEnergy(particle.v) > type.thresh*params.energy_scale
 end
 
-function event!(dt,particle,model,params,meas,verbose)
+function event!(dt,particle,model,params,meas_inner,verbose)
     verbose && @info "==================================="
     if dt.type == :dt_collision
         verbose && @info "Collision"
-        eventCollision!(dt,particle,model,params,meas,verbose)
+        eventCollision!(dt,particle,model,params,meas_inner,verbose)
     elseif dt.type == :dt_energy
         verbose && @info "Energy"
-        eventEnergy!(dt,particle,model,params,meas,verbose)
+        eventEnergy!(dt,particle,model,params,meas_inner,verbose)
     elseif dt.type == :dt_tbin
         verbose && @info "TBin"
-        eventTbin!(dt,particle,model,params,meas,verbose)
+        eventTbin!(dt,particle,model,params,meas_inner,verbose)
     elseif dt.type == :dt_rbin
         verbose && @info "RBin"
-        eventRBin!(dt,particle,model,params,meas,verbose)
+        eventRBin!(dt,particle,model,params,meas_inner,verbose)
     else
         
     end
 end
 
 #### * TBins Measurements
-function eventTbin!(dt,particle,model,params,meas,verbose)
-    @inbounds @. meas.meast.v²[particle.tbin,:] += particle.v^2 * particle.weight
-    @inbounds @. meas.meast.r²[particle.tbin,:] += particle.r^2 * particle.weight
-    @inbounds @. meas.meast.r[particle.tbin,:] += particle.r * particle.weight
-    @inbounds @. meas.meast.v[particle.tbin,:] += particle.v * particle.weight
-    @inbounds @. meas.meast.rv[particle.tbin,:] += particle.v * particle.r * particle.weight
-    @inbounds meas.meast.w[particle.tbin] += particle.weight
-    @inbounds meas.meast.εᵢ[particle.tbin] += dot(particle.v,particle.v) * particle.weight
+function eventTbin!(dt,particle,model,params,meas_inner,verbose)
+    @inbounds @. meas_inner.meast.v²[particle.tbin,:] += particle.v^2 * particle.weight
+    @inbounds @. meas_inner.meast.r²[particle.tbin,:] += particle.r^2 * particle.weight
+    @inbounds @. meas_inner.meast.r[particle.tbin,:] += particle.r * particle.weight
+    @inbounds @. meas_inner.meast.v[particle.tbin,:] += particle.v * particle.weight
+    @inbounds @. meas_inner.meast.rv[particle.tbin,:] += particle.v * particle.r * particle.weight
+    @inbounds meas_inner.meast.w[particle.tbin] += particle.weight
+    @inbounds meas_inner.meast.εᵢ[particle.tbin] += dot(particle.v,particle.v) * particle.weight
     particle.tbin += 1
 end
 
 
 #### * Collisions
 
-function eventCollision!(dt::dt_EVENT,particle,model,params,meas,verbose)
+function eventCollision!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
     verbose && @info "Energy Bin collision: " dt
-    coll_type, thresh = getCollType(particle,model,params,verbose)
+    coll_type, thresh, mass = getCollType(particle,model,params,verbose)
 
     verbose && @info coll_type
 
     verbose && @info "Energy Before: " getEnergy(particle.v)/params.energy_scale
     if coll_type == :Null
     elseif coll_type == :ELASTIC
-        elasticColl!(getRelVel(particle,model),particle,model,params,meas,verbose)
+        elasticColl!(mass,getRelVel(particle,model),particle,model,params,meas_inner,verbose)
     elseif coll_type == :EXCITATION
-        excitationColl!(thresh,getRelVel(particle,model),particle,model,params,meas,verbose)
+        excitationColl!(mass,thresh,getRelVel(particle,model),particle,model,params,meas_inner,verbose)
     elseif coll_type == :IONIZATION
-        ionisationColl!(thresh,model.ion_type,getRelVel(particle,model),particle,model,params,meas,verbose)
+        ionisationColl!(mass,thresh,model.ion_type,getRelVel(particle,model),particle,model,params,meas_inner,verbose)
     elseif coll_type == :ATTACHMENT
+        attachmentColl!(mass,thresh,model.ion_type,getRelVel(particle,model),particle,model,params,meas_inner,verbose)
     end
     verbose && @info "Energy After: " getEnergy(particle.v)/params.energy_scale
 
@@ -135,44 +136,43 @@ function getCollType(particle,model,params,verbose)
     CS = 0.
     en = getEnergy(particle.v)/params.energy_scale
 
-    for (cs,type,thresh) in params.splat_gas
-        CS += cs(en)*1e-20 * sqrt(2*q*en/me) /params.time_scale
+    for (cs,type,thresh,mass,w) in params.splat_gas
+        CS += cs(en)*1e-20 * w * sqrt(2*q*en/me) /params.time_scale
         # @info cs(en)*1e-20 * sqrt(2*q*en/me) /params.time_scale
         # @info getTotalFreq(particle,model,params,verbose)
         if R < CS/getTotalFreq(particle,model,params,verbose)
-            return type, thresh
+            return type, thresh, mass
         end
     end
-    return :Null, 0.
+    return :Null, 0. , 0.
 end
 
-function elasticColl!(g,particle,model,params,meas,verbose)
+function elasticColl!(n0,g,particle,model,params,meas_inner,verbose)
     coschi, sinchi, phi = scatteringAngle(g,particle,model,params,verbose)
     v2 = sqrt(dot(g,g)) * SArray{Tuple{3},Float64,1,3}(cos(phi)*sinchi,sin(phi)*sinchi,coschi)
     v2 = shift(v2,g)
-    v2 = (me*particle.v + params.gas.Mₑₗ[1]*amu * (g-particle.v + v2)) /(me + params.gas.Mₑₗ[1]*amu)
-    meas.measg.coschi += dot(particle.v,v2)/(norm(v2)*norm(particle.v))
-    meas.measg.coll_count.elastic += 1
-    # meas.no_elas += 1
+    v2 = (me*particle.v + n0*amu * (g-particle.v + v2)) /(me + n0*amu)
+    meas_inner.measg.coschi += dot(particle.v,v2)/(norm(v2)*norm(particle.v))
+    meas_inner.measg.coll_count.elastic += 1
+    # meas_inner.no_elas += 1
     particle.v = v2
 end
 
-function excitationColl!(thresh,g,particle,model,params,meas,verbose)
-    #TODO: Add Thresholds to cross sections
+function excitationColl!(n0,thresh,g,particle,model,params,meas_inner,verbose)
 
     if dot(g,g)-2*thresh/me > 0.
         coschi, sinchi, phi = scatteringAngle(g,particle,model,params,verbose)
         v2 = sqrt(dot(g,g)-2*thresh/me) * SArray{Tuple{3},Float64,1,3}(cos(phi)*sinchi,sin(phi)*sinchi,coschi)
         v2 = shift(v2,g)
-        v2 = (me*particle.v + params.gas.Mₑₗ[1]*amu * (g-particle.v + v2)) /(me + params.gas.Mₑₗ[1]*amu)
-        meas.measg.coschi += dot(particle.v,v2)/(norm(v2)*norm(particle.v))
-        meas.measg.coll_count.excitation += 1
+        v2 = (me*particle.v + n0*amu * (g-particle.v + v2)) /(me + n0*amu)
+        meas_inner.measg.coschi += dot(particle.v,v2)/(norm(v2)*norm(particle.v))
+        meas_inner.measg.coll_count.excitation += 1
         particle.v = v2
     end
     
 end
 
-function ionisationColl!(thresh,ion_type,g,particle,model,params,meas,verbose)
+function ionisationColl!(thresh,ion_type,g,particle,model,params,meas_inner,verbose)
 
     part_energy, other_part_energy = getIonisationEnergy(thresh,ion_type,g)
 
@@ -180,11 +180,11 @@ function ionisationColl!(thresh,ion_type,g,particle,model,params,meas,verbose)
 
     v2 = sqrt(2*part_energy/me) * SArray{Tuple{3},Float64,1,3}(cos(phi)*sinchi,sin(phi)*sinchi,coschi)
     v2 = shift(v2,g)
-    v2 = (me*particle.v + params.gas.Mₑₗ[1]*amu * (g-particle.v + v2)) /(me + params.gas.Mₑₗ[1]*amu)
+    v2 = (me*particle.v + n0*amu * (g-particle.v + v2)) /(me + n0*amu)
 
     particle.weight *= 2.
-    meas.measg.coschi += dot(particle.v,v2)/(norm(v2)*norm(particle.v))
-    meas.measg.coll_count.ionisation += 1
+    meas_inner.measg.coschi += dot(particle.v,v2)/(norm(v2)*norm(particle.v))
+    meas_inner.measg.coll_count.ionisation += 1
     particle.v = v2
 end
 
@@ -205,6 +205,9 @@ function getIonisationEnergy(thresh,ion_type::RatioIonisation,g)
     return part_energy, other_part_energy
 end
 
+function attachmentColl!(mass,thresh,g,particle,model,params,meas_inner,verbose)
+    particle.weight /= 2.
+end
 
 function updateEbin!(particle,params)
     ea = getEnergy(particle.v)
@@ -323,7 +326,7 @@ end
         return dt_EVENT(down,:dt_rbin,:Down)
     end
 end
-function eventEnergy!(dt::dt_EVENT,particle,model,params,meas,verbose)
+function eventEnergy!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
     verbose && @info "Energy Bin Change: " dt
     if dt.direction == :Up
         particle.ebin += 1
@@ -332,7 +335,7 @@ function eventEnergy!(dt::dt_EVENT,particle,model,params,meas,verbose)
     end
 end
 
-function eventRBin!(dt::dt_EVENT,particle,model,params,meas,verbose)
+function eventRBin!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
     verbose && @info "RBin Bin Change: " dt
     if dt.direction == :Up
         particle.rbin += 1
@@ -341,7 +344,7 @@ function eventRBin!(dt::dt_EVENT,particle,model,params,meas,verbose)
     end
 
     if particle.rbin == length(params.rbins)
-        meas.measLμJ.EELS[findMinInd(params.ebinsLμJ,getEnergy(particle.v))] += particle.weight
+        meas_inner.measLμJ.EELS[findMinInd(params.ebinsLμJ,getEnergy(particle.v))] += particle.weight
     end
     
 end
@@ -354,7 +357,6 @@ end
 
 @xport function updateParticle!(dt,particle,En0,n0::LμJDensity,params,verbose)
     particle.r += particle.v * dt
-    verbose && @info particle.r
     particle.t += dt
 end
 
@@ -407,7 +409,6 @@ function findMinTime(times;verbose)
 end
 
 function getCDt(particle,model,params,verbose)
-    # dt_coll = dt_EVENT(randexp()/(getTotalFreq(particle,model,params,verbose)*getDensity(particle,model.n0,params,verbose)*sqrt(2*params.ebins[particle.ebin+1]*q/me)*params.length_scale^2)::Float64,:dt_collision,:Up)
     dt_coll = dt_EVENT(randexp()/(getTotalFreq(particle,model,params,verbose)*getDensity(particle,model.n0,params,verbose)*params.length_scale^3)::Float64,:dt_collision,:Up)
 end
 

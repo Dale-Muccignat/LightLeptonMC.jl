@@ -140,21 +140,22 @@ function buildFreq(model,gas,ebins,energy_scale)
     total_freq = zeros(length(ebins))
     en_spacing = ebins[end]-ebins[end-1]
     for i in 1:length(total_freq)-1
-        total_freq[i] = maximum([sum([cs(en)*sqrt(2*en*q/me) for (cs,type,thresh) in gas]) for en in LinRange(ebins[i]+0.000001,ebins[i+1],1000)])*1e-20
+        total_freq[i] = maximum([sum([cs(en)*sqrt(2*en*q/me)*w for (cs,type,thresh,mass,w) in gas]) for en in LinRange(ebins[i]+0.000001,ebins[i+1],1000)])*1e-20
         # total_freq[i] = maximum([sum([cs(en) for (cs,type,thresh) in gas]) for en in LinRange(ebins[i]+0.000001,ebins[i+1],1000)])*1e-20
         #NOTE: This is no longer a frequency
     end
-    total_freq[end] = maximum([sum([cs(en)*sqrt(2*en*q/me) for (cs,type,thresh) in gas]) for en in LinRange(ebins[end],ebins[end]+en_spacing,1000)])*1e-20
+    total_freq[end] = maximum([sum([cs(en)*sqrt(2*en*q/me)*w for (cs,type,thresh,mass,w) in gas]) for en in LinRange(ebins[end],ebins[end]+en_spacing,1000)])*1e-20
     return total_freq
 end
 
 @xport function splatCS(gas,energy_scale)
     gases = (gas.elastic...,gas.excitation...,gas.ionisation...,gas.attachment...)
     types = ([:ELASTIC for i in 1:length(gas.elastic)]...,[:EXCITATION for i in 1:length(gas.excitation)]...,[:IONIZATION for i in 1:length(gas.ionisation)]...,[:ATTACHMENT for i in 1:length(gas.attachment)]...)
-    threshes = ([0. for thresh in gas.elastic]...,[thresh for thresh in gas.exlosses]...,[thresh for thresh in gas.iolosses]...).*energy_scale .*q
-    @show threshes
+    threshes = ([0. for thresh in gas.elastic]...,[thresh for thresh in gas.exlosses]...,[thresh for thresh in gas.iolosses]...,[0. for thresh in gas.attachment]...).*energy_scale .*q
+    masses = ([m for m in gas.Mₑₗ]...,[m for m in gas.Mₑₓ]...,[m for m in gas.Mₐₜ]...,[m for m in gas.Mᵢₒ]...)
+    ws = ([w for w in gas.wₑₗ]...,[w for w in gas.wₑₓ]...,[w for w in gas.wₐₜ]...,[w for w in gas.wᵢₒ]...)
 
-    zip(gases,types,threshes)
+    zip(gases,types,threshes,masses,ws)
 end
 
 #### * RBins

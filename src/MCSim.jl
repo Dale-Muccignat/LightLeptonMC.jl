@@ -46,20 +46,26 @@ include("MC.jl")
 include("Measurements.jl")
 @reexport using .Measurements
 
+function mc(gas::Gas;S=0.,E=1.,T=0.,N=1000,verbose=false)
+    model = MCMODEL(n=N,En0=UniformField(1.),T=UniformTemp(0.),v_0=InitVelocity(S,[0,0,1]))
+    mc(model,initParams(model.type,gas,model),verbose=verbose)
+end
+
+
 function mc(model=MCMODEL(),params=initParams(MCMODEL());verbose=false)
 
-    meas = initMeas(model,params)
+    # meas = initMeas(model,params)
     scale!(params)
 
     # @show params.rbins
     # meas = @distributed (+) for n in 1:model.n
-    for n in 1:model.n
+    meas = @distributed (+) for n in 1:model.n
 
         if n%(model.n*0.1) == 0.
             @info "Progress: "*string(100*n/model.n)*"%"
         end
 
-        meas += flight(PART(model.type,model,params),model,params,verbose)
+        flight(PART(model.type,model,params),model,params,verbose)
     end
     # @show params.rbins
     unscale!(params)
@@ -85,6 +91,7 @@ end
 Base.:+(x::Nothing,y::Nothing) = nothing
 Base.:*(x::Nothing,y::Float64) = nothing
 Base.:/(x::Nothing,y::Float64) = nothing
+Base.:+(x::SWARMMEAS,y::SWARMMEAS) = GenericAddition(x,y)::SWARMMEAS
 Base.:+(x::MEAST,y::MEAST) = GenericAddition(x,y)::MEAST
 Base.:+(x::MEASLμJ,y::MEASLμJ) = GenericAddition(x,y)::MEASLμJ
 Base.:+(x::MEASC,y::MEASC) = GenericAddition(x,y)::MEASC
