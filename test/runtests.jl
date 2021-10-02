@@ -1,7 +1,7 @@
 using MCSim, FVB
 using Test
 
-N = 1000
+N = 10000
 @testset "MCSim.jl" begin
     @testset "Maxwell" begin
         meas, swarm = mc(MaxwellModel(),E=1.,T=0.,N=N)
