@@ -1,4 +1,4 @@
 language: julia
-rvm:
+julia:
   - 1.6.2
   - nightly
