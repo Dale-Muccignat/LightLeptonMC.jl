@@ -143,7 +143,7 @@ end
     return 0
 end end
 
-function elasticColl!(cs_no,g,particle,model,params,meas_inner,verbose)
+@fastmath function elasticColl!(cs_no,g,particle,model,params,meas_inner,verbose)
     coschi, sinchi, phi = scatteringAngle(g,particle,model,params,verbose)
     v2 = sqrt(dot(g,g)) * SArray{Tuple{3},Float64,1,3}(cos(phi)*sinchi,sin(phi)*sinchi,coschi)
     v2 = shift(v2,g)
@@ -154,7 +154,7 @@ function elasticColl!(cs_no,g,particle,model,params,meas_inner,verbose)
     particle.v = v2
 end
 
-function excitationColl!(cs_no,g,particle,model,params,meas_inner,verbose)
+@fastmath function excitationColl!(cs_no,g,particle,model,params,meas_inner,verbose)
 
     if dot(g,g)-2*params.splat_gas.thresh[cs_no]/me > 0.
         coschi, sinchi, phi = scatteringAngle(g,particle,model,params,verbose)
@@ -168,7 +168,7 @@ function excitationColl!(cs_no,g,particle,model,params,meas_inner,verbose)
     
 end
 
-function ionisationColl!(cs_no,ion_type,g,particle,model,params,meas_inner,verbose)
+@fastmath function ionisationColl!(cs_no,ion_type,g,particle,model,params,meas_inner,verbose)
 
     part_energy, other_part_energy = getIonisationEnergy(params.splat_gas.thresh[cs_no],ion_type,g)
 
@@ -264,7 +264,7 @@ function getDtEBinsPos(En0::UniformField,n0::UniformDensity,particle,model,param
     return dt_ENERGY(Inf, Up())
 end
 
-@xport function getRDt(particle,params)
+@fastmath function getRDt(particle,params)
 	#NOTE: Only for fields of 0
     p = particle.r
     v = particle.v
@@ -345,13 +345,13 @@ function eventRBin!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
     
 end
 
-@xport function updateParticle!(dt,particle,En0::UniformField,n0::UniformDensity,params,verbose)
+@xport @fastmath function updateParticle!(dt,particle,En0::UniformField,n0::UniformDensity,params,verbose)
     particle.r += (particle.v + 0.5 * params.a * params.n0 * dt)*dt
     particle.v += params.a * params.n0 * dt
     particle.t += dt
 end
 
-@xport function updateParticle!(dt,particle,En0,n0::LμJDensity,params,verbose)
+@xport @fastmath function updateParticle!(dt,particle,En0,n0::LμJDensity,params,verbose)
     particle.r += particle.v * dt
     particle.t += dt
 end

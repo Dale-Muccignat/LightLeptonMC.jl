@@ -3,29 +3,13 @@ MCSim
 
 This package takes gases from Gases.jl and performs a Monte Carlo simulation in either a swarm or LμJ configuration. An example workflow is included below.
 
-First, initilise the chosen model:
-
 ```
-    MCMODEL()                                      # creates a default swarm configuration
-    MCMODEL(type={SWARM(),LμJ()},v_0,r_0,n0,En0)   # creates a custom configuration
-```
+    `mc(::Gas;E,T,verbose)`
 
-Then, initilise the params object with the chose Gas:
-
-```
-    MCPARAMS()                                     # creates parameters with a Maxwell gas
-    MCPARAMS({SWARM,LμJ},::Gas,::MCMODEL)          # creates custom parameters with a gas from Gases.jl
-```
-
-Finally, run the Monte Carlo simulation:
-
-```
-    mc(::MCMODEL,::MCPARAMS)                       # runs a Monte Carlo simluation using the provided model and configuration
 ```
 
 """
 module MCSim
-
 #TODO: Add Attachment, super-eleastic, liquid
 #TODO: Add Potential
 #TODO: Add Density Gradient (this is probably best solved through Danny's code though)
