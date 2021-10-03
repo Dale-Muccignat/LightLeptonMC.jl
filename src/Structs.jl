@@ -30,7 +30,7 @@ end
     val::AUTO = 1.
 end
 @xport @AutoParm struct UniformTemp <: Temp
-    val::AUTO = 1.
+    val::AUTO = 0.
 end
 
 abstract type Ionisation end
@@ -192,10 +192,14 @@ end
 end
 
 @AutoParm @xport mutable struct SWARMMEAS
-    bε::Float64 = 0.
+    ε::Float64 = 0.
+    εs::Vector{Float64} = 0.
     bW::Float64 = 0.
+    bWs::Vector{Float64} = 0.
     bDt::Float64 = 0.
+    bDts::Vector{Float64} = 0.
     bDl::Float64 = 0.
+    bDls::Vector{Float64} = 0.
 end
 
 @fastmath function findMinInd(x::Array{Float64,1},y::Float64)::Int64

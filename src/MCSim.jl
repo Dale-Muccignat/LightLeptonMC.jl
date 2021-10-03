@@ -36,12 +36,12 @@ function mc(gas::Gas;S=0.,E=1.,T=0.,N=1000,verbose=false)
 end
 
 function mc(model::MCMODEL,gas::Gas;verbose=false)
-    mc(model,initParams(model.type,gas,model))
+    mc(model,initParams(model.type,gas,model),verbose=verbose)
 end
 
 function mc(model=MCMODEL(),params=initParams(MCMODEL());verbose=false)
 
-    # meas = initMeas(model,params)
+    meas = initMeas(model,params)
     scale!(params)
 
     # @show params.rbins
@@ -52,12 +52,13 @@ function mc(model=MCMODEL(),params=initParams(MCMODEL());verbose=false)
             @info "Progress: "*string(100*n/model.n)*"%"
         end
 
-        flight(PART(model.type,model,params),model,params,verbose)
+        meas_inner = flight(PART(model.type,model,params),model,params,verbose)
+        [meas_inner]
     end
     # @show params.rbins
     unscale!(params)
-    unscale!(model.type,params,meas)
-    return process(model.type,meas,params,model);
+    unscale!(model.type,params,meas[1])
+    return process(model.type,meas[1],params,model);
     
 
 end

@@ -261,7 +261,7 @@ function getDtEBinsPos(En0::UniformField,n0::UniformDensity,particle,model,param
 		#same as before except with the lower boundry of the next bin up
 		return dt_EVENT(-(particle.v[3]-vf_z) /(params.a[3] * params.n0), :dt_energy,:Up)
 	end
-    return dt_ENERGY(Inf, Up())
+    return dt_ENERGY(Inf, :dt_energy, Up())
 end
 
 @fastmath function getRDt(particle,params)

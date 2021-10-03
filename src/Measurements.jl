@@ -34,20 +34,20 @@ end
 
 function swarmMeasurements(meas,params,model)
 
-    bεs = []
+    εs = []
     bWs = []
     bDts = []
     bDls = []
     bins = length(meas.meast.w[end÷2:end])
     for i in length(meas.meast.w)-bins:length(meas.meast.w)
-        push!(bεs,meas.meast.εᵢ[i])
+        push!(εs,meas.meast.εᵢ[i])
         push!(bWs,(meas.meast.r[i,3]-meas.meast.r[i-1,3])/params.tbins[2])
 
 		push!(bDls, (1/2 * ( (meas.meast.r²[i,3] - meas.meast.r[i,3]^2) - (meas.meast.r²[i-1,3] - meas.meast.r[i-1,3]^2) )) / (params.tbins[2]))
 		push!(bDts, (1/4 * ( (meas.meast.r²[i,2] + meas.meast.r²[i,1]) - (meas.meast.r²[i-1,2] + meas.meast.r²[i-1,1]) )) / (params.tbins[2]))
     end
 
-    SWARMMEAS(mean(bεs),mean(bWs),mean(bDts)*params.n0,mean(bDls)*params.n0)
+    SWARMMEAS(mean(εs),εs,mean(bWs),bWs,mean(bDts)*params.n0,bDts.*params.n0,mean(bDls)*params.n0,bDls.*params.n0)
 end
 
 

@@ -24,7 +24,7 @@ end
 function initParams(type::SWARM,input_gas=MaxwellModel,model::MCMODEL=MCMODEL())
 
     ebins = [0.,(10. .^(-3:0.1:2.))...]
-    tbins = collect(LinRange(0,type.t_f,100))
+    tbins = collect(LinRange(0,type.t_f,1000))
     n0=buildDensity(model.n0,tbins)
     a=buildField(model.En0)
 
