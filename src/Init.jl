@@ -122,7 +122,7 @@ function initParams(type::LμJ,input_gas,model::MCMODEL=MCMODEL())
 
     params = MCPARAMS(
         ebins=ebins,
-        ebinsLμJ=collect(model.type.thresh:model.type.Δε_detector:(model.v_0.ε+5.)),
+        ebinsLμJ=collect(model.type.thresh:model.type.Δε_detector:(model.v_0.ε+model.type.Δε_detector)),
         gas=input_gas,
         splat_gas=splat_gas,
         rbins=rbins,

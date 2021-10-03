@@ -14,7 +14,7 @@ module MCSim
 #TODO: Add Potential
 #TODO: Add Density Gradient (this is probably best solved through Danny's code though)
 
-using Reexport, Distributed
+using Reexport, Distributed, JLD2, Dates
 @reexport using Gases
 export mc, MCINIT, MCPARAMS
 
@@ -30,6 +30,30 @@ include("MC.jl")
 include("Measurements.jl")
 @reexport using .Measurements
 
+macro jld2save(filename, vars...)
+    # Copy paste
+    # writeexprs = Vector{Expr}(undef, length(vars))
+    # for i = 1:length(vars)
+    #     writeexprs[i] = :(JLD2.write(f, $(string(vars[i])), $(esc(vars[i])), wsession))
+    # end
+
+    JLD2 = esc(:JLD2)
+    writeexprs = map(vars) do var
+        :($JLD2.write(f, $(string(var)), $(esc(var)), wsession))
+    end
+
+    quote
+        if !isdefined(@__MODULE__, :JLD2)
+            error("Need to have the JLD2 module included for this to work.")
+        end
+
+        $JLD2.jldopen($(esc(filename)), true, true, true, Base.IOStream) do f
+            wsession = $JLD2.JLDWriteSession()
+            $(Expr(:block, writeexprs...))
+        end
+    end
+end
+
 function mc(gas::Gas;S=0.,E=1.,T=0.,N=1000,verbose=false)
     model = MCMODEL(n=N,En0=UniformField(1.),T=UniformTemp(0.),v_0=InitVelocity(S,[0,0,1]))
     mc(model,initParams(model.type,gas,model),verbose=verbose)
@@ -38,6 +62,18 @@ end
 function mc(model::MCMODEL,gas::Gas;verbose=false)
     mc(model,initParams(model.type,gas,model),verbose=verbose)
 end
+
+function mc(model::MCMODEL,gases,indicies;verbose=false)
+    distribution_data = Dict() 
+    for i in indicies
+        params = initParams(model.type,gases[i],model)
+        meas, swarm = mc(model,params,verbose=verbose)
+        distribution_data[i] = (params.ebinsLμJ,meas.measLμJ.EELS)
+    end
+    saveBatch(distribution_data,model,indicies)
+    return distribution_data
+end
+
 
 function mc(model=MCMODEL(),params=initParams(MCMODEL());verbose=false)
 
@@ -87,6 +123,16 @@ Base.:+(x::MEASS,y::MEASS) = GenericAddition(x,y)::MEASS
 Base.:+(x::COLLCOUNT,y::COLLCOUNT) = GenericAddition(x,y)::COLLCOUNT
 function Base.:+(x::MEAS,y::MEAS)
     return MEAS(GenericAddition(x.measLμJ,y.measLμJ),GenericAddition(x.measg,y.measg),GenericAddition(x.meast,y.meast),GenericAddition(x.meass,y.meass),GenericAddition(x.measc,y.measc))
+end
+
+function saveBatch(dists,model,indicies)
+    i = indicies[1]
+    en = model.v_0.ε
+    n = model.n
+    filename = "ML/"*"$en"*"eV/"*"$en"*"_no"*"$n"*"_#"*"$i"*"_" * string(Dates.today()) * "_" * string(Dates.hour(now())) * "-" * string(Dates.minute(now())) * "-" * string(Dates.second(now())) * "-" * string(Dates.millisecond(now()))
+    @jld2save filename*"TEMP"*".jld2" dists
+    cp(filename*"TEMP"*".jld2",filename*".jld2")
+    rm(filename*"TEMP"*".jld2")
 end
 
 
