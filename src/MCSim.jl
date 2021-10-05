@@ -55,7 +55,7 @@ macro jld2save(filename, vars...)
 end
 
 function mc(gas::Gas;S=0.,E=1.,T=0.,N=1000,verbose=false)
-    model = MCMODEL(n=N,En0=UniformField(1.),T=UniformTemp(0.),v_0=InitVelocity(S,[0,0,1]))
+    model = MCMODEL(n=N,En0=UniformField(E),T=UniformTemp(T),v_0=InitVelocity(S,[0,0,1]))
     mc(model,initParams(model.type,gas,model),verbose=verbose)
 end
 
@@ -63,14 +63,24 @@ function mc(model::MCMODEL,gas::Gas;verbose=false)
     mc(model,initParams(model.type,gas,model),verbose=verbose)
 end
 
-function mc(model::MCMODEL,gases,indicies;verbose=false)
+function mc(model::MCMODEL,gases,indicies;verbose=false,w=1.0,ref_gas=MaxwellModel(),save=false)
     distribution_data = Dict() 
+    @info "Batch: " indicies[1]
     for i in indicies
-        params = initParams(model.type,gases[i],model)
+        @info "Number: " i
+        if w == 1.
+            params = initParams(model.type,gases[i],model)
+        else
+            params = initParams(model.type,gases[i]*w + ref_gas*(1 .-w),model)
+        end
+        
         meas, swarm = mc(model,params,verbose=verbose)
         distribution_data[i] = (params.ebinsLμJ,meas.measLμJ.EELS)
     end
-    saveBatch(distribution_data,model,indicies)
+    if save
+        saveBatch(distribution_data,model,indicies,w)
+    end
+    
     return distribution_data
 end
 
@@ -125,11 +135,12 @@ function Base.:+(x::MEAS,y::MEAS)
     return MEAS(GenericAddition(x.measLμJ,y.measLμJ),GenericAddition(x.measg,y.measg),GenericAddition(x.meast,y.meast),GenericAddition(x.meass,y.meass),GenericAddition(x.measc,y.measc))
 end
 
-function saveBatch(dists,model,indicies)
+function saveBatch(dists,model,indicies,w)
     i = indicies[1]
+    j = indicies[end]
     en = model.v_0.ε
     n = model.n
-    filename = "ML/"*"$en"*"eV/"*"$en"*"_no"*"$n"*"_#"*"$i"*"_" * string(Dates.today()) * "_" * string(Dates.hour(now())) * "-" * string(Dates.minute(now())) * "-" * string(Dates.second(now())) * "-" * string(Dates.millisecond(now()))
+    filename = "ML/"*"$w"*"/"*"$en"*"eV/"*"$en"*"_no"*"$n"*"_#"*"$i"*":"*"$j"*"_" * string(Dates.today()) * "_" * string(Dates.hour(now())) * "-" * string(Dates.minute(now())) * "-" * string(Dates.second(now())) * "-" * string(Dates.millisecond(now()))
     @jld2save filename*"TEMP"*".jld2" dists
     cp(filename*"TEMP"*".jld2",filename*".jld2")
     rm(filename*"TEMP"*".jld2")
