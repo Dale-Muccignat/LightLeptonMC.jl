@@ -1,7 +1,7 @@
 module Init
 
 using ..Structs
-using PhysicalConstants.CODATA2018, Unitful, LinearAlgebra, StaticArrays, AndExport, Gases, LXCatParser, AutoParameters
+using PhysicalConstants.CODATA2018, Unitful, LinearAlgebra, StaticArrays, AndExport, Gases, LXCatParser, AutoParameters, Interpolations
 
 export initParams, initMeas, PART, getEnergy
 
@@ -31,7 +31,7 @@ function initParams(type::SWARM,input_gas=MaxwellModel,model::MCMODEL=MCMODEL())
     length_scale = model.n0.val*1e-20
     time_scale = model.n0.val*1e-20*sqrt(2*q/me)
     energy_scale = (length_scale/time_scale)^2
-    splat_gas=splatCS(input_gas,energy_scale)
+    splat_gas=splatCS(input_gas,energy_scale,ebins)
     total_freq=buildFreq(model,splat_gas,ebins,energy_scale)
 
     params = MCPARAMS(
@@ -117,7 +117,7 @@ function initParams(type::LμJ,input_gas,model::MCMODEL=MCMODEL())
     time_scale = model.n0.val*1e-20*sqrt(2*q/me)
     energy_scale = (length_scale/time_scale)^2
 
-    splat_gas=splatCS(input_gas,energy_scale)
+    splat_gas=splatCS(input_gas,energy_scale,ebins)
     total_freq=buildFreq(model,splat_gas,ebins,energy_scale)
 
     params = MCPARAMS(
@@ -149,7 +149,7 @@ function buildFreq(model,gas,ebins,energy_scale)
     total_freq = zeros(length(ebins))
     en_spacing = ebins[end]-ebins[end-1]
     for i in 1:length(total_freq)-1
-        total_freq[i] = maximum([sum([gas.cs[i](en)*sqrt(2*en*q/me)*gas.w[i] for i in eachindex(gas.cs)]) for en in LinRange(ebins[i]+0.000001,ebins[i+1],1000)])*1e-20
+        total_freq[i] = maximum([sum([gas.cs[i](en)*sqrt(2*en*q/me)*gas.w[i] for i in eachindex(gas.cs)]) for en in LinRange(ebins[i]+1e-6,ebins[i+1],1000)])*1e-20
         # total_freq[i] = maximum([sum([cs(en) for (cs,type,thresh) in gas]) for en in LinRange(ebins[i]+0.000001,ebins[i+1],1000)])*1e-20
         #NOTE: This is no longer a frequency
     end
@@ -157,15 +157,22 @@ function buildFreq(model,gas,ebins,energy_scale)
     return total_freq
 end
 
-@xport function splatCS(gas,energy_scale)
+@xport function splatCS(gas,energy_scale,ebins)
     gases = [gas.elastic...,gas.excitation...,gas.ionisation...,gas.attachment...]
+    # Interpolation is slighty faster than the gases cross-section
+    en_spacing = ebins[end]-ebins[end-1]
+    gases_itp::Vector{Interpolations.Extrapolation{Float64, 1, ScaledInterpolation{Float64, 1, Interpolations.BSplineInterpolation{Float64, 1, Vector{Float64}, BSpline{Linear{Throw{OnGrid}}}, Tuple{Base.OneTo{Int64}}}, BSpline{Linear{Throw{OnGrid}}}, Tuple{StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}}}}, BSpline{Linear{Throw{OnGrid}}}, Flat{Nothing}}} = []
+    for gas in gases
+        push!(gases_itp, LinearInterpolation(1e-6:1e-4:(ebins[end]+en_spacing+1.),gas.(1e-6:1e-4:(ebins[end]+en_spacing+1.)),extrapolation_bc=Flat()))
+    end
+    
     types = [[:ELASTIC for i in 1:length(gas.elastic)]...,[:EXCITATION for i in 1:length(gas.excitation)]...,[:IONIZATION for i in 1:length(gas.ionisation)]...,[:ATTACHMENT for i in 1:length(gas.attachment)]...]
     threshes = [[0. for thresh in gas.elastic]...,[thresh for thresh in gas.exlosses]...,[thresh for thresh in gas.iolosses]...,[0. for thresh in gas.attachment]...].*energy_scale .*q
     masses = [[m for m in gas.Mₑₗ]...,[m for m in gas.Mₑₓ]...,[m for m in gas.Mₐₜ]...,[m for m in gas.Mᵢₒ]...] .* amu
     ws = [[w for w in gas.wₑₗ]...,[w for w in gas.wₑₓ]...,[w for w in gas.wₐₜ]...,[w for w in gas.wᵢₒ]...]
 
 
-    MCGAS(gases,types,threshes,masses,ws)
+    MCGAS(gases_itp,types,threshes,masses,ws)
 end
 
 #### * RBins
