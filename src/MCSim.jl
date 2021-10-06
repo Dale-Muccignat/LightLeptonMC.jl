@@ -1,10 +1,11 @@
 """
 MCSim
 
-This package takes gases from Gases.jl and performs a Monte Carlo simulation in either a swarm or LμJ configuration. An example workflow is included below.
+This package takes gases from Gases.jl and performs a Monte Carlo simulation in either a swarm or LμJ configuration. An example swarm simulation is included below.
 
-```
-    `mc(::Gas;E,T,verbose)`
+```julia
+    meas, swarm = mc(MaxwellModel();E=1.,T=0.,N=1000,S=0.,verbose=false)
+    mean, swarm = mc(model,gas)
 
 ```
 
@@ -16,6 +17,7 @@ module MCSim
 
 using Reexport, Distributed, JLD2, Dates
 @reexport using Gases
+@reexport using FVB
 export mc, MCINIT, MCPARAMS
 
 include("Structs.jl")
@@ -64,7 +66,7 @@ function mc(model::MCMODEL,gas::Gas;verbose=false)
 end
 
 function mc(model::MCMODEL,gases,indicies;verbose=false,w=1.0,ref_gas=MaxwellModel(),save=false)
-    distribution_data = Dict() 
+    distribution_data::Dict{Int64,Tuple{Vector{Float64},Vector{Float64}}} = Dict() 
     @info "Batch: " indicies[1]
     for i in indicies
         @info "Number: " i

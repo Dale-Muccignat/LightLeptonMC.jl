@@ -32,7 +32,7 @@ function flight(particle,model,params,verbose)
 
     alive = true
     while alive
-        verbose && @info "Particle energy before: " getEnergy(particle.v)/params.energy_scale
+        # verbose && @info "Particle energy before: " getEnergy(particle.v)/params.energy_scale
 
         dt = getDt(model.type,particle,model,params,verbose)
 
@@ -40,7 +40,7 @@ function flight(particle,model,params,verbose)
 
         event!(dt,particle,model,params,meas_inner,verbose)
 
-        verbose && @info "Particle energy after: " getEnergy(particle.v)/params.energy_scale
+        # verbose && @info "Particle energy after: " getEnergy(particle.v)/params.energy_scale
 
         alive = checkAlive(model.type,particle,model,params,verbose)
         # if verbose && meas_inner.measg.coll_count.elastic > 5 alive = false end
@@ -54,26 +54,29 @@ end
 
 function checkAlive(type::LμJ,particle,model,params,verbose)
 
-    if getEnergy(particle.v) < type.thresh*params.energy_scale
-        verbose && @info "Absorbed"
-    end
-    
+    # if getEnergy(particle.v) < type.thresh*params.energy_scale
+    #     verbose && @info "Absorbed"
+    # end
+
+    # if particle.rbin == length(params.rbins)
+    #     verbose && @info "Detected"
+    # end
     particle.rbin != length(params.rbins) && getEnergy(particle.v) > type.thresh*params.energy_scale
 end
 
 function event!(dt,particle,model,params,meas_inner,verbose)
-    verbose && @info "==================================="
+    # verbose && @info "==================================="
     if dt.type == :dt_collision
-        verbose && @info "Collision"
+        # verbose && @info "Collision"
         eventCollision!(dt,particle,model,params,meas_inner,verbose)
     elseif dt.type == :dt_energy
-        verbose && @info "Energy"
+        # verbose && @info "Energy"
         eventEnergy!(dt,particle,model,params,meas_inner,verbose)
     elseif dt.type == :dt_tbin
-        verbose && @info "TBin"
+        # verbose && @info "TBin"
         eventTbin!(dt,particle,model,params,meas_inner,verbose)
     elseif dt.type == :dt_rbin
-        verbose && @info "RBin"
+        # verbose && @info "RBin"
         eventRBin!(dt,particle,model,params,meas_inner,verbose)
     else
         
@@ -96,10 +99,10 @@ end
 #### * Collisions
 
 function eventCollision!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
-    verbose && @info "Energy Bin collision: " dt
+    # verbose && @info "Energy Bin collision: " dt
     cs_ind = getCollType(particle,model,params,verbose)
 
-    verbose && @info params.splat_gas.type[cs_ind]
+    # verbose && @info params.splat_gas.type[cs_ind]
 
     if cs_ind == 0
     elseif params.splat_gas.type[cs_ind] == :ELASTIC
@@ -116,10 +119,10 @@ function eventCollision!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
 end
 
 function getRelVel(cs_no,particle,model,params)
-    if model.T == 0.
+    if model.T.val == 0.
         g = copy(particle.v)
     else
-        g = findu(cs_no,particle,model,params) #TODO findu
+        g = findu(cs_no,particle,model,params)
     end
     return g 
 end
@@ -132,7 +135,7 @@ end
     v = sqrt(dot(particle.v,particle.v))/params.length_scale
 
     for cs_ind in eachindex(params.splat_gas.cs)
-        CS += params.splat_gas.cs[cs_ind](en)*1e-20 * params.splat_gas.w[cs_ind] * v
+        @inbounds CS += params.splat_gas.cs[cs_ind](en)*1e-20 * params.splat_gas.w[cs_ind] * v
         # @show CS
         # @show getTotalFreq(particle,model,params,verbose)
 
@@ -208,13 +211,14 @@ end
 function updateEbin!(particle,params)
     ea = getEnergy(particle.v)
 	while ea < params.ebins[particle.ebin]
-		# @show "no"
 		particle.ebin-= 1
 	end
-	while ea > params.ebins[particle.ebin+1]
-		# @show "no"
-		particle.ebin+= 1
-	end
+    if particle.ebin != length(params.ebins)
+        while ea > params.ebins[particle.ebin+1]
+            particle.ebin+= 1
+        end
+    end
+    
 end
 
 
@@ -323,7 +327,7 @@ end
     end
 end
 function eventEnergy!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
-    verbose && @info "Energy Bin Change: " dt
+    # verbose && @info "Energy Bin Change: " dt
     if dt.direction == :Up
         particle.ebin += 1
     elseif dt.direction == :Down
@@ -332,7 +336,7 @@ function eventEnergy!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
 end
 
 function eventRBin!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
-    verbose && @info "RBin Bin Change: " dt
+    # verbose && @info "RBin Bin Change: " dt
     if dt.direction == :Up
         particle.rbin += 1
     elseif dt.direction == :Down
@@ -370,29 +374,29 @@ end
 end
 
 @xport function getDt(type::SWARM,particle,model,params,verbose)
-    verbose && @info "Current time: " particle.t
+    # verbose && @info "Current time: " particle.t
     dt_coll = getCDt(particle,model,params,verbose)
     dt_energy = getDtEBinsPos(model.En0,model.n0,particle,model,params)
     dt_tbin = dt_EVENT(params.tbins[particle.tbin+1] - particle.t, :dt_tbin,:Up)
     dts = (dt_coll,dt_energy,dt_tbin)
-    verbose && @info dts
+    # verbose && @info dts
     dt_times = (dt_coll.time,dt_energy.time,dt_tbin.time)
     return dts[findMinTime(dt_times,verbose=verbose)]
 end
 
 @xport function getDt(type::LμJ,particle,model,params,verbose)
-    verbose && @info "Current time: " particle.t
+    # verbose && @info "Current time: " particle.t
     dt_coll = getCDt(particle,model,params,verbose)
     dt_rbin = getRDt(particle,params)
     dts = (dt_coll,dt_rbin)
-    verbose && @info dts
+    # verbose && @info dts
     dt_times = (dt_coll.time,dt_rbin.time)
     return dts[findMinTime(dt_times,verbose=verbose)]
 end
 
 function findMinTime(times;verbose)
 
-    verbose && @info times
+    # verbose && @info times
     dt = minimum(times)
     for i in 1:length(times)
         if dt == times[i]

@@ -1,8 +1,8 @@
-using MCSim, FVB 
+using MCSim
 using Test
 
 
-N = 10000
+N = 1000000
 tol = 0.01
 function withinTol(y,ŷ,tol=0.01)
     @test y - y*tol <= ŷ<= y+y*tol
