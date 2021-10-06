@@ -56,8 +56,8 @@ macro jld2save(filename, vars...)
     end
 end
 
-function mc(gas::Gas;S=0.,E=1.,T=0.,N=1000,verbose=false)
-    model = MCMODEL(n=N,En0=UniformField(E),T=UniformTemp(T),v_0=InitVelocity(S,[0,0,1]))
+function mc(gas::Gas;S=0.,E=1.,T=0.,N=1000,t=1e-5,verbose=false)
+    model = MCMODEL(type=SWARM(t),n=N,En0=UniformField(E),T=UniformTemp(T),v_0=InitVelocity(S,[0,0,1]))
     mc(model,initParams(model.type,gas,model),verbose=verbose)
 end
 
@@ -67,9 +67,9 @@ end
 
 function mc(model::MCMODEL,gases,indicies;verbose=false,w=1.0,ref_gas=MaxwellModel(),save=false)
     distribution_data::Dict{Int64,Tuple{Vector{Float64},Vector{Float64}}} = Dict() 
-    @info "Batch: " indicies[1]
+    # @info "Batch: " indicies[1]
     for i in indicies
-        @info "Number: " i
+        # @info "Number: " i
         if w == 1.
             params = initParams(model.type,gases[i],model)
         else
@@ -96,9 +96,9 @@ function mc(model=MCMODEL(),params=initParams(MCMODEL());verbose=false)
     # meas = @distributed (+) for n in 1:model.n
     meas = @distributed (+) for n in 1:model.n
 
-        if n%(model.n*0.1) == 0.
-            @info "Progress: "*string(100*n/model.n)*"%"
-        end
+        # if n%(model.n*0.1) == 0.
+            # @info "Progress: "*string(100*n/model.n)*"%"
+        # end
 
         meas_inner = flight(PART(model.type,model,params),model,params,verbose)
         [meas_inner]
