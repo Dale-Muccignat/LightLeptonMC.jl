@@ -18,7 +18,7 @@ module MCSim
 using Reexport, Distributed, JLD2, Dates
 @reexport using Gases
 @reexport using FVB
-export mc, MCINIT, MCPARAMS
+export mc, MCINIT, MCPARAMS, saveBatch
 
 include("Structs.jl")
 @reexport using .Structs
