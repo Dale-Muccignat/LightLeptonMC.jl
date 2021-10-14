@@ -6,7 +6,6 @@ This package takes gases from Gases.jl and performs a Monte Carlo simulation in 
 ```julia
     meas, swarm = mc(MaxwellModel();E=1.,T=0.,N=1000,S=0.,verbose=false)
     mean, swarm = mc(model,gas)
-
 ```
 
 """
@@ -18,7 +17,7 @@ module MCSim
 using Reexport, Distributed, JLD2, Dates
 @reexport using Gases
 @reexport using FVB
-export mc, MCINIT, MCPARAMS, saveBatch
+export mc, MCINIT, MCPARAMS, saveBatch, saveDist
 
 include("Structs.jl")
 @reexport using .Structs
@@ -76,7 +75,7 @@ function mc(model::MCMODEL,gases,indicies;verbose=false,w=1.0,ref_gas=MaxwellMod
             params = initParams(model.type,gases[i]*w + ref_gas*(1 .-w),model)
         end
         
-        meas, swarm = mc(model,params,verbose=verbose)
+        meas, swarm, params= mc(model,params,verbose=verbose)
         distribution_data[i] = (params.ebinsLμJ,meas.measLμJ.EELS)
     end
     if save
@@ -106,7 +105,7 @@ function mc(model=MCMODEL(),params=initParams(MCMODEL());verbose=false)
     # @show params.rbins
     unscale!(params)
     unscale!(model.type,params,meas[1])
-    return process(model.type,meas[1],params,model);
+    return process(model.type,meas[1],params,model)..., params;
     
 
 end
@@ -148,5 +147,15 @@ function saveBatch(dists,model,indicies,w)
     rm(filename*"TEMP"*".jld2")
 end
 
+function saveDist(name,model,params,meas)
+    en = model.v_0.ε
+    n = model.n
+    ebins = params.ebinsLμJ
+    dist = meas.measLμJ.EELS
+    filename = "$name"*"_"*"$en"*"_no"*"$n"*"_" * string(Dates.today()) * "_" * string(Dates.hour(now())) * "-" * string(Dates.minute(now())) * "-" * string(Dates.second(now())) * "-" * string(Dates.millisecond(now()))
+    @jld2save filename*"TEMP"*".jld2" dist ebins
+    cp(filename*"TEMP"*".jld2",filename*".jld2")
+    rm(filename*"TEMP"*".jld2")
+end
 
 end
