@@ -145,6 +145,7 @@ end
 
 @xport @AutoParm mutable struct MEASLμJ
     EELS::AUTO = nothing
+    zy_bins::AUTO = nothing
 end
 
 function MEASLμJ(model::MCMODEL,params::MCPARAMS)

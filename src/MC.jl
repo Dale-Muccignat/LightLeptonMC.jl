@@ -78,11 +78,27 @@ function event!(dt,particle,model,params,meas_inner,verbose)
     elseif dt.type == :dt_rbin
         verbose && @info "RBin"
         eventRBin!(dt,particle,model,params,meas_inner,verbose)
+    elseif dt.type == :dt_zbin
+        verbose && @info "ZBin"
+        eventZBin!(dt,particle,model,params,meas_inner,verbose)
+    elseif dt.type == :dt_ybin
+        verbose && @info "YBin"
+        eventYBin!(dt,particle,model,params,meas_inner,verbose)
     else
         
     end
 end
 
+@xport @fastmath function updateParticle!(dt,particle,En0::UniformField,n0::UniformDensity,params,verbose)
+    particle.r += (particle.v + 0.5 * params.a * params.n0 * dt)*dt
+    particle.v += params.a * params.n0 * dt
+    particle.t += dt
+end
+
+@xport @fastmath function updateParticle!(dt,particle,En0,n0::LμJDensity,params,verbose)
+    particle.r += particle.v * dt
+    particle.t += dt
+end
 #### * TBins Measurements
 function eventTbin!(dt,particle,model,params,meas_inner,verbose)
     @inbounds @. meas_inner.meast.v²[particle.tbin,:] += particle.v^2 * particle.weight
@@ -211,20 +227,6 @@ function attachmentColl!(cs_no,g,particle,model,params,meas_inner,verbose)
     particle.weight /= 2.
 end
 
-function updateEbin!(particle,params)
-    ea = getEnergy(particle.v)
-	while ea < params.ebins[particle.ebin]
-		particle.ebin-= 1
-	end
-    if particle.ebin != length(params.ebins)
-        while ea > params.ebins[particle.ebin+1]
-            particle.ebin+= 1
-        end
-    end
-    
-end
-
-
 function scatteringAngle(g,particle,model,params,verbose)
     coschi = 1-2*rand()
     sinchi = sqrt(1-coschi^2)
@@ -249,8 +251,46 @@ end
 
 	return Rz * Ry * v_new
 end
+#### * Update Bin numbers
 
-# * Bin Events
+function updateEbin!(particle,params)
+    ea = getEnergy(particle.v)
+	while ea < params.ebins[particle.ebin]
+		particle.ebin-= 1
+	end
+    if particle.ebin != length(params.ebins)
+        while ea > params.ebins[particle.ebin+1]
+            particle.ebin+= 1
+        end
+    end
+    
+end
+
+function eventEnergy!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
+    verbose && @info "Energy Bin Change: " dt
+    if dt.direction == :Up
+        particle.ebin += 1
+    elseif dt.direction == :Down
+        particle.ebin -= 1
+    end
+end
+
+function eventRBin!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
+    verbose && @info "RBin Bin Change: " dt
+    if dt.direction == :Up
+        particle.rbin += 1
+    elseif dt.direction == :Down
+        particle.rbin -= 1
+    end
+
+    if particle.rbin == length(params.rbins)
+        meas_inner.measLμJ.EELS[findMinInd(params.ebinsLμJ,getEnergy(particle.v))] += particle.weight
+    end
+    
+end
+
+
+# * Get Bin Numbers
 
 function getDtEBinsPos(En0::UniformField,n0::UniformDensity,particle,model,params)
 	v_perp = particle.v[1]^2 + particle.v[2]^2 #Seperate out of the vz velocity
@@ -329,39 +369,7 @@ end
         return dt_EVENT(down,:dt_rbin,:Down)
     end
 end
-function eventEnergy!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
-    verbose && @info "Energy Bin Change: " dt
-    if dt.direction == :Up
-        particle.ebin += 1
-    elseif dt.direction == :Down
-        particle.ebin -= 1
-    end
-end
 
-function eventRBin!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
-    verbose && @info "RBin Bin Change: " dt
-    if dt.direction == :Up
-        particle.rbin += 1
-    elseif dt.direction == :Down
-        particle.rbin -= 1
-    end
-
-    if particle.rbin == length(params.rbins)
-        meas_inner.measLμJ.EELS[findMinInd(params.ebinsLμJ,getEnergy(particle.v))] += particle.weight
-    end
-    
-end
-
-@xport @fastmath function updateParticle!(dt,particle,En0::UniformField,n0::UniformDensity,params,verbose)
-    particle.r += (particle.v + 0.5 * params.a * params.n0 * dt)*dt
-    particle.v += params.a * params.n0 * dt
-    particle.t += dt
-end
-
-@xport @fastmath function updateParticle!(dt,particle,En0,n0::LμJDensity,params,verbose)
-    particle.r += particle.v * dt
-    particle.t += dt
-end
 
 # * Fetch Functions
 
@@ -415,7 +423,15 @@ function getCDt(particle,model,params,verbose)
     dt_coll = dt_EVENT(randexp()/(getTotalFreq(particle,model,params,verbose)*getDensity(particle,model.n0,params,verbose)*params.length_scale^3)::Float64,:dt_collision,:Up)
 end
 
-# * Temperature
+function findTotalCF(en,model,params)
+    CS = 0.
+    for cs_ind in eachindex(params.splat_gas.cs)
+        @inbounds CS += params.splat_gas.cs[cs_ind](en) * params.splat_gas.w[cs_ind] * sqrt(en/electron_v2eV)
+    end
+
+    return CS
+end
+#### * Temperature
 
 
 @fastmath function findu(cs_ind,particle,model,params)
@@ -465,13 +481,5 @@ end
 	return g*params.length_scale/params.time_scale
 end
 
-function findTotalCF(en,model,params)
-    CS = 0.
-    for cs_ind in eachindex(params.splat_gas.cs)
-        @inbounds CS += params.splat_gas.cs[cs_ind](en) * params.splat_gas.w[cs_ind] * sqrt(en/electron_v2eV)
-    end
-
-    return CS
-end
 
 end
