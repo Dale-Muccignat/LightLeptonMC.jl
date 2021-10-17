@@ -108,7 +108,7 @@ end
 
 function initParams(type::LμJ,input_gas,model::MCMODEL=MCMODEL())
 
-    ebins = [0.,(10. .^(-3:0.1:log10(model.v_0.ε)+0.1))...]
+    ebins = [0.,(10. .^(-3:0.1:log10(model.v_0.ε)+2*model.v_0.Δε_source))...]
     rbins = buildRBins(type,model.n0)
     n0=buildDensity(model.n0,rbins)
     a=buildField(model.En0)
@@ -131,7 +131,10 @@ function initParams(type::LμJ,input_gas,model::MCMODEL=MCMODEL())
         total_freq=total_freq,
         length_scale = length_scale,
         time_scale = time_scale,
-        energy_scale = energy_scale
+        energy_scale = energy_scale,
+        tbins = 1.5e-14:1e-16:2.5e-14,
+        ybins = -5e-8:1e-10:5e-8,
+        zbins = (-7.5e-6 - 5e-8):1e-10:(-7.5e-6 + 5e-8)
         )
 
     return params
@@ -209,6 +212,14 @@ function Structs.PART(type::SWARM,model,params)
     particle.r = initPartr(model.r_0,params).*params.length_scale
     particle.v = initPartv(model.v_0,params).*params.length_scale ./params.time_scale
     particle.ebin = findMinInd(params.ebins,getEnergy(particle.v))
+    if params.zbins != nothing
+        particle.zbin = findMinInd(params.zbins,particle.r[3])
+    end
+    
+    if params.ybins != nothing
+        particle.ybin = findMinInd(params.ybins,particle.r[2])
+    end
+        
 
     return particle
 
@@ -221,6 +232,13 @@ function Structs.PART(type::LμJ,model,params)
     particle.ebin = findMinInd(params.ebins,getEnergy(particle.v))
     particle.rbin = findMinInd(params.rbins,dot(particle.r,particle.r))
 
+    if params.zbins != nothing
+        particle.zbin = findMinInd(params.zbins,particle.r[3])
+    end
+    
+    if params.ybins != nothing
+        particle.ybin = findMinInd(params.ybins,particle.r[2])
+    end
     return particle
 
 end

@@ -101,13 +101,18 @@ end
 end
 #### * TBins Measurements
 function eventTbin!(dt,particle,model,params,meas_inner,verbose)
-    @inbounds @. meas_inner.meast.v²[particle.tbin,:] += particle.v^2 * particle.weight
-    @inbounds @. meas_inner.meast.r²[particle.tbin,:] += particle.r^2 * particle.weight
-    @inbounds @. meas_inner.meast.r[particle.tbin,:] += particle.r * particle.weight
-    @inbounds @. meas_inner.meast.v[particle.tbin,:] += particle.v * particle.weight
-    @inbounds @. meas_inner.meast.rv[particle.tbin,:] += particle.v * particle.r * particle.weight
-    @inbounds meas_inner.meast.w[particle.tbin] += particle.weight
-    @inbounds meas_inner.meast.εᵢ[particle.tbin] += dot(particle.v,particle.v) * particle.weight
+    if meas_inner.meast.r != nothing 
+        @inbounds @. meas_inner.meast.v²[particle.tbin,:] += particle.v^2 * particle.weight
+        @inbounds @. meas_inner.meast.r²[particle.tbin,:] += particle.r^2 * particle.weight
+        @inbounds @. meas_inner.meast.r[particle.tbin,:] += particle.r * particle.weight
+        @inbounds @. meas_inner.meast.v[particle.tbin,:] += particle.v * particle.weight
+        @inbounds @. meas_inner.meast.rv[particle.tbin,:] += particle.v * particle.r * particle.weight
+        @inbounds meas_inner.meast.w[particle.tbin] += particle.weight
+        @inbounds meas_inner.meast.εᵢ[particle.tbin] += dot(particle.v,particle.v) * particle.weight
+    end
+
+    meas_inner.measLμJ.zy_bins != nothing ? meas_inner.measLμJ.zy_bins[particle.zbin,particle.ybin,particle.tbin] += particle.weight : nothing
+    
     particle.tbin += 1
 end
 
@@ -155,7 +160,7 @@ end
         # @show CS
         # @show getTotalFreq(particle,model,params,verbose)
 
-        if R < CS/getTotalFreq(particle,model,params,verbose)
+        if R < CS/getTotalFreq(particle,model,params)
             return cs_ind
         end
     end
@@ -289,8 +294,25 @@ function eventRBin!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
     
 end
 
+function eventYBin!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
+    verbose && @info "yBin Bin Change: " dt
+    if dt.direction == :Up
+        particle.ybin += 1
+    elseif dt.direction == :Down
+        particle.ybin -= 1
+    end
+end
 
-# * Get Bin Numbers
+function eventZBin!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
+    verbose && @info "zBin Bin Change: " dt
+    if dt.direction == :Up
+        particle.zbin += 1
+    elseif dt.direction == :Down
+        particle.zbin -= 1
+    end
+end
+
+# * Get Bin Times
 
 function getDtEBinsPos(En0::UniformField,n0::UniformDensity,particle,model,params)
 	v_perp = particle.v[1]^2 + particle.v[2]^2 #Seperate out of the vz velocity
@@ -311,7 +333,7 @@ function getDtEBinsPos(En0::UniformField,n0::UniformDensity,particle,model,param
     return dt_ENERGY(Inf, :dt_energy, Up())
 end
 
-@fastmath function getRDt(particle,params)
+@fastmath function getRDt(particle,model,params)
 	#NOTE: Only for fields of 0
     p = particle.r
     v = particle.v
@@ -320,10 +342,6 @@ end
 	up, down = Inf, Inf
 	a = v[3]^2+v[2]^2
 	b = 2*(p[3]*v[3]+v[2]*p[2])
-	# a = v[3]^2+v[2]^2+v[1]^2
-	# b = 2*(p[3]*v[3]+v[2]*p[2]+v[1]*p[1])
-	## Down
-	# c = p[3]^2+p[2]^2+p[1]^2-(r21-1e-12)
 	c = p[3]^2+p[2]^2-r21+1e-6
     delta = b^2-4*a*c
 	if (delta > 0.) #&& (c > 0.)
@@ -340,13 +358,8 @@ end
 			down = Inf
 		end
 	end
-	# @show r21
-	# @show getr(p,v,down)
-	## Up
-	# c = p[3]^2+p[2]^2-r22-1e-6
 	c = c+r21-r22-2e-6
     delta = b^2-4*a*c
-	# c = p[3]^2+p[2]^2+p[1]^2-(r22+1e-12)
 	if (delta > 0.) #&& (c < 0.)
 		t1 = (-b+sqrt(delta))/(2*a)
 		t2 = (-b-sqrt(delta))/(2*a)
@@ -358,11 +371,6 @@ end
 		end
 		up = min(t1,t2)
 	end
-	# @show r22
-	# @show getr(p,v,up)
-	# if r22 > 4.5e19
-	# 	@show up,down
-	# end
     if up == min(up,down)
         return dt_EVENT(up,:dt_rbin,:Up)
     else
@@ -370,38 +378,80 @@ end
     end
 end
 
+function getCDt(particle,model,params)
+    dt_coll = dt_EVENT(randexp()/(getTotalFreq(particle,model,params)*getDensity(particle,model.n0,params)*params.length_scale^3)::Float64,:dt_collision,:Up)
+end
+
+function getZDt(particle,model,params)
+    if params.zbins != nothing
+        if (particle.v[3] < 0.) && (particle.zbin != 1)
+            return dt_EVENT((params.zbins[particle.zbin]-1e-12-particle.r[3])/particle.v[3], :dt_zbin,:Down)
+        elseif (particle.zbin < length(params.zbins)) && (particle.v[3] > 0.)
+            return dt_EVENT((params.zbins[particle.zbin+1]+1e-12-particle.r[3])/particle.v[3], :dt_zbin, :Up)
+        end
+    end
+    return dt_EVENT(Inf,:dt_zbin,:Up)
+end
+
+function getYDt(particle,model,params)
+    if params.ybins != nothing
+        if (particle.v[2] < 0.) && (particle.ybin != 1)
+            return dt_EVENT((params.ybins[particle.ybin]-1e-12-particle.r[2])/particle.v[2], :dt_ybin,:Down)
+        elseif (particle.ybin < length(params.ybins)) && (particle.v[2] > 0.)
+            return dt_EVENT((params.ybins[particle.ybin+1]+1e-12-particle.r[2])/particle.v[2], :dt_ybin, :Up)
+        end
+    end
+    return dt_EVENT(Inf,:dt_ybin,:Up)
+end
+
+function getTDt(particle,model,params)
+    if params.tbins != nothing 
+        if particle.tbin < length(params.tbins) && particle.t > params.tbins[1]
+            return dt_tbin = dt_EVENT(params.tbins[particle.tbin+1] - particle.t, :dt_tbin,:Up)
+        end
+    end
+    
+    return dt_EVENT(Inf,:dt_tbin,:Up)
+
+end
 
 # * Fetch Functions
 
-@xport function getTotalFreq(particle,model,params,verbose)
+@xport function getTotalFreq(particle,model,params)
     params.total_freq[particle.ebin]
 end
 
-@xport function getDensity(particle,n0::UniformDensity,params,verbose)
+@xport function getDensity(particle,n0::UniformDensity,params)
     params.n0
 end
-@xport function getDensity(particle,n0::LμJDensity,params,verbose)
+@xport function getDensity(particle,n0::LμJDensity,params)
     params.n0[particle.rbin]
 end
 
 @xport function getDt(type::SWARM,particle,model,params,verbose)
     verbose && @info "Current time: " particle.t
-    dt_coll = getCDt(particle,model,params,verbose)
+    dt_coll = getCDt(particle,model,params)
     dt_energy = getDtEBinsPos(model.En0,model.n0,particle,model,params)
-    dt_tbin = dt_EVENT(params.tbins[particle.tbin+1] - particle.t, :dt_tbin,:Up)
+    dt_tbin = getTDt(particle,model,params)
     dts = (dt_coll,dt_energy,dt_tbin)
     verbose && @info dts
     dt_times = (dt_coll.time,dt_energy.time,dt_tbin.time)
     return dts[findMinTime(dt_times,verbose=verbose)]
 end
 
+
+
 @xport function getDt(type::LμJ,particle,model,params,verbose)
     verbose && @info "Current time: " particle.t
-    dt_coll = getCDt(particle,model,params,verbose)
-    dt_rbin = getRDt(particle,params)
-    dts = (dt_coll,dt_rbin)
+    # @info particle.r ./ params.length_scale
+    dt_coll = getCDt(particle,model,params)
+    dt_rbin = getRDt(particle,model,params)
+    dt_tbin = getTDt(particle,model,params)
+    dt_zbin = getZDt(particle,model,params)
+    dt_ybin = getYDt(particle,model,params)
+    dts = (dt_coll,dt_rbin,dt_zbin,dt_ybin,dt_tbin)
     verbose && @info dts
-    dt_times = (dt_coll.time,dt_rbin.time)
+    dt_times = (dt_coll.time,dt_rbin.time,dt_zbin.time,dt_ybin.time,dt_tbin.time)
     return dts[findMinTime(dt_times,verbose=verbose)]
 end
 
@@ -419,9 +469,6 @@ function findMinTime(times;verbose)
 
 end
 
-function getCDt(particle,model,params,verbose)
-    dt_coll = dt_EVENT(randexp()/(getTotalFreq(particle,model,params,verbose)*getDensity(particle,model.n0,params,verbose)*params.length_scale^3)::Float64,:dt_collision,:Up)
-end
 
 function findTotalCF(en,model,params)
     CS = 0.

@@ -149,7 +149,12 @@ end
 end
 
 function MEASLμJ(model::MCMODEL,params::MCPARAMS)
-    MEASLμJ(zeros(length(params.ebinsLμJ)))
+    if params.ybins != nothing && params.zbins != nothing
+        return MEASLμJ(zeros(length(params.ebinsLμJ)),zeros(length(params.zbins),length(params.ybins),length(params.tbins)))
+    else
+        return MEASLμJ(zeros(length(params.ebinsLμJ)),nothing)
+    end
+    
 
 end
 
