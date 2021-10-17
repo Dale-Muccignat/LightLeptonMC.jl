@@ -61,7 +61,13 @@ function checkAlive(type::LμJ,particle,model,params,verbose)
     if particle.rbin == length(params.rbins)
         verbose && @info "Detected"
     end
-    particle.rbin != length(params.rbins) && getEnergy(particle.v) > type.thresh*params.energy_scale
+
+    if params.tbins != nothing
+        return particle.rbin != length(params.rbins) && getEnergy(particle.v) > type.thresh*params.energy_scale && particle.t < params.tbins[end]
+    else
+        return particle.rbin != length(params.rbins) && getEnergy(particle.v) > type.thresh*params.energy_scale 
+    end
+        
 end
 
 function event!(dt,particle,model,params,meas_inner,verbose)
@@ -96,6 +102,7 @@ end
 end
 
 @xport @fastmath function updateParticle!(dt,particle,En0,n0::LμJDensity,params,verbose)
+    #TODO: Make this dependent upon Zero Field only
     particle.r += particle.v * dt
     particle.t += dt
 end
