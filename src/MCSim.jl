@@ -113,8 +113,44 @@ function mc(model::MCMODEL,params::MCPARAMS;verbose=false)
     unscale!(params)
     unscale!(model.type,params,meas[1])
     return process(model.type,meas[1],params,model)..., params;
-    
 
+end
+
+@xport function buildModel()
+    println("Welcome to the model builder helper")
+    println("What type of model [LuJ/Swarm]:")
+    modeltype = readline()
+    while modeltype ∉ ["LuJ","Swarm"]
+        println("Error: Model not found")
+        println("What type of model [LuJ/Swarm]:")
+        modeltype = readline()
+    end
+    
+    println("How many particles?")
+    ns = readline()
+    n=0
+    while n == 0
+        try
+            n=parse(Int64,ns)
+        catch
+            println("Error: Not an Int64")
+            println("How many particles?")
+            ns = readline()
+        end
+    end
+
+    println("What initial energy (in eV)?")
+    εs = readline()
+    ε=Inf
+    while ε == Inf 
+        try
+            ε=parse(Float64,εs)
+        catch
+            println("Error: Not an Float64")
+            println("What initial energy (in eV)?")
+            εs = readline()
+        end
+    end
 end
 
 
