@@ -15,7 +15,12 @@ abstract type Temp end
     val::AUTO
     axis::AUTO
 end
-@xport struct ZeroVelocity <: Velocity end
+@xport @AutoParm struct GaussianLμJSpacial <: Velocity
+    val::AUTO = -7.6e-6
+    Δy_source::AUTO = 7.5e-6
+    gaussian_axis::AUTO = [0,1,0]
+    axis::AUTO = [0,0,1]
+end
 
 @xport @AutoParm struct UniformDensity <: Density
     val::AUTO = 1e23
@@ -34,10 +39,13 @@ end
 end
 
 abstract type Ionisation end
+
 @xport @AutoParm mutable struct UniformIonisation <: Ionisation end
 @xport @AutoParm mutable struct RatioIonisation <: Ionisation
     ratio::AUTO = 0.5
 end
+
+@xport struct ZeroVelocity <: Velocity end
 
 @xport @AutoParm struct InitVelocity <: Velocity
     ε::AUTO = 100.
@@ -64,7 +72,7 @@ end
     En0::AUTO = UniformField()
     T::AUTO = UniformTemp()
     ion_type::AUTO = UniformIonisation()
-    # measurements::Vector{Symbol} = [:Spacial, :Time]
+    meas::AUTO = [:t]
 end
 
 @xport @AutoParm mutable struct SWARM
@@ -84,8 +92,8 @@ end
 
 
 @AutoParm mutable struct MCPARAMS
-    ebins::AUTO = [(10. .^(-3:0.01:3))...]
-    ebinsLμJ::AUTO = nothing
+    cbins::AUTO = [0.,(10. .^(-3:0.01:2))...]
+    ebins::AUTO = nothing
     gas::AUTO = nothing
     splat_gas::AUTO = nothing
     total_freq::AUTO = nothing
@@ -103,8 +111,8 @@ end
 
 end
 
-function MCPARAMS(;ebins=nothing,ebinsLμJ=nothing,gas=nothing,splat_gas=nothing,total_freq=nothing,a=nothing,n0=nothing,rbins=nothing,tbins=nothing,zbins=nothing,xbins=nothing,ybins=nothing,length_scale=noting,time_scale=nothing,energy_scale=nothing)
-    MCPARAMS(ebins,ebinsLμJ,gas,splat_gas,total_freq,a,n0,rbins,tbins,zbins,xbins,ybins,length_scale,time_scale,energy_scale)
+function MCPARAMS(;cbins=nothing,ebins=nothing,gas=nothing,splat_gas=nothing,total_freq=nothing,a=nothing,n0=nothing,rbins=nothing,tbins=nothing,zbins=nothing,xbins=nothing,ybins=nothing,length_scale=noting,time_scale=nothing,energy_scale=nothing)
+    MCPARAMS(cbins,ebins,gas,splat_gas,total_freq,a,n0,rbins,tbins,zbins,xbins,ybins,length_scale,time_scale,energy_scale)
 end
 
 
@@ -114,7 +122,7 @@ end
 	t::Float64 = 0.
 	weight::Float64 = 1.
 	tbin::Int64 = 1
-	ebin::Int64 = 1
+	cbin::Int64 = 1
 	zbin::Int64 = 1
 	ybin::Int64 = 1
     xbin::Int64 = 1
@@ -150,9 +158,9 @@ end
 
 function MEASLμJ(model::MCMODEL,params::MCPARAMS)
     if params.ybins != nothing && params.zbins != nothing
-        return MEASLμJ(zeros(length(params.ebinsLμJ)),zeros(length(params.zbins),length(params.ybins),length(params.tbins)))
+        return MEASLμJ(zeros(length(params.ebins)),zeros(length(params.zbins),length(params.ybins),length(params.tbins)))
     else
-        return MEASLμJ(zeros(length(params.ebinsLμJ)),nothing)
+        return MEASLμJ(zeros(length(params.ebins)),nothing)
     end
     
 

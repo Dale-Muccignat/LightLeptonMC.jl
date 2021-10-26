@@ -1,7 +1,7 @@
 using Distributed
+addprocs(31)
 using Test
 
-addprocs()
 
 using MCSim
 

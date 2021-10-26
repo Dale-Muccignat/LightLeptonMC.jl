@@ -143,7 +143,7 @@ function eventCollision!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
         attachmentColl!(cs_ind,getRelVel(cs_ind,particle,model,params),particle,model,params,meas_inner,verbose)
     end
 
-    updateEbin!(particle,params)
+    updateCbin!(particle,params)
 end
 
 function getRelVel(cs_no,particle,model,params)
@@ -265,14 +265,14 @@ end
 end
 #### * Update Bin numbers
 
-function updateEbin!(particle,params)
+function updateCbin!(particle,params)
     ea = getEnergy(particle.v)
-	while ea < params.ebins[particle.ebin]
-		particle.ebin-= 1
+	while ea < params.cbins[particle.cbin]
+		particle.cbin-= 1
 	end
-    if particle.ebin != length(params.ebins)
-        while ea > params.ebins[particle.ebin+1]
-            particle.ebin+= 1
+    if particle.cbin != length(params.cbins)
+        while ea > params.cbins[particle.cbin+1]
+            particle.cbin+= 1
         end
     end
     
@@ -281,9 +281,9 @@ end
 function eventEnergy!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
     verbose && @info "Energy Bin Change: " dt
     if dt.direction == :Up
-        particle.ebin += 1
+        particle.cbin += 1
     elseif dt.direction == :Down
-        particle.ebin -= 1
+        particle.cbin -= 1
     end
 end
 
@@ -296,7 +296,7 @@ function eventRBin!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
     end
 
     if particle.rbin == length(params.rbins)
-        meas_inner.measLμJ.EELS[findMinInd(params.ebinsLμJ,getEnergy(particle.v))] += particle.weight
+        meas_inner.measLμJ.EELS[findMinInd(params.ebins,getEnergy(particle.v))] += particle.weight
     end
     
 end
@@ -321,19 +321,19 @@ end
 
 # * Get Bin Times
 
-function getDtEBinsPos(En0::UniformField,n0::UniformDensity,particle,model,params)
+function getDtCBinsPos(En0::UniformField,n0::UniformDensity,particle,model,params)
 	v_perp = particle.v[1]^2 + particle.v[2]^2 #Seperate out of the vz velocity
-	if (particle.v[3] < 0.) && ((params.ebins[particle.ebin]/electron_v2eV - v_perp) > 0.) && (particle.ebin!= 1)
+	if (particle.v[3] < 0.) && ((params.cbins[particle.cbin]/electron_v2eV - v_perp) > 0.) && (particle.cbin!= 1)
 		#If the velocity is less than zero, i.e if the energy bin needs to go down
 		#The second condition is to ensure that the energy can go down considering the perpindicular velocity... or something along those lines. It just makes sure the squareroot doesn't return an imaginary number
-		vf_z = sqrt(params.ebins[particle.ebin]/electron_v2eV - v_perp)
+		vf_z = sqrt(params.cbins[particle.cbin]/electron_v2eV - v_perp)
 		# vf_z is the velocity the particle will need to reach the lower boundry of the energy bin
 		return dt_EVENT(-(particle.v[3]+vf_z) /(params.a[3] * params.n0),:dt_energy, :Down)
 		#Just finding the time until the particles velocity reaches vf_z
-	else#if (particle.ebin_no < length(vars.ebins))
+	else#if (particle.cbin_no < length(vars.cbins))
 		# here the vz is positive, and also making sure we aren't at the max bin value
 		#Don't need to check the second  condition above as the particle can only increase in energy
-		vf_z = sqrt(params.ebins[particle.ebin+1]/electron_v2eV - v_perp)
+		vf_z = sqrt(params.cbins[particle.cbin+1]/electron_v2eV - v_perp)
 		#same as before except with the lower boundry of the next bin up
 		return dt_EVENT(-(particle.v[3]-vf_z) /(params.a[3] * params.n0), :dt_energy,:Up)
 	end
@@ -425,7 +425,7 @@ end
 # * Fetch Functions
 
 @xport function getTotalFreq(particle,model,params)
-    params.total_freq[particle.ebin]
+    params.total_freq[particle.cbin]
 end
 
 @xport function getDensity(particle,n0::UniformDensity,params)
@@ -438,7 +438,7 @@ end
 @xport function getDt(type::SWARM,particle,model,params,verbose)
     verbose && @info "Current time: " particle.t
     dt_coll = getCDt(particle,model,params)
-    dt_energy = getDtEBinsPos(model.En0,model.n0,particle,model,params)
+    dt_energy = getDtCBinsPos(model.En0,model.n0,particle,model,params)
     dt_tbin = getTDt(particle,model,params)
     dts = (dt_coll,dt_energy,dt_tbin)
     verbose && @info dts
