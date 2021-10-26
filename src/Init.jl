@@ -56,46 +56,6 @@ function initParams(input_gas=MaxwellModel(),model::MCMODEL=MCMODEL())
     return params
 end
 
-function initParams(type::LμJ,input_gas,model::MCMODEL=MCMODEL())
-    #TODO: Merge this with the other type and move the dependency into helper functions
-
-    ebins = [0.,(10. .^(-3:0.1:log10(model.v_0.ε)+2*model.v_0.Δε_source))...]
-    rbins = buildRBins(type,model.n0)
-    n0=buildDensity(model.n0,rbins)
-    a=buildField(model.En0)
-
-    length_scale = model.n0.val*1e-20
-    time_scale = model.n0.val*1e-20*sqrt(2*q/me)
-    energy_scale = (length_scale/time_scale)^2
-
-    splat_gas=splatCS(input_gas,energy_scale,ebins)
-    total_freq=buildFreq(model,splat_gas,ebins,energy_scale)
-
-    params = MCPARAMS(
-        ebins=ebins,
-        enbins=collect(model.type.thresh:model.type.Δε_detector:(model.v_0.ε+2*model.v_0.Δε_source)),
-        gas=input_gas,
-        splat_gas=splat_gas,
-        rbins=rbins,
-        n0=n0,
-        a=a,
-        total_freq=total_freq,
-        length_scale = length_scale,
-        time_scale = time_scale,
-        energy_scale = energy_scale,
-        # tbins = 1.5e-14:1e-16:2.5e-14,
-        tbins = LinRange(1.5e-13,160e-13,10).*2,
-        # ybins = -5e-8:1e-10:5e-8,
-        ybins = LinRange(-7e-7,7e-7,200),
-        # zbins = (-7.5e-6 - 5e-8):1e-10:(-7.5e-6 + 5e-8) #TODO: Think of a way to make this nice
-        zbins = LinRange(-7.5e-6,-6.5e-6,200)
-        # zbins = [7.6e-6,7.5e-6,7.4e-6].*-1
-        )
-
-    return params
-end
-
-
 # * Scale functions
 @xport function scale!(params)
     ls = params.length_scale

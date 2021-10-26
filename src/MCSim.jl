@@ -14,7 +14,7 @@ module MCSim
 #TODO: Add Potential
 #TODO: Add Density Gradient (this is probably best solved through Danny's code though)
 
-using Reexport, Distributed, JLD2, Dates
+using Reexport, Distributed, JLD2, Dates, Artifacts, AndExport
 @reexport using Gases
 @reexport using FVB
 export mc, MCINIT, MCPARAMS, saveBatch, saveDist
@@ -30,6 +30,13 @@ include("MC.jl")
 
 include("Measurements.jl")
 @reexport using .Measurements
+
+noble_datadir = artifact"NobleGases"
+@xport Ne = Gas(parseLXCat(joinpath(noble_datadir,"Ne.txt")))
+@xport Ar = Gas(parseLXCat(joinpath(noble_datadir,"Ar.txt")))
+@xport He = Gas(parseLXCat(joinpath(noble_datadir,"He.txt")))
+@xport Kr = Gas(parseLXCat(joinpath(noble_datadir,"Kr.txt")))
+@xport Xe = Gas(parseLXCat(joinpath(noble_datadir,"Xe.txt")))
 
 macro jld2save(filename, vars...)
     # Copy paste
