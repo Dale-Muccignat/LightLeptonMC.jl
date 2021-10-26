@@ -1,6 +1,5 @@
 [NobleGases]
 git-tree-sha1 = "c590fab32fb7a576b427e3d7260578e090830a58"
-lazy = true
 
     [[NobleGases.download]]
     sha256 = "2829cbf14ea4ef7befe437594d6997d8727ce97b8781819856f04e4f93e13156"

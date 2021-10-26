@@ -175,7 +175,7 @@ end
 end end
 
 @fastmath function elasticColl!(cs_no,g,particle,model,params,meas_inner,verbose)
-    coschi, sinchi, phi = scatteringAngle(g,particle,model,params,verbose)
+    coschi, sinchi, phi = scatteringAngle(cs_no,g,particle,model,params,verbose)
     v2 = sqrt(dot(g,g)) * SArray{Tuple{3},Float64,1,3}(cos(phi)*sinchi,sin(phi)*sinchi,coschi)
     v2 = shift(v2,g)
     v2 = (me*particle.v + params.splat_gas.m[cs_no]* (g-particle.v + v2)) /(me + params.splat_gas.m[cs_no])
@@ -188,7 +188,7 @@ end
 @fastmath function excitationColl!(cs_no,g,particle,model,params,meas_inner,verbose)
 
     if dot(g,g)-2*params.splat_gas.thresh[cs_no]/me > 0.
-        coschi, sinchi, phi = scatteringAngle(g,particle,model,params,verbose)
+        coschi, sinchi, phi = scatteringAngle(cs_no,g,particle,model,params,verbose)
         v2 = sqrt(dot(g,g)-2*params.splat_gas.thresh[cs_no]/me) * SArray{Tuple{3},Float64,1,3}(cos(phi)*sinchi,sin(phi)*sinchi,coschi)
         v2 = shift(v2,g)
         v2 = (me*particle.v + params.splat_gas.m[cs_no]* (g-particle.v + v2)) /(me + params.splat_gas.m[cs_no])
@@ -204,7 +204,7 @@ end
     if dot(g,g)-2*params.splat_gas.thresh[cs_no]/me > 0.
         part_energy, other_part_energy = getIonisationEnergy(params.splat_gas.thresh[cs_no],ion_type,g)
 
-        coschi, sinchi, phi = scatteringAngle(g,particle,model,params,verbose)
+        coschi, sinchi, phi = scatteringAngle(cs_no,g,particle,model,params,verbose)
 
         v2 = sqrt(2*part_energy/me) * SArray{Tuple{3},Float64,1,3}(cos(phi)*sinchi,sin(phi)*sinchi,coschi)
         v2 = shift(v2,g)
@@ -239,8 +239,10 @@ function attachmentColl!(cs_no,g,particle,model,params,meas_inner,verbose)
     particle.weight /= 2.
 end
 
-function scatteringAngle(g,particle,model,params,verbose)
-    coschi = 1-2*rand()
+function scatteringAngle(cs_no,g,particle,model,params,verbose)
+    # coschi = 1-2*rand()
+    # @show getEnergy(g)/params.energy_scale
+    coschi = params.splat_gas.dcs[cs_no][particle.cbin](rand())::Float64
     sinchi = sqrt(1-coschi^2)
     phi = rand()*2*pi
     return coschi, sinchi, phi

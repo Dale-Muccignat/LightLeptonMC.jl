@@ -1,7 +1,7 @@
 module Init
 
 using ..Structs
-using PhysicalConstants.CODATA2018, Unitful, LinearAlgebra, StaticArrays, AndExport, Gases, LXCatParser, AutoParameters, Interpolations
+using PhysicalConstants.CODATA2018, Unitful, LinearAlgebra, StaticArrays, AndExport, Gases, LXCatParser, AutoParameters, Interpolations, QuadGK
 
 export initParams, initMeas, PART, getEnergy
 
@@ -14,6 +14,7 @@ const Td = 1e-21
 
 @AutoParm struct MCGAS
     cs::AUTO
+    dcs::AUTO
     type::AUTO
     thresh::AUTO
     m::AUTO 
@@ -132,22 +133,43 @@ function buildFreq(model,gas,cbins,energy_scale)
     return total_freq
 end
 
-function splatCS(gas,energy_scale,cbins)
+@xport function splatCS(gas,energy_scale,cbins)
     gases = [gas.elastic...,gas.excitation...,gas.ionisation...,gas.attachment...]
-    # Interpolation is slighty faster than the gases cross-section
+    gases_dcss = [gas.elastic_DCS...,gas.excitation_DCS...,gas.ionisation_DCS...,gas.attachment_DCS...] 
+
     en_spacing = cbins[end]-cbins[end-1]
-    gases_itp::Vector{Interpolations.Extrapolation{Float64, 1, ScaledInterpolation{Float64, 1, Interpolations.BSplineInterpolation{Float64, 1, Vector{Float64}, BSpline{Linear{Throw{OnGrid}}}, Tuple{Base.OneTo{Int64}}}, BSpline{Linear{Throw{OnGrid}}}, Tuple{StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}}}}, BSpline{Linear{Throw{OnGrid}}}, Flat{Nothing}}} = []
+    ens = LinRange(1e-6,cbins[end]+en_spacing+1.,100)
+    θs = LinRange(1e-6,π,100)
+
+    gases_itp::Vector{Interpolations.Extrapolation{Float64, 1, ScaledInterpolation{Float64, 1, Interpolations.BSplineInterpolation{Float64, 1, Vector{Float64}, BSpline{Linear{Throw{OnGrid}}}, Tuple{Base.OneTo{Int64}}}, BSpline{Linear{Throw{OnGrid}}}, Tuple{LinRange{Float64}}}, BSpline{Linear{Throw{OnGrid}}}, Flat{Nothing}}} = []
     for gas in gases
-        push!(gases_itp, LinearInterpolation(1e-6:1e-4:(cbins[end]+en_spacing+1.),gas.(1e-6:1e-4:(cbins[end]+en_spacing+1.)),extrapolation_bc=Flat()))
+        push!(gases_itp, LinearInterpolation(ens,gas.(ens),extrapolation_bc=Flat()))
+    end
+
+    dcss::Vector{Vector{Interpolations.Extrapolation{Float64, 1, Interpolations.GriddedInterpolation{Float64, 1, Float64, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Tuple{Vector{Float64}}}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Interpolations.Throw{Nothing}}}} = []
+    replace_nan(v) = map(x -> isnan(x) ? zero(x) : x, v)
+    for σ in gases_dcss
+        DCS_matrix::Matrix{Float64} = [quadgk(chi -> σ(e,chi)*sin(chi),0,t)[1]/quadgk(chi -> σ(e,chi)*sin(chi),0,pi)[1] for e in ens, t in θs]
+        DCS_matrix = replace_nan(DCS_matrix)
+        spl2 = LinearInterpolation((ens,θs),DCS_matrix,extrapolation_bc=Flat())	#2D spline of the matrix
+        # func3(e,R) = LinearInterpolation(spl2(e,θs),cos.(θs))(R)::Float64	#Interpolates the above vector and evaluates a value of chi for a given R
+        # @show typeof(LinearInterpolation(spl2(1.,θs),cos.(θs)))	#Interpolates the above vector and evaluates a value of chi for a given R
+        #TODO: Try this with energy dependency aswell
+        push!(dcss,[LinearInterpolation(spl2(c,θs),cos.(θs)) for c in cbins])
     end
     
+    
     types = [[:ELASTIC for i in 1:length(gas.elastic)]...,[:EXCITATION for i in 1:length(gas.excitation)]...,[:IONIZATION for i in 1:length(gas.ionisation)]...,[:ATTACHMENT for i in 1:length(gas.attachment)]...]
+
     threshes = [[0. for thresh in gas.elastic]...,[thresh for thresh in gas.exlosses]...,[thresh for thresh in gas.iolosses]...,[0. for thresh in gas.attachment]...].*energy_scale .*q
+
     masses = [[m for m in gas.Mₑₗ]...,[m for m in gas.Mₑₓ]...,[m for m in gas.Mₐₜ]...,[m for m in gas.Mᵢₒ]...] .* amu
+
     ws = [[w for w in gas.wₑₗ]...,[w for w in gas.wₑₓ]...,[w for w in gas.wₐₜ]...,[w for w in gas.wᵢₒ]...]
 
 
-    MCGAS(gases_itp,types,threshes,masses,ws)
+    MCGAS(gases_itp,dcss,types,threshes,masses,ws)
+    # return gases_itp,dcss,types,threshes,masses,ws
 end
 
 #### * Bins
