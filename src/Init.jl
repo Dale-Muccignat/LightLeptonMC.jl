@@ -148,7 +148,8 @@ end
     end
 
     dcss::Vector{Vector{Interpolations.Extrapolation{Float64, 1, Interpolations.GriddedInterpolation{Float64, 1, Float64, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Tuple{Vector{Float64}}}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Interpolations.Throw{Nothing}}}} = []
-    replace_nan(v) = map(x -> isnan(x) ? zero(x) : x, v)
+    replace_nan(v) = map(x -> isnan(x) ? zero(x)+1e-10 : x, v)
+    replace_0(v) = map(x -> x == 0 ? zero(x)+1e-10 : x, v)
     for σ in gases_dcss
         DCS_matrix::Matrix{Float64} = zeros(length(ens),length(θs))
         for i in eachindex(ens)
@@ -164,14 +165,13 @@ end
                 end
             end
         end
-        DCS_matrix = replace_nan(DCS_matrix)
+        DCS_matrix = replace_0(replace_nan(DCS_matrix))
         DCS_matrix = cumsum(DCS_matrix,dims=2)
         spl2 = LinearInterpolation((ens,θs),DCS_matrix,extrapolation_bc=Flat())	#2D spline of the matrix
         # func3(e,R) = LinearInterpolation(spl2(e,θs),cos.(θs))(R)::Float64	#Interpolates the above vector and evaluates a value of chi for a given R
         # @show typeof(LinearInterpolation(spl2(1.,θs),cos.(θs)))	#Interpolates the above vector and evaluates a value of chi for a given R
         #TODO: Try this with energy dependency aswell
         for c in cbins
-            @show spl2(c,0:0.1:pi)
             LinearInterpolation(Interpolations.deduplicate_knots!(spl2(c,θs)),cos.(θs))
         end
         
