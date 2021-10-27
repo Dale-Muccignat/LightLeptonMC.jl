@@ -150,13 +150,32 @@ end
     dcss::Vector{Vector{Interpolations.Extrapolation{Float64, 1, Interpolations.GriddedInterpolation{Float64, 1, Float64, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Tuple{Vector{Float64}}}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Interpolations.Throw{Nothing}}}} = []
     replace_nan(v) = map(x -> isnan(x) ? zero(x) : x, v)
     for σ in gases_dcss
-        DCS_matrix::Matrix{Float64} = [quadgk(chi -> σ(e,chi)*sin(chi),0,t)[1]/quadgk(chi -> σ(e,chi)*sin(chi),0,pi)[1] for e in ens, t in θs]
+        DCS_matrix::Matrix{Float64} = zeros(length(ens),length(θs))
+        for i in eachindex(ens)
+            norm = quadgk(chi -> σ(ens[i],chi)*sin(chi),0,pi)[1]
+            func(chi) = σ(ens[i],chi)*sin(chi)
+            for j in eachindex(θs)
+                if j == 1
+                    DCS_matrix[i,j] = quadgk(func,0,θs[j])[1]/norm
+                elseif j == length(θs)
+                    DCS_matrix[i,j] = 1. 
+                else
+                    DCS_matrix[i,j] = quadgk(func,θs[j-1],θs[j])[1]/norm
+                end
+            end
+        end
         DCS_matrix = replace_nan(DCS_matrix)
+        DCS_matrix = cumsum(DCS_matrix,dims=2)
         spl2 = LinearInterpolation((ens,θs),DCS_matrix,extrapolation_bc=Flat())	#2D spline of the matrix
         # func3(e,R) = LinearInterpolation(spl2(e,θs),cos.(θs))(R)::Float64	#Interpolates the above vector and evaluates a value of chi for a given R
         # @show typeof(LinearInterpolation(spl2(1.,θs),cos.(θs)))	#Interpolates the above vector and evaluates a value of chi for a given R
         #TODO: Try this with energy dependency aswell
-        push!(dcss,[LinearInterpolation(spl2(c,θs),cos.(θs)) for c in cbins])
+        for c in cbins
+            @show spl2(c,0:0.1:pi)
+            LinearInterpolation(Interpolations.deduplicate_knots!(spl2(c,θs)),cos.(θs))
+        end
+        
+        push!(dcss,[LinearInterpolation(Interpolations.deduplicate_knots!(spl2(c,θs)),cos.(θs)) for c in cbins])
     end
     
     
@@ -352,20 +371,5 @@ function initPartv(v_0::GaussianVelocity,params)
     sqrt.(new_ea*v_0.axis/electron_v2eV)
 end
 
-# @xport function getGas(input_gas,ebins)
-#     CSs::Vector{CrossSection} = []
-#     for gas in input_gas.elastic
-#         push!(CSs,CrossSection(:ELASTIC,"",me/input_gas.Mₑₗ[1],0.,1.,ebins,gas.(ebins)))
-#     end
-#     for gas in input_gas.excitation
-#         push!(CSs,CrossSection(:EXCITATION,"",me/input_gas.Mₑₗ[1],find_loss(gas),1.,ebins,gas.(ebins)))
-#     end
-#     for gas in input_gas.ionisation
-#         push!(CSs,CrossSection(:IONIZATION,"",me/input_gas.Mₑₗ[1],find_loss(gas),1.,ebins,gas.(ebins)))
-#     end
-    
-#     return CSs
-
-# end
 
 end

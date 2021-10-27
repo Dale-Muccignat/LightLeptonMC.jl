@@ -5,7 +5,7 @@ using Test
 
 using MCSim
 
-N = 200000
+N = 500000
 tol = 0.01
 function withinTol(y,ŷ,tol=0.01)
     @test y - y*tol <= ŷ<= y+y*tol
@@ -26,6 +26,21 @@ end
         withinTol(sol.ε̄,swarm.ε)
         withinTol(sol.DT,swarm.bDt)
         withinTol(sol.DL,swarm.bDl)
+    end
+    @testset "Anisotropic (ReidRamp)" begin
+        @info "Anisotropic (ReidRamp) Test"
+        meas, swarm, params  = mc(ReidRampA(),E=25.,T=0.,N=N,t=1e-7)
+        withinTol(1.234,swarm.ε)
+        withinTol(1.958e24,swarm.bDt)
+        meas, swarm, params  = mc(ReidRampB(),E=25.,T=0.,N=N,t=1e-7)
+        withinTol(1.229,swarm.ε)
+        withinTol(1.898e24,swarm.bDt)
+        meas, swarm, params  = mc(ReidRampC(),E=25.,T=0.,N=N,t=1e-7)
+        withinTol(1.216,swarm.ε)
+        withinTol(1.919e24,swarm.bDt)
+        meas, swarm, params  = mc(ReidRampD(),E=25.,T=0.,N=N,t=1e-7)
+        withinTol(1.210,swarm.ε)
+        withinTol(1.795e24,swarm.bDt)
     end
     @testset "Maxwell - Temperature" begin
         @info "Temperature (ReidRamp) Test"
