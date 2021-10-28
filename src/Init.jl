@@ -154,7 +154,7 @@ end
     for σ in gases_dcss
         DCS_matrix::Matrix{Float64} = zeros(length(ens),length(θs))
         for i in eachindex(ens)
-            func(chi) = σ(ens[i],chi)*sin(chi) == 0 ? 1e-10 : σ(ens[i],chi)*sin(chi)
+            func(chi) = σ(ens[i],chi)*sin(chi) < 1e-10 ? 1e-10 : σ(ens[i],chi)*sin(chi)
             norm = quadgk(func,0,pi)[1]
             for j in eachindex(θs)
                 if j == 1
