@@ -101,6 +101,7 @@ end
     # n0::Union{Vector{Float64},Float64,Nothing} = nothing
     n0::AUTO = nothing
     rbins::Union{Vector{Float64},Nothing} = nothing
+    χbins::Union{Vector{Float64},Nothing} = nothing
     tbins::Union{Vector{Float64},Nothing} = collect(LinRange(0,1e-5,10))
     zbins::Union{Vector{Float64},Nothing} = nothing
     xbins::Union{Vector{Float64},Nothing} = nothing
@@ -111,8 +112,8 @@ end
 
 end
 
-function MCPARAMS(;cbins=nothing,ebins=nothing,gas=nothing,splat_gas=nothing,total_freq=nothing,a=nothing,n0=nothing,rbins=nothing,tbins=nothing,zbins=nothing,xbins=nothing,ybins=nothing,length_scale=noting,time_scale=nothing,energy_scale=nothing)
-    MCPARAMS(cbins,ebins,gas,splat_gas,total_freq,a,n0,rbins,tbins,zbins,xbins,ybins,length_scale,time_scale,energy_scale)
+function MCPARAMS(;cbins=nothing,ebins=nothing,gas=nothing,splat_gas=nothing,total_freq=nothing,a=nothing,n0=nothing,rbins=nothing,χbins=nothing,tbins=nothing,zbins=nothing,xbins=nothing,ybins=nothing,length_scale=noting,time_scale=nothing,energy_scale=nothing)
+    MCPARAMS(cbins,ebins,gas,splat_gas,total_freq,a,n0,rbins,χbins,tbins,zbins,xbins,ybins,length_scale,time_scale,energy_scale)
 end
 
 
@@ -153,16 +154,25 @@ end
 
 @xport @AutoParm mutable struct MEASLμJ
     EELS::AUTO = nothing
+    χ::AUTO = nothing
     zy_bins::AUTO = nothing
 end
 
 function MEASLμJ(model::MCMODEL,params::MCPARAMS)
+    EELS,χ,zyt_bins = nothing, nothing, nothing
     if params.ybins != nothing && params.zbins != nothing
-        return MEASLμJ(zeros(length(params.ebins)),zeros(length(params.zbins),length(params.ybins),length(params.tbins)))
-    else
-        return MEASLμJ(zeros(length(params.ebins)),nothing)
+        zyt_bins = zeros(length(params.zbins),length(params.ybins),length(params.tbins))
     end
     
+    if params.ebins != nothing
+        EELS = zeros(length(params.ebins))
+    end
+
+    if params.χbins != nothing
+        χ = zeros(length(params.χbins))
+    end
+    
+    return MEASLμJ(EELS, χ, zyt_bins)
 
 end
 

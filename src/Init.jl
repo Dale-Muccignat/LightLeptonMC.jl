@@ -25,7 +25,7 @@ end
 function initParams(input_gas=MaxwellModel(),model::MCMODEL=MCMODEL())
 
     cbins = [0.,(10. .^(-3:0.1:2.))...]
-    tbins, ebins, rbins, zbins, ybins, xbins = generateBins(model)
+    tbins, ebins, rbins, χbins, zbins, ybins, xbins = generateBins(model)
     n0=buildDensity(model.n0,tbins)
     a=buildField(model.En0)
 
@@ -44,6 +44,7 @@ function initParams(input_gas=MaxwellModel(),model::MCMODEL=MCMODEL())
         xbins=xbins,
         cbins=cbins,
         rbins=rbins,
+        χbins=χbins,
         gas=input_gas,
         splat_gas=splat_gas,
         n0=n0,
@@ -147,35 +148,31 @@ end
         push!(gases_itp, LinearInterpolation(ens2,gas.(ens2),extrapolation_bc=Flat()))
     end
 
-    dcss::Vector{Vector{Interpolations.Extrapolation{Float64, 1, Interpolations.GriddedInterpolation{Float64, 1, Float64, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Tuple{Vector{Float64}}}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Interpolations.Throw{Nothing}}}} = []
-    replace_nan(v) = map(x -> isnan(x) ? zero(x)+1e-10 : x, v)
-    replace_0(v) = map(x -> x == 0 ? zero(x)+1e-10 : x, v)
+    dcss::Vector{Vector{Interpolations.Extrapolation{Float64, 1, Interpolations.GriddedInterpolation{Float64, 1, Float64, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Tuple{Vector{Float64}}}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Interpolations.Flat{Nothing}}}} = []
+    # replace_nan(v) = map(x -> isnan(x) ? zero(x)+1e-10 : x, v)
+    # replace_0(v) = map(x -> x == 0 ? zero(x)+1e-10 : x, v)
     for σ in gases_dcss
         DCS_matrix::Matrix{Float64} = zeros(length(ens),length(θs))
         for i in eachindex(ens)
-            norm = quadgk(chi -> σ(ens[i],chi)*sin(chi),0,pi)[1]
-            func(chi) = σ(ens[i],chi)*sin(chi)
+            func(chi) = σ(ens[i],chi)*sin(chi) == 0 ? 1e-10 : σ(ens[i],chi)*sin(chi)
+            norm = quadgk(func,0,pi)[1]
             for j in eachindex(θs)
                 if j == 1
                     DCS_matrix[i,j] = quadgk(func,0,θs[j])[1]/norm
                 elseif j == length(θs)
-                    DCS_matrix[i,j] = 1. 
+                    DCS_matrix[i,j] = 1. - sum(DCS_matrix[i,:])
                 else
                     DCS_matrix[i,j] = quadgk(func,θs[j-1],θs[j])[1]/norm
                 end
             end
         end
-        DCS_matrix = replace_0(replace_nan(DCS_matrix))
+        # DCS_matrix = replace_0(replace_nan(DCS_matrix))
         DCS_matrix = cumsum(DCS_matrix,dims=2)
         spl2 = LinearInterpolation((ens,θs),DCS_matrix,extrapolation_bc=Flat())	#2D spline of the matrix
         # func3(e,R) = LinearInterpolation(spl2(e,θs),cos.(θs))(R)::Float64	#Interpolates the above vector and evaluates a value of chi for a given R
         # @show typeof(LinearInterpolation(spl2(1.,θs),cos.(θs)))	#Interpolates the above vector and evaluates a value of chi for a given R
         #TODO: Try this with energy dependency aswell
-        for c in cbins
-            LinearInterpolation(Interpolations.deduplicate_knots!(spl2(c,θs)),cos.(θs))
-        end
-        
-        push!(dcss,[LinearInterpolation(Interpolations.deduplicate_knots!(spl2(c,θs)),cos.(θs)) for c in cbins])
+        push!(dcss,[LinearInterpolation(Interpolations.deduplicate_knots!(spl2(c,θs)),cos.(θs),extrapolation_bc=Flat()) for c in cbins])
     end
     
     
@@ -196,7 +193,7 @@ end
 # This tries a best guess at what parameters will be needed but is in no way good. Once params are initialized you will need to customize the ones you want as you need
 
 function generateBins(model)
-    tbins, ebins, zbins, ybins, xbins, rbins = nothing, nothing, nothing, nothing, nothing, nothing
+    tbins, ebins, zbins, ybins, xbins, rbins, χbins = nothing, nothing, nothing, nothing, nothing, nothing, nothing
 
     for m in model.meas
         if m == :t
@@ -211,10 +208,12 @@ function generateBins(model)
             xbins = buildXBins(model.type,model)
         elseif m == :r
             rbins = buildRBins(model.type,model,model.n0)
+        elseif m == :χ
+            χbins = buildχBins(model.type,model)
         end
     end
 
-    return tbins, ebins, rbins, zbins, ybins, xbins
+    return tbins, ebins, rbins, χbins, zbins, ybins, xbins
 
 end
 
@@ -240,6 +239,14 @@ end
 
 function buildTBins(type::SWARM,model)
     return LinRange(0,type.t_f,1000)
+end
+
+function buildχBins(type::LμJ,model)
+    return LinRange(0,π,100)
+end
+
+function buildχBins(type::SWARM,model)
+    return LinRange(0,π,100)
 end
 
 function buildZBins(type::LμJ,model)
