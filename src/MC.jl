@@ -108,7 +108,7 @@ end
 end
 #### * TBins Measurements
 function eventTbin!(dt,particle,model,params,meas_inner,verbose)
-    if meas_inner.meast.r != nothing 
+    if :t ∈ model.meas
         @inbounds @. meas_inner.meast.v²[particle.tbin,:] += particle.v^2 * particle.weight
         @inbounds @. meas_inner.meast.r²[particle.tbin,:] += particle.r^2 * particle.weight
         @inbounds @. meas_inner.meast.r[particle.tbin,:] += particle.r * particle.weight
@@ -118,7 +118,7 @@ function eventTbin!(dt,particle,model,params,meas_inner,verbose)
         @inbounds meas_inner.meast.εᵢ[particle.tbin] += dot(particle.v,particle.v) * particle.weight
     end
 
-    meas_inner.measLμJ.zyt_bins != nothing ? meas_inner.measLμJ.zyt_bins[particle.zbin,particle.ybin,particle.tbin] += particle.weight : nothing
+    :zyt ∈ model.meas ? meas_inner.measLμJ.zyt[particle.zbin,particle.ybin,particle.tbin] += particle.weight : nothing
     
     particle.tbin += 1
 end
@@ -298,8 +298,9 @@ function eventRBin!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
     end
 
     if particle.rbin == length(params.rbins)
-        meas_inner.measLμJ.χ[findMinInd(params.χbins,abs(atan(particle.r[2],particle.r[3])))] += particle.weight
-        meas_inner.measLμJ.EELS[findMinInd(params.ebins,getEnergy(particle.v))] += particle.weight
+        :χ in model.meas ? meas_inner.measLμJ.χ[findMinInd(params.χbins,abs(atan(particle.r[2],particle.r[3])))] += particle.weight : nothing
+        :eχ in model.meas ? meas_inner.measLμJ.εχ[findMinInd(params.ebins,getEnergy(particle.v)),findMinInd(params.χbins,abs(atan(particle.r[2],particle.r[3])))] += particle.weight : nothing
+        :e in model.meas ? meas_inner.measLμJ.ε[findMinInd(params.ebins,getEnergy(particle.v))] += particle.weight : nothing
     end
     
 end

@@ -153,26 +153,31 @@ end
 end
 
 @xport @AutoParm mutable struct MEASLμJ
-    EELS::AUTO = nothing
+    ε::AUTO = nothing
     χ::AUTO = nothing
-    zy_bins::AUTO = nothing
+    εχ::AUTO = nothing
+    zyt::AUTO = nothing
 end
 
 function MEASLμJ(model::MCMODEL,params::MCPARAMS)
-    EELS,χ,zyt_bins = nothing, nothing, nothing
-    if params.ybins != nothing && params.zbins != nothing
-        zyt_bins = zeros(length(params.zbins),length(params.ybins),length(params.tbins))
+    EELS,χ,zyt,εχ = nothing, nothing, nothing, nothing
+    if :zyt ∈ model.meas
+        zyt= zeros(length(params.zbins),length(params.ybins),length(params.tbins))
     end
     
-    if params.ebins != nothing
-        EELS = zeros(length(params.ebins))
+    if :e ∈ model.meas
+        ε = zeros(length(params.ebins))
     end
 
-    if params.χbins != nothing
+    if :χ ∈ model.meas
         χ = zeros(length(params.χbins))
     end
     
-    return MEASLμJ(EELS, χ, zyt_bins)
+    if :eχ ∈ model.meas
+        εχ = zeros(length(params.ebins),length(params.χbins))
+    end
+
+    return MEASLμJ(ε, χ, εχ,zyt)
 
 end
 

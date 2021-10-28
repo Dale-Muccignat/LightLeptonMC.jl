@@ -77,7 +77,7 @@ function mc(model::MCMODEL,gases::Vector{Gas},indicies;verbose=false,w=1.0,ref_g
         end
         
         meas, swarm, params= mc(model,params,verbose=verbose)
-        distribution_data[i] = (params.ebins,meas.measLμJ.EELS)
+        distribution_data[i] = (params.ebins,meas.measLμJ.ε)
     end
     if save
         saveBatch(distribution_data,model,indicies,w)
@@ -191,7 +191,7 @@ function saveDist(name,model,params,meas)
     en = model.v_0.ε
     n = model.n
     ebins = params.ebins
-    dist = meas.measLμJ.EELS
+    dist = meas.measLμJ.ε
     filename = "$name"*"_"*"$en"*"_no"*"$n"*"_" * string(Dates.today()) * "_" * string(Dates.hour(now())) * "-" * string(Dates.minute(now())) * "-" * string(Dates.second(now())) * "-" * string(Dates.millisecond(now()))
     @jld2save filename*"TEMP"*".jld2" dist ebins
     cp(filename*"TEMP"*".jld2",filename*".jld2")

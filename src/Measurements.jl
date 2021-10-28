@@ -17,7 +17,10 @@ const Td = 1e-21
 end
 
 @xport function process(type::LμJ,meas,params,model)
-    meas.measLμJ.EELS ./= model.n
+    meas.measLμJ.ε ./= model.n
+    meas.measLμJ.εχ ./= model.n
+    meas.measLμJ.χ ./= model.n
+    meas.measLμJ.zyt ./= model.n
     meas, SWARMMEAS()
 end
 

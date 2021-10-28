@@ -193,25 +193,16 @@ end
 # This tries a best guess at what parameters will be needed but is in no way good. Once params are initialized you will need to customize the ones you want as you need
 
 function generateBins(model)
-    tbins, ebins, zbins, ybins, xbins, rbins, χbins = nothing, nothing, nothing, nothing, nothing, nothing, nothing
 
-    for m in model.meas
-        if m == :t
-            tbins = buildTBins(model.type,model)
-        elseif m == :e
-            ebins = buildEnBins(model.type,model)
-        elseif m == :z
-            zbins = buildZBins(model.type,model)
-        elseif m == :y
-            ybins = buildYBins(model.type,model)
-        elseif m == :x
-            xbins = buildXBins(model.type,model)
-        elseif m == :r
-            rbins = buildRBins(model.type,model,model.n0)
-        elseif m == :χ
-            χbins = buildχBins(model.type,model)
-        end
-    end
+    m = string.(model.meas)
+
+    tbins = 1 ∈ occursin.("t",m) ? buildTBins(model.type,model) : nothing
+    ebins = 1 ∈ occursin.("e",m) ? buildEnBins(model.type,model) : nothing
+    zbins = 1 ∈ occursin.("z",m) ? buildZBins(model.type,model) : nothing
+    ybins = 1 ∈ occursin.("y",m) ? buildYBins(model.type,model) : nothing
+    xbins = 1 ∈ occursin.("x",m) ? buildXBins(model.type,model) : nothing
+    rbins = 1 ∈ occursin.("r",m) ? buildRBins(model.type,model,model.n0) : nothing
+    χbins = 1 ∈ occursin.("χ",m) ? buildχBins(model.type,model) : nothing
 
     return tbins, ebins, rbins, χbins, zbins, ybins, xbins
 
