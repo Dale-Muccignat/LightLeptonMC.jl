@@ -1,7 +1,15 @@
 # MCSim
 
 A flexible Monte Carlo simulation package for swarm and Liquid Micro-Jet applications.
-
+## Install
+To install this package, several dependancies are required and are handled through a local registry. First, add the local registry:
+```julia
+] registry add git@github.com:Dale-Muccignat/localregistry2.git
+```
+Then add MCSim
+```julia
+] add MCSim
+```
 ## Swarm
 
 To use, initiate a `Gas` struct from `Gases.jl`:
