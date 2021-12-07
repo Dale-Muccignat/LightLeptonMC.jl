@@ -1,13 +1,10 @@
-using Distributed
-addprocs(31)
 using Test
-
 
 using MCSim
 
-N = 500000
+N = 100000
 tol = 0.01
-function withinTol(y,ŷ,tol=0.01)
+function withinTol(y,ŷ,tol=0.05)
     @test y - y*tol <= ŷ<= y+y*tol
 end
 @testset "MCSim.jl" begin
