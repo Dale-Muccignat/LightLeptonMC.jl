@@ -197,7 +197,7 @@ uuid = "9fa8497b-333b-5362-9e8d-4d0656e87820"
 deps = ["LXCatParser", "RSequences"]
 git-tree-sha1 = "4a0fec4e3b629181bb82188d80f2effc4acb4de1"
 uuid = "2c68f703-1361-4b11-b625-5488bb42ec3f"
-version = "0.1.0"
+version = "0.2.0"
 
 [[HostCPUFeatures]]
 deps = ["BitTwiddlingConvenienceFunctions", "IfElse", "Libdl", "Static"]
