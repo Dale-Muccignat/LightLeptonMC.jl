@@ -169,11 +169,12 @@ Base.:/(x::Nothing,y) = nothing
 Base.:+(x::SWARMMEAS,y::SWARMMEAS) = GenericAddition(x,y)::SWARMMEAS
 Base.:+(x::MEAST,y::MEAST) = GenericAddition(x,y)::MEAST
 Base.:+(x::MEASLμJ,y::MEASLμJ) = GenericAddition(x,y)::MEASLμJ
+Base.:+(x::MEASCELL,y::MEASCELL) = GenericAddition(x,y)::MEASCELL
 Base.:+(x::MEASC,y::MEASC) = GenericAddition(x,y)::MEASC
 Base.:+(x::MEASS,y::MEASS) = GenericAddition(x,y)::MEASS
 Base.:+(x::COLLCOUNT,y::COLLCOUNT) = GenericAddition(x,y)::COLLCOUNT
 function Base.:+(x::MEAS,y::MEAS)
-    return MEAS(GenericAddition(x.measLμJ,y.measLμJ),GenericAddition(x.measg,y.measg),GenericAddition(x.meast,y.meast),GenericAddition(x.meass,y.meass),GenericAddition(x.measc,y.measc))
+    return MEAS(GenericAddition(x.measLμJ,y.measLμJ),GenericAddition(x.measCell,y.measCell),GenericAddition(x.measg,y.measg),GenericAddition(x.meast,y.meast),GenericAddition(x.meass,y.meass),GenericAddition(x.measc,y.measc))
 end
 
 function saveBatch(dists,model,indicies,w)

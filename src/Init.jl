@@ -13,7 +13,7 @@ const ħ = ustrip(float(ReducedPlanckConstant))
 const Td = 1e-21
 
 @AutoParm struct MCGAS
-    cs::AUTO
+    cs::Vector{Interpolations.Extrapolation{Float64, 1, ScaledInterpolation{Float64, 1, Interpolations.BSplineInterpolation{Float64, 1, Vector{Float64}, BSpline{Linear{Throw{OnGrid}}}, Tuple{Base.OneTo{Int64}}}, BSpline{Linear{Throw{OnGrid}}}, Tuple{StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64}}}, BSpline{Linear{Throw{OnGrid}}}, Flat{Nothing}}}
     dcs::AUTO
     type::AUTO
     thresh::AUTO

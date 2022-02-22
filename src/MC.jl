@@ -315,13 +315,16 @@ function eventRBin!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
     elseif dt.direction == :Down
         particle.rbin -= 1
     end
+    measureRBin!(model.type,particle,model,params,meas_inner,verbose)
+end
 
+function measureRBin!(type::LμJ,particle,model,params,meas_inner,verbose)
     if particle.rbin == length(params.rbins)
         :χ in model.meas ? meas_inner.measLμJ.χ[findMinInd(params.χbins,abs(atan(particle.r[2],particle.r[3])))] += particle.weight : nothing
         :eχ in model.meas ? meas_inner.measLμJ.εχ[findMinInd(params.ebins,getEnergy(particle.v)),findMinInd(params.χbins,abs(atan(particle.r[2],particle.r[3])))] += particle.weight : nothing
         :e in model.meas ? meas_inner.measLμJ.ε[findMinInd(params.ebins,getEnergy(particle.v))] += particle.weight : nothing
     end
-    
+
 end
 
 function eventYBin!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
@@ -330,6 +333,13 @@ function eventYBin!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
         particle.ybin += 1
     elseif dt.direction == :Down
         particle.ybin -= 1
+    end
+    measureYBin!(model.type,particle,model,params,meas_inner,verbose)
+end
+
+function measureYBin!(type::CELL,particle,model,params,meas_inner,verbose)
+    if particle.ybin == length(params.ybins)
+        :y in model.meas ? meas_inner.measCell.y[findMinInd(params.ybins,particle.r[2])] += particle.weight : nothing
     end
 end
 
@@ -340,8 +350,30 @@ function eventZBin!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
     elseif dt.direction == :Down
         particle.zbin -= 1
     end
+    measureZBin!(model.type,particle,model,params,meas_inner,verbose)
 end
 
+function measureZBin!(type::CELL,particle,model,params,meas_inner,verbose)
+    if particle.zbin == length(params.zbins)
+        :z in model.meas ? meas_inner.measCell.z[findMinInd(params.zbins,particle.r[3])] += particle.weight : nothing
+    end
+end
+
+function eventXBin!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
+    verbose && @info "xBin Bin Change: " dt
+    if dt.direction == :Up
+        particle.xbin += 1
+    elseif dt.direction == :Down
+        particle.xbin -= 1
+    end
+    measureXBin!(model.type,particle,model,params,meas_inner,verbose)
+end
+
+function measureXBin!(type::CELL,particle,model,params,meas_inner,verbose)
+    if particle.xbin == length(params.xbins)
+        :x in model.meas ? meas_inner.measCell.x[findMinInd(params.xbins,particle.r[1])] += particle.weight : nothing
+    end
+end
 # * Get Bin Times
 
 function getEnDt(En0::UniformField,n0::UniformDensity,particle,model,params)
@@ -420,10 +452,20 @@ end
 
 function getZDt(particle,model,params)
     if params.zbins != nothing
-        if (particle.v[3] < 0.) && (particle.zbin != 1)
-            return dt_EVENT((params.zbins[particle.zbin]-1e-12-particle.r[3])/particle.v[3], :dt_zbin,:Down)
-        elseif (particle.zbin < length(params.zbins)) && (particle.v[3] > 0.)
-            return dt_EVENT((params.zbins[particle.zbin+1]+1e-12-particle.r[3])/particle.v[3], :dt_zbin, :Up)
+        if model.optimise_spatial == true
+            if (particle.v[3] < 0.) && (particle.zbin != 1)
+                return dt_EVENT((params.zbins[1]-1e-12-particle.r[3])/particle.v[3], :dt_zbin,:Down)
+            elseif (particle.zbin < length(params.zbins)) && (particle.v[3] > 0.)
+                return dt_EVENT((params.zbins[end]+1e-12-particle.r[3])/particle.v[3], :dt_zbin, :Up)
+            end
+        else
+            if params.zbins != nothing
+                if (particle.v[3] < 0.) && (particle.zbin != 1)
+                    return dt_EVENT((params.zbins[particle.zbin]-1e-12-particle.r[3])/particle.v[3], :dt_zbin,:Down)
+                elseif (particle.zbin < length(params.zbins)) && (particle.v[3] > 0.)
+                    return dt_EVENT((params.zbins[particle.zbin+1]+1e-12-particle.r[3])/particle.v[3], :dt_zbin, :Up)
+                end
+            end
         end
     end
     return dt_EVENT(Inf,:dt_zbin,:Up)
@@ -431,10 +473,20 @@ end
 
 function getYDt(particle,model,params)
     if params.ybins != nothing
-        if (particle.v[2] < 0.) && (particle.ybin != 1)
-            return dt_EVENT((params.ybins[particle.ybin]-1e-12-particle.r[2])/particle.v[2], :dt_ybin,:Down)
-        elseif (particle.ybin < length(params.ybins)) && (particle.v[2] > 0.)
-            return dt_EVENT((params.ybins[particle.ybin+1]+1e-12-particle.r[2])/particle.v[2], :dt_ybin, :Up)
+        if model.optimise_spatial == true
+            if (particle.v[3] < 0.) && (particle.ybin != 1)
+                return dt_EVENT((params.ybins[1]-1e-12-particle.r[2])/particle.v[2], :dt_zbin,:Down)
+            elseif (particle.ybin < length(params.ybins)) && (particle.v[2] > 0.)
+                return dt_EVENT((params.ybins[end]+1e-12-particle.r[2])/particle.v[2], :dt_zbin, :Up)
+            end
+        else
+            if params.ybins != nothing
+                if (particle.v[2] < 0.) && (particle.ybin != 1)
+                    return dt_EVENT((params.ybins[particle.ybin]-1e-12-particle.r[2])/particle.v[2], :dt_zbin,:Down)
+                elseif (particle.ybin < length(params.ybins)) && (particle.v[2] > 0.)
+                    return dt_EVENT((params.ybins[particle.ybin+1]+1e-12-particle.r[2])/particle.v[2], :dt_zbin, :Up)
+                end
+            end
         end
     end
     return dt_EVENT(Inf,:dt_ybin,:Up)
@@ -442,10 +494,20 @@ end
 
 function getXDt(particle,model,params)
     if params.xbins != nothing
-        if (particle.v[3] < 0.) && (particle.xbin != 1)
-            return dt_EVENT((params.xbins[particle.xbin]-1e-12-particle.r[3])/particle.v[3], :dt_ybin,:Down)
-        elseif (particle.xbin < length(params.xbins)) && (particle.v[3] > 0.)
-            return dt_EVENT((params.xbins[particle.xbin+1]+1e-12-particle.r[3])/particle.v[3], :dt_ybin, :Up)
+        if model.optimise_spatial == true
+            if (particle.v[1] < 0.) && (particle.xbin != 1)
+                return dt_EVENT((params.xbins[1]-1e-12-particle.r[1])/particle.v[1], :dt_zbin,:Down)
+            elseif (particle.xbin < length(params.xbins)) && (particle.v[1] > 0.)
+                return dt_EVENT((params.xbins[end]+1e-12-particle.r[1])/particle.v[1], :dt_zbin, :Up)
+            end
+        else
+            if params.xbins != nothing
+                if (particle.v[1] < 0.) && (particle.xbin != 1)
+                    return dt_EVENT((params.xbins[particle.xbin]-1e-12-particle.r[1])/particle.v[1], :dt_zbin,:Down)
+                elseif (particle.xbin < length(params.xbins)) && (particle.v[1] > 0.)
+                    return dt_EVENT((params.xbins[particle.xbin+1]+1e-12-particle.r[1])/particle.v[1], :dt_zbin, :Up)
+                end
+            end
         end
     end
     return dt_EVENT(Inf,:dt_ybin,:Up)

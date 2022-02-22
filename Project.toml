@@ -1,7 +1,7 @@
 name = "MCSim"
 uuid = "991984a3-fa47-4c97-b7d3-89e3c6c3a7f8"
 authors = ["Dale-Muccignat <dale.muccignat@my.jcu.edu.au>"]
-version = "0.2.1"
+version = "0.2.2"
 
 [deps]
 AndExport = "4484d908-372d-4f90-b90b-0ec97f005b8c"

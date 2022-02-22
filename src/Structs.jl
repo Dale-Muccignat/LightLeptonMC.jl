@@ -73,6 +73,7 @@ end
     T::AUTO = UniformTemp()
     ion_type::AUTO = UniformIonisation()
     meas::AUTO = [:t]
+    optimise_spatial::AUTO = true
 end
 
 @xport @AutoParm mutable struct SWARM
@@ -143,6 +144,7 @@ end
 
 @AutoParm mutable struct MEAS
     measLμJ::AUTO = MEASLμJ()
+    measCell::AUTO = MEASCELL()
     measg::AUTO = MEASG()
     meast::AUTO = MEAST()
     meass::AUTO = MEASS()
@@ -150,10 +152,15 @@ end
 end
 
 function MEAS(type::SWARM,model,params::MCPARAMS=MCPARAMS())
-    MEAS(MEASLμJ(),MEASG(),MEAST(params),MEASS(),MEASC())
+    MEAS(MEASLμJ(),MEASCELL(),MEASG(),MEAST(params),MEASS(),MEASC())
 end
+
 function MEAS(type::LμJ,model,params::MCPARAMS=MCPARAMS())
-    MEAS(MEASLμJ(model,params),MEASG(),MEAST(),MEASS(),MEASC())
+    MEAS(MEASLμJ(model,params),MEASCELL(),MEASG(),MEAST(),MEASS(),MEASC())
+end
+
+function MEAS(type::CELL,model,params::MCPARAMS=MCPARAMS())
+    MEAS(MEASLμJ(),MEASCELL(model,params),MEASG(),MEAST(),MEASS(),MEASC())
 end
 
 @xport @AutoParm mutable struct COLLCOUNT
@@ -190,6 +197,30 @@ function MEASLμJ(model::MCMODEL,params::MCPARAMS)
 
     return MEASLμJ(ε, χ, εχ,zyt)
 
+end
+
+@xport @AutoParm mutable struct MEASCELL
+    ε::AUTO = nothing
+    x::AUTO = nothing
+    y::AUTO = nothing
+    z::AUTO = nothing
+end
+
+function MEASCELL(model::MCMODEL,params::MCPARAMS)
+    ε, x, y, z = nothing, nothing, nothing, nothing
+    if :e ∈ model.meas
+        ε = zeros(length(params.ebins))
+    end
+    if :x ∈ model.meas
+        x = zeros(length(params.xbins))
+    end
+    if :y ∈ model.meas
+        y = zeros(length(params.ybins))
+    end
+    if :z ∈ model.meas
+        z = zeros(length(params.zbins))
+    end
+    return MEASCELL(ε,x,y,z)
 end
 
 @AutoParm mutable struct MEASG
