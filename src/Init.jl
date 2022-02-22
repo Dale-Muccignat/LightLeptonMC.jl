@@ -143,7 +143,7 @@ end
     ens2 = 1e-6:1e-4:(cbins[end]+en_spacing+1.)
     θs = LinRange(1e-6,π,100)
 
-    gases_itp::Vector{Interpolations.Extrapolation{Float64, 1, ScaledInterpolation{Float64, 1, Interpolations.BSplineInterpolation{Float64, 1, Vector{Float64}, BSpline{Linear{Throw{OnGrid}}}, Tuple{Base.OneTo{Int64}}}, BSpline{Linear{Throw{OnGrid}}}, Tuple{StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}}}}, BSpline{Linear{Throw{OnGrid}}}, Flat{Nothing}}} = []
+    gases_itp::Vector{Interpolations.Extrapolation{Float64, 1, ScaledInterpolation{Float64, 1, Interpolations.BSplineInterpolation{Float64, 1, Vector{Float64}, BSpline{Linear{Throw{OnGrid}}}, Tuple{Base.OneTo{Int64}}}, BSpline{Linear{Throw{OnGrid}}}, Tuple{StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64}}}, BSpline{Linear{Throw{OnGrid}}}, Flat{Nothing}}} = []
     for gas in gases
         push!(gases_itp, LinearInterpolation(ens2,gas.(ens2),extrapolation_bc=Flat()))
     end
@@ -212,12 +212,33 @@ function buildRBins(type::SWARM,model,n0::UniformDensity)
     return LinRange(0,1e-6,10)
 end
 
-function buildRBins(type::LμJ,model,n0::LμJDensity)
-    return [0.,(type.jet_width/2)^2,1e20]
-end
-
 function buildEnBins(type::SWARM,model)
     return 10 .^LinRange(-3,2,1000)
+end
+
+function buildTBins(type::SWARM,model)
+    return LinRange(0,type.t_f,1000)
+end
+
+function buildχBins(type::SWARM,model)
+    return LinRange(0,π,100)
+end
+
+function buildZBins(type::SWARM,model)
+    return LinRange(-7.5e-6,-6.5e-6,200)
+end
+
+function buildYBins(type::SWARM,model)
+    return LinRange(-7e-7,7e-7,200)
+end
+
+function buildXBins(type::SWARM,model)
+    return LinRange(-7e-7,7e-7,200)
+end
+
+
+function buildRBins(type::LμJ,model,n0::LμJDensity)
+    return [0.,(type.jet_width/2)^2,1e20]
 end
 
 function buildEnBins(type::LμJ,model)
@@ -228,15 +249,7 @@ function buildTBins(type::LμJ,model)
     return LinRange(3e-13,320e-13,10)
 end
 
-function buildTBins(type::SWARM,model)
-    return LinRange(0,type.t_f,1000)
-end
-
 function buildχBins(type::LμJ,model)
-    return LinRange(0,π,100)
-end
-
-function buildχBins(type::SWARM,model)
     return LinRange(0,π,100)
 end
 
@@ -244,23 +257,11 @@ function buildZBins(type::LμJ,model)
     return LinRange(-7.5e-6,-6.5e-6,200)
 end
 
-function buildZBins(type::SWARM,model)
-    return LinRange(-7.5e-6,-6.5e-6,200)
-end
-
 function buildYBins(type::LμJ,model)
     return LinRange(-7e-7,7e-7,200)
 end
 
-function buildYBins(type::SWARM,model)
-    return LinRange(-7e-7,7e-7,200)
-end
-
 function buildXBins(type::LμJ,model)
-    return LinRange(-7e-7,7e-7,200)
-end
-
-function buildXBins(type::SWARM,model)
     return LinRange(-7e-7,7e-7,200)
 end
 

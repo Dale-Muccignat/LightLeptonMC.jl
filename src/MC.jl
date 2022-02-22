@@ -48,11 +48,22 @@ function flight(particle,model,params,verbose)
     return meas_inner
 end
 
-function checkAlive(type::SWARM,particle,model,params,verbose)
-    return particle.t < model.type.t_f*params.time_scale
+function checkAlive(type,particle,model,params,verbose)
+
+    alive = true
+    if params.tbins != nothing
+        alive = alive && particle.t < model.type.t_f*params.time_scale
+    end
+    
+    return alive && checkAliveModel(type,particle,model,params,verbose)
 end
 
-function checkAlive(type::LμJ,particle,model,params,verbose)
+function checkAliveModel(type::SWARM,particle,model,params,verbose)
+
+    return true
+end
+
+function checkAliveModel(type::LμJ,particle,model,params,verbose)
 
     if getEnergy(particle.v) < type.thresh*params.energy_scale
         verbose && @info "Absorbed"
@@ -62,12 +73,21 @@ function checkAlive(type::LμJ,particle,model,params,verbose)
         verbose && @info "Detected"
     end
 
-    if params.tbins != nothing
-        return particle.rbin != length(params.rbins) && getEnergy(particle.v) > type.thresh*params.energy_scale && particle.t < params.tbins[end]
-    else
-        return particle.rbin != length(params.rbins) && getEnergy(particle.v) > type.thresh*params.energy_scale 
+    return particle.rbin != length(params.rbins) && getEnergy(particle.v) > type.thresh*params.energy_scale 
+end
+
+function checkAliveModel(type::CELL,particle,model,params,verbose)
+
+    if getEnergy(particle.v) < type.thresh*params.energy_scale
+        verbose && @info "Absorbed"
     end
-        
+
+    if particle.zbin == length(params.zbins) || particle.ybin == length(params.ybins) || particle.xbin == length(params.xbins)
+        verbose && @info "Detected"
+    end
+    alive = particle.zbin != length(params.zbins) && particle.ybin != length(params.ybins) && particle.xbin != length(params.xbins)
+
+    return alive && getEnergy(particle.v) > type.thresh*params.energy_scale 
 end
 
 function event!(dt,particle,model,params,meas_inner,verbose)
