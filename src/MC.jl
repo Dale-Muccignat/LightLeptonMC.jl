@@ -121,8 +121,7 @@ end
     particle.t += dt
 end
 
-@xport @fastmath function updateParticle!(dt,particle,En0,n0::LμJDensity,params,verbose)
-    #TODO: Make this dependent upon Zero Field only
+@xport @fastmath function updateParticle!(dt,particle,En0::ZeroField,n0,params,verbose)
     particle.r += particle.v * dt
     particle.t += dt
 end
