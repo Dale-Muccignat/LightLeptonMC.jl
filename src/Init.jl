@@ -308,6 +308,9 @@ function buildField(En0::UniformField)
     SVector(0.,0.,q*Td*En0.val/me)
 end
 
+function buildField(En0::ZeroField)
+    SVector(0.,0.,0.)
+end
 
 
 #### * PARTICLE

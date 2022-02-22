@@ -4,11 +4,11 @@ using AutoParameters, Gases, StaticArrays, AndExport
 
 export MCMODEL, MCINIT, MCPARAMS, PART, MEAS, MEAST, MEASS, MEASC, findMinInd
 
-abstract type Velocity end
-abstract type Spacial end
-abstract type Density end
-abstract type Field end
-abstract type Temp end
+@xport abstract type Velocity end
+@xport abstract type Spacial end
+@xport abstract type Density end
+@xport abstract type Field end
+@xport abstract type Temp end
 
 @xport struct ZeroSpacial <: Spacial end
 @xport @AutoParm struct InitSpacial <: Spacial
