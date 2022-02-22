@@ -89,17 +89,17 @@ end
     # Defined spacial parameters for the CELL
     Δε_detector::AUTO = 0.9
     thresh::AUTO = 1.
-    depth::AUTO = 15e-6
-    width::AUTO = 15e-6
-    height::AUTO = 15e-6
+    z::AUTO = 15e-6
+    x::AUTO = 15e-6
+    y::AUTO = 15e-6
 end
 
 @xport function LμJ(;Δε_detector=0.9,thresh=1.,jet_width=15e-6)
     LμJ(Δε_detector,thresh,jet_width)
 end
 
-@xport function CELL(;Δε_detector=0.9,thresh=1.,depth=15e-6,width=15e-6,height=15e-6)
-    CELL(Δε_detector,thresh,depth,width,height)
+@xport function CELL(;Δε_detector=0.9,thresh=1.,z=15e-6,x=15e-6,y=15e-6)
+    CELL(Δε_detector,thresh,z,x,y)
 end
 
 @AutoParm mutable struct MCPARAMS
