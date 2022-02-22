@@ -208,6 +208,8 @@ function generateBins(model)
 
 end
 
+# TODO: Combine these into one function per model
+
 function buildRBins(type::SWARM,model,n0::UniformDensity)
     return LinRange(0,1e-6,10)
 end
@@ -236,7 +238,33 @@ function buildXBins(type::SWARM,model)
     return LinRange(-7e-7,7e-7,200)
 end
 
+function buildRBins(type::CELL,model,n0::UniformDensity)
+    return LinRange(0,1e-6,10)
+end
 
+function buildEnBins(type::CELL,model)
+    return collect(model.type.thresh:model.type.Δε_detector:(model.v_0.ε+2*model.v_0.Δε_source))
+end
+
+function buildTBins(type::CELL,model)
+    return LinRange(0,type.t_f,1000)
+end
+
+function buildχBins(type::CELL,model)
+    return LinRange(0,π,100)
+end
+
+function buildZBins(type::CELL,model)
+    return LinRange(0,type.z,200)
+end
+
+function buildYBins(type::CELL,model)
+    return LinRange(0,type.y,200)
+end
+
+function buildXBins(type::CELL,model)
+    return LinRange(0,type.x,200)
+end
 function buildRBins(type::LμJ,model,n0::LμJDensity)
     return [0.,(type.jet_width/2)^2,1e20]
 end
