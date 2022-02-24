@@ -24,6 +24,14 @@ end
     meas, SWARMMEAS()
 end
 
+@xport function process(type::CELL,meas,params,model)
+    :ε in model.meas ? meas.measCell.ε ./= model.n : nothing
+    :x in model.meas ? meas.measCell.x ./= model.n : nothing
+    :y in model.meas ? meas.measCell.y ./= model.n : nothing
+    :z in model.meas ? meas.measCell.z ./= model.n : nothing
+    meas, SWARMMEAS()
+end
+
 function weights!(meas)
     for i in 1:length(meas.meast.w)
         meas.meast.εᵢ[i] *= 0.5*me/meas.meast.w[i]/q
