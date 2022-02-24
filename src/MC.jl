@@ -405,11 +405,11 @@ function getEnDt(En0::UniformField,n0::UniformDensity,particle,model,params)
 		#same as before except with the lower boundry of the next bin up
 		return dt_EVENT(-(particle.v[3]-vf_z) /(params.a[3] * params.n0), :dt_energy,:Up)
 	end
-    return dt_ENERGY(Inf, :dt_energy, Up())
+    return dt_EVENT(Inf, :dt_energy, :Up)
 end
 
 function getEnDt(Eno::ZeroField,n0,particle,model,params)
-    return dt_ENERGY(Inf, :dt_energy, Up())
+    return dt_EVENT(Inf, :dt_energy, :Up)
 end
 
 @fastmath function getRDt(particle,model,params)
@@ -561,7 +561,7 @@ end
     dt_ybin = getYDt(particle,model,params)
     dt_xbin = getXDt(particle,model,params)
     verbose && @info dts
-    dts = (dt_coll,dt_energy,dt_tbin,dt_rbin,dt_zbin,dt_ybin)
+    dts = (dt_coll,dt_energy,dt_tbin,dt_rbin,dt_zbin,dt_ybin,dt_xbin)
     dt_times = (dt_coll.time,dt_energy.time,dt_tbin.time,dt_rbin.time,dt_zbin.time,dt_ybin.time,dt_xbin.time)
     return dts[findMinTime(dt_times,verbose=verbose)]
 end

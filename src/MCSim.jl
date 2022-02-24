@@ -100,7 +100,7 @@ function mc(model::MCMODEL,params::MCPARAMS;verbose=false)
             @info "Progress: "*string(100*n/model.n)*"%"
         end
 
-        meas_inner = flight(PART(model.type,model,params),model,params,verbose)
+        meas_inner = flight(PART(model,params),model,params,verbose)
         [meas_inner]
     end
     # @show params.rbins

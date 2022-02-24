@@ -115,6 +115,12 @@ end
     es = 1/params.energy_scale
 end
 
+@xport function unscale!(type::CELL,params,meas::MEAS)
+    ls = 1/params.length_scale
+    ts = 1/params.time_scale
+    es = 1/params.energy_scale
+end
+
 function initMeas(model,params::MCPARAMS = MCPARAMS())
     MEAS(model.type,model,params)
 end
@@ -243,6 +249,7 @@ function buildRBins(type::CELL,model,n0::UniformDensity)
 end
 
 function buildEnBins(type::CELL,model)
+    #TODO: Make specific to each velocity type
     return collect(model.type.thresh:model.type.Δε_detector:(model.v_0.ε+2*model.v_0.Δε_source))
 end
 
@@ -315,7 +322,7 @@ end
 
 #### * PARTICLE
 
-function Structs.PART(type::SWARM,model,params)
+function Structs.PART(model,params)
 
     particle = PART()
     particle.r = initPartr(model.r_0,params).*params.length_scale
@@ -325,29 +332,15 @@ function Structs.PART(type::SWARM,model,params)
         particle.zbin = findMinInd(params.zbins,particle.r[3])
     end
     
+    if params.xbins != nothing
+        particle.xbin = findMinInd(params.xbins,particle.r[1])
+    end
+
     if params.ybins != nothing
         particle.ybin = findMinInd(params.ybins,particle.r[2])
     end
         
 
-    return particle
-
-end
-function Structs.PART(type::LμJ,model,params)
-
-    particle = PART()
-    particle.r = initPartr(model.r_0,params).*params.length_scale
-    particle.v = initPartv(model.v_0,params).*params.length_scale ./params.time_scale
-    particle.cbin = findMinInd(params.cbins,getEnergy(particle.v))
-    particle.rbin = findMinInd(params.rbins,dot(particle.r,particle.r))
-
-    if params.zbins != nothing
-        particle.zbin = findMinInd(params.zbins,particle.r[3])
-    end
-    
-    if params.ybins != nothing
-        particle.ybin = findMinInd(params.ybins,particle.r[2])
-    end
     return particle
 
 end
