@@ -4,8 +4,8 @@ MCSim
 This package takes gases from Gases.jl and performs a Monte Carlo simulation in either a swarm or LμJ configuration. An example swarm simulation is included below.
 
 ```julia
-    meas, swarm = mc(MaxwellModel();E=1.,T=0.,N=1000,S=0.,verbose=false)
-    mean, swarm = mc(model,gas)
+    meas, swarm, params = mc(MaxwellModel();E=1.,T=0.,N=1000,S=0.,verbose=false)
+    mean, swarm, params = mc(model,gas)
 ```
 
 """
