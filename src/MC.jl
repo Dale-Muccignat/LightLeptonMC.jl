@@ -239,6 +239,7 @@ end
 
 function getIonisationEnergy(thresh,ion_type::DiscreteIonisation,g)
     total_energy = getEnergy(g)*q - thresh
+    #TODO: Check units
     if rand() > 0.5
         other_part_energy = total_energy - ion_type.val
     else
