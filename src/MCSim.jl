@@ -112,11 +112,11 @@ end
 
 @xport function buildModel()
     println("Welcome to the model builder helper")
-    println("What type of model [LuJ/Swarm]:")
+    println("What type of model [LuJ/Swarm/Cell]:")
     modeltype = readline()
-    while modeltype ∉ ["LuJ","Swarm"]
+    while modeltype ∉ ["LuJ","Swarm","Cell"]
         println("Error: Model not found")
-        println("What type of model [LuJ/Swarm]:")
+        println("What type of model [LuJ/Swarm/Cell]:")
         modeltype = readline()
     end
     

@@ -41,8 +41,13 @@ end
 abstract type Ionisation end
 
 @xport @AutoParm mutable struct UniformIonisation <: Ionisation end
+
 @xport @AutoParm mutable struct RatioIonisation <: Ionisation
     ratio::AUTO = 0.5
+end
+
+@xport @AutoParm mutable struct DiscreteIonisation <: Ionisation
+    loss::AUTO = 5.
 end
 
 @xport struct ZeroVelocity <: Velocity end
