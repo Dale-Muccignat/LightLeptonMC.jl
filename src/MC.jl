@@ -237,12 +237,24 @@ end
     
 end
 
+function getIonisationEnergy(thresh,ion_type::DiscreteIonisation,g)
+    total_energy = getEnergy(g)*q - thresh
+    if rand() > 0.5
+        other_part_energy = total_energy - ion_type.val
+    else
+        other_part_energy = ion_type.val 
+    end
+    part_energy = total_energy - other_part_energy 
+    return part_energy, other_part_energy
+end
+
 function getIonisationEnergy(thresh,ion_type::UniformIonisation,g)
     total_energy = getEnergy(g)*q - thresh
     other_part_energy = total_energy * rand()
     part_energy = total_energy - other_part_energy 
     return part_energy, other_part_energy
 end
+
 function getIonisationEnergy(thresh,ion_type::RatioIonisation,g)
     total_energy = getEnergy(g)*q - thresh
     if rand() > 0.5 
