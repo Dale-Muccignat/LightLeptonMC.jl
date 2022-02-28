@@ -26,7 +26,7 @@ function initParams(input_gas=MaxwellModel(),model::MCMODEL=MCMODEL())
 
     cbins = [0.,(10. .^(-3:0.1:2.))...]
     tbins, ebins, rbins, χbins, zbins, ybins, xbins = generateBins(model)
-    n0=buildDensity(model.n0,tbins)
+    n0=buildDensity(model.n0,rbins,zbins)
     a=buildField(model.En0)
 
     length_scale = model.n0.val*1e-20
@@ -244,8 +244,8 @@ function buildXBins(type::SWARM,model)
     return LinRange(-7e-7,7e-7,200)
 end
 
-function buildRBins(type::CELL,model,n0::UniformDensity)
-    return LinRange(0,1e-6,10)
+function buildRBins(type::CELL,model,n0)
+    return LinRange(0,type.r,type.bin_no)
 end
 
 function buildEnBins(type::CELL,model)
@@ -262,15 +262,15 @@ function buildχBins(type::CELL,model)
 end
 
 function buildZBins(type::CELL,model)
-    return LinRange(0,type.z,200)
+    return append!([-1.],LinRange(0.,type.z,200))
 end
 
 function buildYBins(type::CELL,model)
-    return LinRange(0,type.y,200)
+    return LinRange(-type.y,type.y,200)
 end
 
 function buildXBins(type::CELL,model)
-    return LinRange(0,type.x,200)
+    return LinRange(-type.x,type.x,200)
 end
 function buildRBins(type::LμJ,model,n0::LμJDensity)
     return [0.,(type.jet_width/2)^2,1e20]
@@ -302,12 +302,18 @@ end
 
 #### Density ####
 
-function buildDensity(n0::UniformDensity,rbins)
+function buildDensity(n0::UniformDensity,rbins,zbins)
     n0.val
 end
 
-function buildDensity(n0::LμJDensity,rbins)
+function buildDensity(n0::LμJDensity,rbins,zbins)
     [n0.val,0.,0.]
+end
+
+function buildDensity(n0::CellDensity,rbins,zbins)
+    densities = n0.val .* ones(length(zbins))   
+    densities[1] = 0.
+    return densities
 end
 #### Electric Field ####
 

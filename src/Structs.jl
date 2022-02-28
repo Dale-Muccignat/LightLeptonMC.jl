@@ -28,6 +28,9 @@ end
 @xport @AutoParm struct LμJDensity <: Density
     val::AUTO = 1e28
 end
+@xport @AutoParm struct CellDensity <: Density
+    val::AUTO = 1e28
+end
 @xport @AutoParm struct ZeroField <: Field
     val::AUTO = 0.
 end
@@ -98,14 +101,16 @@ end
     z::AUTO = 15e-6
     x::AUTO = 15e-6
     y::AUTO = 15e-6
+    bin_no::AUTO = 100
+    r::AUTO = 1e-6
 end
 
 @xport function LμJ(;Δε_detector=0.9,thresh=1.,jet_width=15e-6)
     LμJ(Δε_detector,thresh,jet_width)
 end
 
-@xport function CELL(;Δε_detector=0.9,thresh=1.,z=15e-6,x=15e-6,y=15e-6)
-    CELL(Δε_detector,thresh,z,x,y)
+@xport function CELL(;Δε_detector=0.9,thresh=1.,z=15e-6,x=15e-6,y=15e-6,bin_no=100,r=1e-6)
+    CELL(Δε_detector,thresh,z,x,y,bin_no,r)
 end
 
 @AutoParm mutable struct MCPARAMS
@@ -209,10 +214,11 @@ end
     x::AUTO = nothing
     y::AUTO = nothing
     z::AUTO = nothing
+    xy::AUTO = nothing
 end
 
 function MEASCELL(model::MCMODEL,params::MCPARAMS)
-    ε, x, y, z = nothing, nothing, nothing, nothing
+    ε, x, y, z, xy = nothing, nothing, nothing, nothing, nothing
     if :e ∈ model.meas
         ε = zeros(length(params.ebins))
     end
@@ -225,7 +231,10 @@ function MEASCELL(model::MCMODEL,params::MCPARAMS)
     if :z ∈ model.meas
         z = zeros(length(params.zbins))
     end
-    return MEASCELL(ε,x,y,z)
+    if :xy ∈ model.meas
+        xy = zeros(length(params.rbins))
+    end
+    return MEASCELL(ε,x,y,z,xy)
 end
 
 @AutoParm mutable struct MEASG

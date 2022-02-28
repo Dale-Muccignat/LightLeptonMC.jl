@@ -45,6 +45,11 @@ function flight(particle,model,params,verbose)
         alive = checkAlive(model.type,particle,model,params,verbose)
         # if verbose && meas_inner.measg.coll_count.elastic > 5 alive = false end
     end
+    @show particle.xbin
+    @show particle.ybin
+    @show particle.zbin
+    @show getEnergy(particle.v) > model.type.thresh*params.energy_scale
+    measureDeath!(model.type,particle,model,params,meas_inner,verbose)
     return meas_inner
 end
 
@@ -85,9 +90,25 @@ function checkAliveModel(type::CELL,particle,model,params,verbose)
     if particle.zbin == length(params.zbins) || particle.ybin == length(params.ybins) || particle.xbin == length(params.xbins)
         verbose && @info "Detected"
     end
-    alive = particle.zbin != length(params.zbins) && particle.ybin != length(params.ybins) && particle.xbin != length(params.xbins)
+    
+    alive = (particle.zbin != length(params.zbins) || particle.zbin != 1) && (particle.ybin != length(params.ybins) || particle.ybin != 1) && (particle.xbin != length(params.xbins) || particle.xbin != 1)
 
     return alive && getEnergy(particle.v) > type.thresh*params.energy_scale 
+end
+
+function measureDeath!(type::LμJ,particle,model,params,meas_inner,verbose)
+    if particle.rbin == length(params.rbins)
+        :χ in model.meas ? meas_inner.measLμJ.χ[findMinInd(params.χbins,abs(atan(particle.r[2],particle.r[3])))] += particle.weight : nothing
+        :eχ in model.meas ? meas_inner.measLμJ.εχ[findMinInd(params.ebins,getEnergy(particle.v)),findMinInd(params.χbins,abs(atan(particle.r[2],particle.r[3])))] += particle.weight : nothing
+        :e in model.meas ? meas_inner.measLμJ.ε[findMinInd(params.ebins,getEnergy(particle.v))] += particle.weight : nothing
+    end
+end
+
+function measureDeath!(type::CELL,particle,model,params,meas_inner,verbose)
+    if particle.zbin == length(params.zbins)
+        :xy in model.meas ? meas_inner.measCell.xy[findMinInd(params.rbins,particle.r[1]^2+particle.r[2]^2)] += particle.weight : nothing
+        :e in model.meas ? meas_inner.measCell.ε[findMinInd(params.ebins,getEnergy(particle.v))] += particle.weight : nothing
+    end
 end
 
 function event!(dt,particle,model,params,meas_inner,verbose)
@@ -221,7 +242,7 @@ end
 @fastmath function ionisationColl!(cs_no,ion_type,g,particle,model,params,meas_inner,verbose)
 
     if dot(g,g)-2*params.splat_gas.thresh[cs_no]/me > 0.
-        part_energy, other_part_energy = getIonisationEnergy(params.splat_gas.thresh[cs_no],ion_type,g)
+        part_energy, other_part_energy = getIonisationEnergy(params.splat_gas.thresh[cs_no],ion_type,g,params)
 
         coschi, sinchi, phi = scatteringAngle(cs_no,g,particle,model,params,verbose)
 
@@ -237,26 +258,25 @@ end
     
 end
 
-function getIonisationEnergy(thresh,ion_type::DiscreteIonisation,g)
+function getIonisationEnergy(thresh,ion_type::DiscreteIonisation,g,params)
     total_energy = getEnergy(g)*q - thresh
-    #TODO: Check units
     if rand() > 0.5
-        other_part_energy = total_energy - ion_type.val
+        other_part_energy = total_energy - ion_type.loss*params.energy_scale*q
     else
-        other_part_energy = ion_type.val 
+        other_part_energy = ion_type.loss*params.energy_scale*q
     end
     part_energy = total_energy - other_part_energy 
     return part_energy, other_part_energy
 end
 
-function getIonisationEnergy(thresh,ion_type::UniformIonisation,g)
+function getIonisationEnergy(thresh,ion_type::UniformIonisation,g,params)
     total_energy = getEnergy(g)*q - thresh
     other_part_energy = total_energy * rand()
     part_energy = total_energy - other_part_energy 
     return part_energy, other_part_energy
 end
 
-function getIonisationEnergy(thresh,ion_type::RatioIonisation,g)
+function getIonisationEnergy(thresh,ion_type::RatioIonisation,g,params)
     total_energy = getEnergy(g)*q - thresh
     if rand() > 0.5 
         other_part_energy = total_energy * ion_type.ratio
@@ -328,16 +348,6 @@ function eventRBin!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
     elseif dt.direction == :Down
         particle.rbin -= 1
     end
-    measureRBin!(model.type,particle,model,params,meas_inner,verbose)
-end
-
-function measureRBin!(type::LμJ,particle,model,params,meas_inner,verbose)
-    if particle.rbin == length(params.rbins)
-        :χ in model.meas ? meas_inner.measLμJ.χ[findMinInd(params.χbins,abs(atan(particle.r[2],particle.r[3])))] += particle.weight : nothing
-        :eχ in model.meas ? meas_inner.measLμJ.εχ[findMinInd(params.ebins,getEnergy(particle.v)),findMinInd(params.χbins,abs(atan(particle.r[2],particle.r[3])))] += particle.weight : nothing
-        :e in model.meas ? meas_inner.measLμJ.ε[findMinInd(params.ebins,getEnergy(particle.v))] += particle.weight : nothing
-    end
-
 end
 
 function eventYBin!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
@@ -346,13 +356,6 @@ function eventYBin!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
         particle.ybin += 1
     elseif dt.direction == :Down
         particle.ybin -= 1
-    end
-    measureYBin!(model.type,particle,model,params,meas_inner,verbose)
-end
-
-function measureYBin!(type::CELL,particle,model,params,meas_inner,verbose)
-    if particle.ybin == length(params.ybins)
-        :y in model.meas ? meas_inner.measCell.y[findMinInd(params.ybins,particle.r[2])] += particle.weight : nothing
     end
 end
 
@@ -363,13 +366,6 @@ function eventZBin!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
     elseif dt.direction == :Down
         particle.zbin -= 1
     end
-    measureZBin!(model.type,particle,model,params,meas_inner,verbose)
-end
-
-function measureZBin!(type::CELL,particle,model,params,meas_inner,verbose)
-    if particle.zbin == length(params.zbins)
-        :z in model.meas ? meas_inner.measCell.z[findMinInd(params.zbins,particle.r[3])] += particle.weight : nothing
-    end
 end
 
 function eventXBin!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
@@ -379,14 +375,8 @@ function eventXBin!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
     elseif dt.direction == :Down
         particle.xbin -= 1
     end
-    measureXBin!(model.type,particle,model,params,meas_inner,verbose)
 end
 
-function measureXBin!(type::CELL,particle,model,params,meas_inner,verbose)
-    if particle.xbin == length(params.xbins)
-        :x in model.meas ? meas_inner.measCell.x[findMinInd(params.xbins,particle.r[1])] += particle.weight : nothing
-    end
-end
 # * Get Bin Times
 
 function getEnDt(En0::UniformField,n0::UniformDensity,particle,model,params)
@@ -548,6 +538,9 @@ end
 end
 @xport function getDensity(particle,n0::LμJDensity,params)
     params.n0[particle.rbin]
+end
+@xport function getDensity(particle,n0::CellDensity,params)
+    params.n0[particle.zbin]
 end
 
 @xport function getDt(particle,model,params,verbose)
