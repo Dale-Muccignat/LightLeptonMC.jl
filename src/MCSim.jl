@@ -56,8 +56,8 @@ macro jld2save(filename, vars...)
     end
 end
 
-function mc(gas::Gas;S=0.,E=1.,T=0.,N=1000,t=1e-5,verbose=false)
-    model = MCMODEL(type=SWARM(t),n=N,En0=UniformField(E),T=UniformTemp(T),v_0=InitVelocity(S,[0,0,1]))
+function mc(gas::Gas;S=0.,E=1.,T=0.,N=1000,t=1e-5,meas=[:t],verbose=false)
+    model = MCMODEL(meas=meas,type=SWARM(t),n=N,En0=UniformField(E),T=UniformTemp(T),v_0=InitVelocity(S,[0,0,1]))
     mc(model,initParams(gas,model),verbose=verbose)
 end
 

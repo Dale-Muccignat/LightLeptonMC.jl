@@ -33,42 +33,42 @@ function flight(particle,model,params,verbose)
     alive = true
     while alive
         verbose && @info "Particle energy before: " getEnergy(particle.v)/params.energy_scale
+        verbose && @info "Particle position before: " particle.r
 
         dt = getDt(particle,model,params,verbose)
 
-        updateParticle!(dt.time,particle,model.En0,model.n0,params,verbose)
+        :f in model.meas ? measureCumulative!(dt.time,particle,model.En0,model.n0,model,params,meas_inner,verbose) : nothing
+
+        updateParticle!(dt.time,particle,model.En0,model.n0,model,params,meas_inner,verbose)
 
         event!(dt,particle,model,params,meas_inner,verbose)
 
         verbose && @info "Particle energy after: " getEnergy(particle.v)/params.energy_scale
+        verbose && @info "Particle position after: " particle.r
 
-        alive = checkAlive(model.type,particle,model,params,verbose)
+        alive = checkAlive(model.type,particle,model,meas_inner,params,verbose)
         # if verbose && meas_inner.measg.coll_count.elastic > 5 alive = false end
     end
-    @show particle.xbin
-    @show particle.ybin
-    @show particle.zbin
-    @show getEnergy(particle.v) > model.type.thresh*params.energy_scale
     measureDeath!(model.type,particle,model,params,meas_inner,verbose)
     return meas_inner
 end
 
-function checkAlive(type,particle,model,params,verbose)
+function checkAlive(type,particle,model,meas_inner,params,verbose)
 
     alive = true
     if params.tbins != nothing
         alive = alive && particle.t < model.type.t_f*params.time_scale
     end
     
-    return alive && checkAliveModel(type,particle,model,params,verbose)
+    return alive && checkAliveModel(type,particle,model,meas_inner,params,verbose)
 end
 
-function checkAliveModel(type::SWARM,particle,model,params,verbose)
+function checkAliveModel(type::SWARM,particle,model,meas_inner,params,verbose)
 
     return true
 end
 
-function checkAliveModel(type::LμJ,particle,model,params,verbose)
+function checkAliveModel(type::LμJ,particle,model,meas_inner,params,verbose)
 
     if getEnergy(particle.v) < type.thresh*params.energy_scale
         verbose && @info "Absorbed"
@@ -81,7 +81,7 @@ function checkAliveModel(type::LμJ,particle,model,params,verbose)
     return particle.rbin != length(params.rbins) && getEnergy(particle.v) > type.thresh*params.energy_scale 
 end
 
-function checkAliveModel(type::CELL,particle,model,params,verbose)
+function checkAliveModel(type::CELL,particle,model,meas_inner,params,verbose)
 
     if getEnergy(particle.v) < type.thresh*params.energy_scale
         verbose && @info "Absorbed"
@@ -91,9 +91,24 @@ function checkAliveModel(type::CELL,particle,model,params,verbose)
         verbose && @info "Detected"
     end
     
-    alive = (particle.zbin != length(params.zbins) || particle.zbin != 1) && (particle.ybin != length(params.ybins) || particle.ybin != 1) && (particle.xbin != length(params.xbins) || particle.xbin != 1)
+    alive = (particle.zbin != length(params.zbins) && particle.zbin != 0) && (particle.ybin != length(params.ybins) && particle.ybin != 0) && (particle.xbin != length(params.xbins) && particle.xbin != 0)
+
+    :SP in model.meas ? alive = alive && sumColl(meas_inner.measg.coll_count) == 0 : nothing
 
     return alive && getEnergy(particle.v) > type.thresh*params.energy_scale 
+end
+
+@fastmath function measureCumulative!(dt,particle,En0,n0,model,params,meas_inner,verbose)
+		# e_bin += particle.weight * 0.5*consts.me*(dot(particle.v,particle.v)+2*sum(particle.v.*vars.a)*dt+dot(vars.a,vars.a)*dt^2)*dt
+		meas_inner.measc.r[particle.tbin,:] += particle.weight * (particle.r + 0.5*particle.v*dt + (1/6)*params.a*params.n0*(dt^2))*dt
+		meas_inner.measc.v[particle.tbin,:] += particle.weight * (particle.v + 0.5*params.a*params.n0*dt)*dt
+		meas_inner.measc.rv[particle.tbin,:] += particle.weight * (particle.r.*particle.v + 0.5*(particle.r.* params.a * params.n0+particle.v.^2)*dt + 0.5*particle.v.* params.a * params.n0*(dt^2) + (1/8)*((params.a * params.n0).^2)*(dt^3))*dt
+
+		meas_inner.measc.weight[particle.tbin] += particle.weight * dt
+end
+
+function measureDeath!(type::SWARM,particle,model,params,meas_inner,verbose)
+    
 end
 
 function measureDeath!(type::LμJ,particle,model,params,meas_inner,verbose)
@@ -106,8 +121,15 @@ end
 
 function measureDeath!(type::CELL,particle,model,params,meas_inner,verbose)
     if particle.zbin == length(params.zbins)
-        :xy in model.meas ? meas_inner.measCell.xy[findMinInd(params.rbins,particle.r[1]^2+particle.r[2]^2)] += particle.weight : nothing
+        :xy in model.meas ? meas_inner.measCell.xy[findMinInd(meas_inner.measCell.xybins,(particle.r[1]^2+particle.r[2]^2)/params.length_scale^2)] += particle.weight : nothing
         :e in model.meas ? meas_inner.measCell.ε[findMinInd(params.ebins,getEnergy(particle.v))] += particle.weight : nothing
+    end
+end
+
+function measureCollision!(energy_loss,particle,model,params,meas_inner,verbose)
+    if :SP in model.meas && sumColl(meas_inner.measg.coll_count) == 1
+        meas_inner.measg.SP_ε = energy_loss
+        meas_inner.measg.SP_r = sqrt(dot(particle.r,particle.r)) # Assumes particle started at [0,0,0]
     end
 end
 
@@ -136,13 +158,13 @@ function event!(dt,particle,model,params,meas_inner,verbose)
     end
 end
 
-@xport @fastmath function updateParticle!(dt,particle,En0::UniformField,n0::UniformDensity,params,verbose)
+@xport @fastmath function updateParticle!(dt,particle,En0::UniformField,n0::UniformDensity,model,params,meas_inner,verbose)
     particle.r += (particle.v + 0.5 * params.a * params.n0 * dt)*dt
     particle.v += params.a * params.n0 * dt
     particle.t += dt
 end
 
-@xport @fastmath function updateParticle!(dt,particle,En0::ZeroField,n0,params,verbose)
+@xport @fastmath function updateParticle!(dt,particle,En0::ZeroField,n0,model,params,meas_inner,verbose)
     particle.r += particle.v * dt
     particle.t += dt
 end
@@ -159,6 +181,14 @@ function eventTbin!(dt,particle,model,params,meas_inner,verbose)
     end
 
     :zyt ∈ model.meas ? meas_inner.measLμJ.zyt[particle.zbin,particle.ybin,particle.tbin] += particle.weight : nothing
+
+    if :f ∈ model.meas
+        # @inbounds meas_inner.measc.ε[particle.tbin] ./= meas_inner.measc.weight[particle.tbin]
+        @inbounds meas_inner.measc.r[particle.tbin,:] ./= meas_inner.measc.weight[particle.tbin]
+        @inbounds meas_inner.measc.v[particle.tbin,:] ./= meas_inner.measc.weight[particle.tbin]
+        @inbounds meas_inner.measc.rv[particle.tbin,:] ./= meas_inner.measc.weight[particle.tbin]
+    end
+    
     
     particle.tbin += 1
 end
@@ -169,7 +199,8 @@ end
 function eventCollision!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
     verbose && @info "Collision: " dt
     cs_ind = getCollType(particle,model,params,verbose)
-
+    energy_loss = 0.
+    :SP in model.meas && sumColl(meas_inner.measg.coll_count) == 0 ? energy_loss = getEnergy(particle.v) : nothing
     verbose && @info "Collision Type: " params.splat_gas.type[cs_ind]
 
     if cs_ind == 0
@@ -183,6 +214,9 @@ function eventCollision!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
         attachmentColl!(cs_ind,getRelVel(cs_ind,particle,model,params),particle,model,params,meas_inner,verbose)
     end
 
+    :SP in model.meas && sumColl(meas_inner.measg.coll_count) == 1 ? energy_loss -= getEnergy(particle.v) : nothing
+
+    measureCollision!(energy_loss,particle,model,params,meas_inner,verbose)
     updateCbin!(particle,params)
 end
 
@@ -260,11 +294,11 @@ end
 
 function getIonisationEnergy(thresh,ion_type::DiscreteIonisation,g,params)
     total_energy = getEnergy(g)*q - thresh
-    if rand() > 0.5
-        other_part_energy = total_energy - ion_type.loss*params.energy_scale*q
-    else
+    # if rand() > 0.5
+        # other_part_energy = total_energy - ion_type.loss*params.energy_scale*q
+    # else
         other_part_energy = ion_type.loss*params.energy_scale*q
-    end
+    # end
     part_energy = total_energy - other_part_energy 
     return part_energy, other_part_energy
 end
@@ -456,14 +490,14 @@ end
 function getZDt(particle,model,params)
     if params.zbins != nothing
         if model.optimise_spatial == true
-            if (particle.v[3] < 0.) && (particle.zbin != 1)
+            if (particle.v[3] < 0.) #&& (particle.zbin != 1)
                 return dt_EVENT((params.zbins[1]-1e-12-particle.r[3])/particle.v[3], :dt_zbin,:Down)
             elseif (particle.zbin < length(params.zbins)) && (particle.v[3] > 0.)
                 return dt_EVENT((params.zbins[end]+1e-12-particle.r[3])/particle.v[3], :dt_zbin, :Up)
             end
         else
             if params.zbins != nothing
-                if (particle.v[3] < 0.) && (particle.zbin != 1)
+                if (particle.v[3] < 0.) #&& (particle.zbin != 1)
                     return dt_EVENT((params.zbins[particle.zbin]-1e-12-particle.r[3])/particle.v[3], :dt_zbin,:Down)
                 elseif (particle.zbin < length(params.zbins)) && (particle.v[3] > 0.)
                     return dt_EVENT((params.zbins[particle.zbin+1]+1e-12-particle.r[3])/particle.v[3], :dt_zbin, :Up)
@@ -477,17 +511,17 @@ end
 function getYDt(particle,model,params)
     if params.ybins != nothing
         if model.optimise_spatial == true
-            if (particle.v[3] < 0.) && (particle.ybin != 1)
-                return dt_EVENT((params.ybins[1]-1e-12-particle.r[2])/particle.v[2], :dt_zbin,:Down)
+            if (particle.v[2] < 0.) #&& (particle.ybin != 1)
+                return dt_EVENT((params.ybins[1]-1e-12-particle.r[2])/particle.v[2], :dt_ybin,:Down)
             elseif (particle.ybin < length(params.ybins)) && (particle.v[2] > 0.)
-                return dt_EVENT((params.ybins[end]+1e-12-particle.r[2])/particle.v[2], :dt_zbin, :Up)
+                return dt_EVENT((params.ybins[end]+1e-12-particle.r[2])/particle.v[2], :dt_ybin, :Up)
             end
         else
             if params.ybins != nothing
-                if (particle.v[2] < 0.) && (particle.ybin != 1)
-                    return dt_EVENT((params.ybins[particle.ybin]-1e-12-particle.r[2])/particle.v[2], :dt_zbin,:Down)
+                if (particle.v[2] < 0.) #&& (particle.ybin != 1)
+                    return dt_EVENT((params.ybins[particle.ybin]-1e-12-particle.r[2])/particle.v[2], :dt_ybin,:Down)
                 elseif (particle.ybin < length(params.ybins)) && (particle.v[2] > 0.)
-                    return dt_EVENT((params.ybins[particle.ybin+1]+1e-12-particle.r[2])/particle.v[2], :dt_zbin, :Up)
+                    return dt_EVENT((params.ybins[particle.ybin+1]+1e-12-particle.r[2])/particle.v[2], :dt_ybin, :Up)
                 end
             end
         end
@@ -498,22 +532,22 @@ end
 function getXDt(particle,model,params)
     if params.xbins != nothing
         if model.optimise_spatial == true
-            if (particle.v[1] < 0.) && (particle.xbin != 1)
-                return dt_EVENT((params.xbins[1]-1e-12-particle.r[1])/particle.v[1], :dt_zbin,:Down)
+            if (particle.v[1] < 0.) #&& (particle.xbin != 1)
+                return dt_EVENT((params.xbins[1]-1e-12-particle.r[1])/particle.v[1], :dt_xbin,:Down)
             elseif (particle.xbin < length(params.xbins)) && (particle.v[1] > 0.)
-                return dt_EVENT((params.xbins[end]+1e-12-particle.r[1])/particle.v[1], :dt_zbin, :Up)
+                return dt_EVENT((params.xbins[end]+1e-12-particle.r[1])/particle.v[1], :dt_xbin, :Up)
             end
         else
             if params.xbins != nothing
-                if (particle.v[1] < 0.) && (particle.xbin != 1)
-                    return dt_EVENT((params.xbins[particle.xbin]-1e-12-particle.r[1])/particle.v[1], :dt_zbin,:Down)
+                if (particle.v[1] < 0.) #&& (particle.xbin != 1)
+                    return dt_EVENT((params.xbins[particle.xbin]-1e-12-particle.r[1])/particle.v[1], :dt_xbin,:Down)
                 elseif (particle.xbin < length(params.xbins)) && (particle.v[1] > 0.)
-                    return dt_EVENT((params.xbins[particle.xbin+1]+1e-12-particle.r[1])/particle.v[1], :dt_zbin, :Up)
+                    return dt_EVENT((params.xbins[particle.xbin+1]+1e-12-particle.r[1])/particle.v[1], :dt_xbin, :Up)
                 end
             end
         end
     end
-    return dt_EVENT(Inf,:dt_ybin,:Up)
+    return dt_EVENT(Inf,:dt_xbin,:Up)
 end
 
 function getTDt(particle,model,params)
@@ -545,6 +579,7 @@ end
 
 @xport function getDt(particle,model,params,verbose)
     verbose && @info "Current time: " particle.t
+    verbose && @info "Zbin: " particle.zbin
     dt_coll = getCDt(particle,model,params)
     dt_energy = getEnDt(model.En0,model.n0,particle,model,params)
     dt_tbin = getTDt(particle,model,params)
@@ -553,8 +588,8 @@ end
     dt_zbin = getZDt(particle,model,params)
     dt_ybin = getYDt(particle,model,params)
     dt_xbin = getXDt(particle,model,params)
-    verbose && @info dts
     dts = (dt_coll,dt_energy,dt_tbin,dt_rbin,dt_zbin,dt_ybin,dt_xbin)
+    verbose && @info dts
     dt_times = (dt_coll.time,dt_energy.time,dt_tbin.time,dt_rbin.time,dt_zbin.time,dt_ybin.time,dt_xbin.time)
     return dts[findMinTime(dt_times,verbose=verbose)]
 end

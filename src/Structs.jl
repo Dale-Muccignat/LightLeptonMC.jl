@@ -162,7 +162,7 @@ end
 end
 
 function MEAS(type::SWARM,model,params::MCPARAMS=MCPARAMS())
-    MEAS(MEASLμJ(),MEASCELL(),MEASG(),MEAST(params),MEASS(),MEASC())
+    MEAS(MEASLμJ(),MEASCELL(),MEASG(),MEAST(params),MEASS(),MEASC(params))
 end
 
 function MEAS(type::LμJ,model,params::MCPARAMS=MCPARAMS())
@@ -170,7 +170,7 @@ function MEAS(type::LμJ,model,params::MCPARAMS=MCPARAMS())
 end
 
 function MEAS(type::CELL,model,params::MCPARAMS=MCPARAMS())
-    MEAS(MEASLμJ(),MEASCELL(model,params),MEASG(),MEAST(),MEASS(),MEASC())
+    MEAS(MEASLμJ(),MEASCELL(model,params),MEASG(model,params),MEAST(),MEASS(),MEASC())
 end
 
 @xport @AutoParm mutable struct COLLCOUNT
@@ -179,6 +179,11 @@ end
     ionisation::AUTO = 0
     attachment::AUTO = 0
 end
+
+@xport function sumColl(collcount::COLLCOUNT)
+    return collcount.elastic+collcount.excitation+collcount.ionisation+collcount.attachment
+end
+
 
 @xport @AutoParm mutable struct MEASLμJ
     ε::AUTO = nothing
@@ -215,10 +220,11 @@ end
     y::AUTO = nothing
     z::AUTO = nothing
     xy::AUTO = nothing
+    xybins::AUTO = nothing
 end
 
 function MEASCELL(model::MCMODEL,params::MCPARAMS)
-    ε, x, y, z, xy = nothing, nothing, nothing, nothing, nothing
+    ε, x, y, z, xy, xybins = nothing, nothing, nothing, nothing, nothing, nothing
     if :e ∈ model.meas
         ε = zeros(length(params.ebins))
     end
@@ -232,16 +238,27 @@ function MEASCELL(model::MCMODEL,params::MCPARAMS)
         z = zeros(length(params.zbins))
     end
     if :xy ∈ model.meas
-        xy = zeros(length(params.rbins))
+        xy = zeros(model.type.bin_no)
+        xybins = convert(Vector{Float64},LinRange(0,model.type.r,model.type.bin_no))
     end
-    return MEASCELL(ε,x,y,z,xy)
+    return MEASCELL(ε,x,y,z,xy,xybins)
 end
 
 @AutoParm mutable struct MEASG
     coschi::AUTO = 0.
     coll_count::AUTO = COLLCOUNT()
+    SP_ε::AUTO = nothing
+    SP_r::AUTO = nothing
 end
 
+function MEASG(model::MCMODEL,params::MCPARAMS)
+    coschi, coll_count, SP_ε, SP_r = 0., COLLCOUNT(), nothing, nothing
+    if :SP ∈ model.meas
+        SP_ε = 0.
+        SP_r = 0.
+    end
+    return MEASG(coschi, coll_count, SP_ε, SP_r)
+end
 
 @AutoParm mutable struct MEAST
     εᵢ::AUTO = nothing
@@ -273,18 +290,38 @@ end
 end
 
 @AutoParm mutable struct MEASC
-
+    εᵢ::AUTO = nothing
+    r::AUTO = nothing
+    v::AUTO = nothing
+    rv::AUTO = nothing
+    weight::AUTO = nothing
 end
+
+function MEASC(params)
+    return MEASC(zeros(length(params.tbins)-1),
+          zeros(length(params.tbins)-1,3),
+          zeros(length(params.tbins)-1,3),
+          zeros(length(params.tbins)-1,3),
+          zeros(length(params.tbins)-1)
+          )
+end
+
 
 @AutoParm @xport mutable struct SWARMMEAS
     ε::Float64 = 0.
     εs::Vector{Float64} = [0.]
     bW::Float64 = 0.
     bWs::Vector{Float64} = [0.]
+    fW::Float64 = 0.
+    fWs::Vector{Float64} = [0.]
     bDt::Float64 = 0.
     bDts::Vector{Float64} = [0.]
+    fDt::Float64 = 0.
+    fDts::Vector{Float64} = [0.]
     bDl::Float64 = 0.
     bDls::Vector{Float64} = [0.]
+    fDl::Float64 = 0.
+    fDls::Vector{Float64} = [0.]
 end
 
 @fastmath function findMinInd(x::Array{Float64,1},y::Float64)::Int64

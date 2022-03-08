@@ -13,7 +13,7 @@ const ħ = ustrip(float(ReducedPlanckConstant))
 const Td = 1e-21
 
 @AutoParm struct MCGAS
-    cs::Vector{Interpolations.Extrapolation{Float64, 1, ScaledInterpolation{Float64, 1, Interpolations.BSplineInterpolation{Float64, 1, Vector{Float64}, BSpline{Linear{Throw{OnGrid}}}, Tuple{Base.OneTo{Int64}}}, BSpline{Linear{Throw{OnGrid}}}, Tuple{StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64}}}, BSpline{Linear{Throw{OnGrid}}}, Flat{Nothing}}}
+    cs::Vector{Interpolations.Extrapolation{Float64,1,Interpolations.GriddedInterpolation{Float64, 1, Float64, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Tuple{Vector{Float64}}},Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}},Interpolations.Flat{Nothing}}}
     dcs::AUTO
     type::AUTO
     thresh::AUTO
@@ -24,7 +24,8 @@ end
 
 function initParams(input_gas=MaxwellModel(),model::MCMODEL=MCMODEL())
 
-    cbins = [0.,(10. .^(-3:0.1:2.))...]
+    cbins = [0.,(10. .^(-3:0.1:6.))...]
+    # cbins = collect(LinRange(0,101,100))
     tbins, ebins, rbins, χbins, zbins, ybins, xbins = generateBins(model)
     n0=buildDensity(model.n0,rbins,zbins)
     a=buildField(model.En0)
@@ -107,6 +108,9 @@ end
     meas.meast.r .*= ls
     meas.meast.v .*= ls/ts
     meas.meast.rv .*= ls^2/ts
+    meas.measc.r .*= ls
+    meas.measc.v .*= ls/ts
+    meas.measc.rv .*= ls^2/ts
 end
 
 @xport function unscale!(type::LμJ,params,meas::MEAS)
@@ -119,6 +123,8 @@ end
     ls = 1/params.length_scale
     ts = 1/params.time_scale
     es = 1/params.energy_scale
+    meas.measg.SP_ε *= es
+    meas.measg.SP_r *= ls
 end
 
 function initMeas(model,params::MCPARAMS = MCPARAMS())
@@ -145,11 +151,14 @@ end
     gases_dcss = [gas.elastic_DCS...,gas.excitation_DCS...,gas.ionisation_DCS...,gas.attachment_DCS...] 
 
     en_spacing = cbins[end]-cbins[end-1]
-    ens = LinRange(1e-6,cbins[end]+en_spacing+1.,100)
-    ens2 = 1e-6:1e-4:(cbins[end]+en_spacing+1.)
+    # ens = LinRange(1e-6,cbins[end]+en_spacing+1.,100)
+    ens = cbins[2:end]
+    # ens2 = 1e-6:1e-4:(cbins[end]+en_spacing+1.)
+    ens2 = cbins[2:end]
     θs = LinRange(1e-6,π,100)
 
-    gases_itp::Vector{Interpolations.Extrapolation{Float64, 1, ScaledInterpolation{Float64, 1, Interpolations.BSplineInterpolation{Float64, 1, Vector{Float64}, BSpline{Linear{Throw{OnGrid}}}, Tuple{Base.OneTo{Int64}}}, BSpline{Linear{Throw{OnGrid}}}, Tuple{StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64}}}, BSpline{Linear{Throw{OnGrid}}}, Flat{Nothing}}} = []
+    gases_itp::Vector{Interpolations.Extrapolation{Float64,1,Interpolations.GriddedInterpolation{Float64, 1, Float64, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Tuple{Vector{Float64}}},Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}},Interpolations.Flat{Nothing}}} = []
+    # gases_itp::Vector{Interpolations.Extrapolation{Float64, 1, ScaledInterpolation{Float64, 1, Interpolations.BSplineInterpolation{Float64, 1, Vector{Float64}, BSpline{Linear{Throw{OnGrid}}}, Tuple{Base.OneTo{Int64}}}, BSpline{Linear{Throw{OnGrid}}}, Tuple{StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64}}}, BSpline{Linear{Throw{OnGrid}}}, Flat{Nothing}}} = []
     for gas in gases
         push!(gases_itp, LinearInterpolation(ens2,gas.(ens2),extrapolation_bc=Flat()))
     end
@@ -225,7 +234,7 @@ function buildEnBins(type::SWARM,model)
 end
 
 function buildTBins(type::SWARM,model)
-    return LinRange(0,type.t_f,1000)
+    return LinRange(0,type.t_f,200)
 end
 
 function buildχBins(type::SWARM,model)
@@ -262,7 +271,7 @@ function buildχBins(type::CELL,model)
 end
 
 function buildZBins(type::CELL,model)
-    return append!([-1.],LinRange(0.,type.z,200))
+    return LinRange(0.,type.z,200)
 end
 
 function buildYBins(type::CELL,model)
@@ -311,9 +320,7 @@ function buildDensity(n0::LμJDensity,rbins,zbins)
 end
 
 function buildDensity(n0::CellDensity,rbins,zbins)
-    densities = n0.val .* ones(length(zbins))   
-    densities[1] = 0.
-    return densities
+    n0.val .* ones(length(zbins))   
 end
 #### Electric Field ####
 
