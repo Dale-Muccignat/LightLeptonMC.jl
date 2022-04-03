@@ -5,6 +5,7 @@ using MCSim
 N = 100000
 tol = 0.01
 function withinTol(y,ŷ,tol=0.05)
+    @info "Values: " y ŷ
     @test y - y*tol <= ŷ<= y+y*tol
 end
 @testset "MCSim.jl" begin
@@ -51,8 +52,8 @@ end
     @testset "Lucas-Saelee" begin
         @info "Ionisation (Lucas-Saelee) Test"
         T = 0.
-        meas, swarm, params = mc(LucasSaelee(),E=1.,T=T,N=N,t=3e-6)
-        sol = pt(LucasSaelee(),E=1.,T=T,lmax=9,N=5000)
+        meas, swarm, params = mc(LucasSaelee(),E=10.,T=T,N=N,t=3e-6)
+        sol = pt(LucasSaelee(),E=10.,T=T,lmax=9,N=5000)
         withinTol(sol.ε̄,swarm.ε)
         withinTol(sol.DT,swarm.bDt)
         withinTol(sol.DL,swarm.bDl)

@@ -98,7 +98,7 @@ end
     return params
 end
 
-@xport function unscale!(type::SWARM,params,meas::MEAS)
+@xport function unscale!(type::SWARM,model,params,meas::MEAS)
     ls = 1/params.length_scale
     ts = 1/params.time_scale
     es = 1/params.energy_scale
@@ -113,17 +113,18 @@ end
     meas.measc.rv .*= ls^2/ts
 end
 
-@xport function unscale!(type::LμJ,params,meas::MEAS)
+@xport function unscale!(type::LμJ,model,params,meas::MEAS)
     ls = 1/params.length_scale
     ts = 1/params.time_scale
     es = 1/params.energy_scale
 end
 
-@xport function unscale!(type::CELL,params,meas::MEAS)
+@xport function unscale!(type::CELL,model,params,meas::MEAS)
     ls = 1/params.length_scale
     ts = 1/params.time_scale
     es = 1/params.energy_scale
     meas.measg.SP_ε *= es
+    :SP_z in model.meas ? meas.measg.SP_εs .*= es : nothing
     meas.measg.SP_r *= ls
 end
 
@@ -385,14 +386,25 @@ function initPartr(r_0::GaussianLμJSpacial,params)
     val .+ SD*R .* r_0.gaussian_axis .+ r_0.val .* r_0.axis
 end
 function initPartv(v_0::ZeroVelocity,params)
-    [0.,0.,0.]
+    SArray{Tuple{3},Float64,1,3}(0.,0.,0.)
 end
 
 function initPartv(v_0::InitVelocity,params)
+    #TODO: Make all these static arrays
     v_0.axis .* getVelocity(v_0.ε)
 end
 
-function initPartv(v_0::GaussianVelocity,params)
+function initPartv(v_0::GaussianDirectionVelocity,params)
+    electron_v2eV = 0.5 * me / q
+    coschi = 1-2*rand()
+    sinchi = sqrt(1-coschi^2)
+    phi = rand()*2*pi
+
+    sqrt(v_0.ε/electron_v2eV) * SArray{Tuple{3},Float64,1,3}(cos(phi)*sinchi,sin(phi)*sinchi,coschi)
+end
+
+
+function initPartv(v_0::GaussianEnergyVelocity,params)
     SD = v_0.Δε_source/(2*sqrt(2*log(2)))
     electron_v2eV = 0.5 * me / q
 

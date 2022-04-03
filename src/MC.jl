@@ -82,17 +82,28 @@ function checkAliveModel(type::LμJ,particle,model,meas_inner,params,verbose)
 end
 
 function checkAliveModel(type::CELL,particle,model,meas_inner,params,verbose)
+    alive = true
 
     if getEnergy(particle.v) < type.thresh*params.energy_scale
         verbose && @info "Absorbed"
     end
 
-    if particle.zbin == length(params.zbins) || particle.ybin == length(params.ybins) || particle.xbin == length(params.xbins)
-        verbose && @info "Detected"
+    if params.zbins != nothing 
+        # :SP_z in model.meas ? alive = alive && particle.zbin != length(params.zbins) : alive = alive && particle.zbin != length(params.zbins) && particle.zbin != 0
+        alive = alive && particle.zbin != length(params.zbins) && particle.zbin != 0
+        verbose && particle.zbin == length(params.zbins) && @info "Detected Z"
+    end
+
+    if params.ybins != nothing 
+        alive = alive && particle.ybin != length(params.ybins)
+        verbose && particle.ybin == length(params.ybins) && @info "Detected Y"
+    end
+
+    if params.xbins != nothing 
+        alive = alive && particle.xbin != length(params.xbins)
+        verbose && particle.xbin == length(params.xbins) && @info "Detected X"
     end
     
-    alive = (particle.zbin != length(params.zbins) && particle.zbin != 0) && (particle.ybin != length(params.ybins) && particle.ybin != 0) && (particle.xbin != length(params.xbins) && particle.xbin != 0)
-
     :SP in model.meas ? alive = alive && sumColl(meas_inner.measg.coll_count) == 0 : nothing
 
     return alive && getEnergy(particle.v) > type.thresh*params.energy_scale 
@@ -208,8 +219,10 @@ function eventCollision!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
         elasticColl!(cs_ind,getRelVel(cs_ind,particle,model,params),particle,model,params,meas_inner,verbose)
     elseif params.splat_gas.type[cs_ind] == :EXCITATION
         excitationColl!(cs_ind,getRelVel(cs_ind,particle,model,params),particle,model,params,meas_inner,verbose)
+        # energy_loss = params.splat_gas.thresh[cs_no]
     elseif params.splat_gas.type[cs_ind] == :IONIZATION
         ionisationColl!(cs_ind,model.ion_type,getRelVel(cs_ind,particle,model,params),particle,model,params,meas_inner,verbose)
+        # energy_loss = params.splat_gas.thresh[cs_no]
     elseif params.splat_gas.type[cs_ind] == :ATTACHMENT
         attachmentColl!(cs_ind,getRelVel(cs_ind,particle,model,params),particle,model,params,meas_inner,verbose)
     end
@@ -276,7 +289,7 @@ end
 @fastmath function ionisationColl!(cs_no,ion_type,g,particle,model,params,meas_inner,verbose)
 
     if dot(g,g)-2*params.splat_gas.thresh[cs_no]/me > 0.
-        part_energy, other_part_energy = getIonisationEnergy(params.splat_gas.thresh[cs_no],ion_type,g,params)
+        part_energy, other_part_energy = getIonisationEnergy(params.splat_gas.thresh[cs_no],ion_type,g,model,params)
 
         coschi, sinchi, phi = scatteringAngle(cs_no,g,particle,model,params,verbose)
 
@@ -292,30 +305,30 @@ end
     
 end
 
-function getIonisationEnergy(thresh,ion_type::DiscreteIonisation,g,params)
+function getIonisationEnergy(thresh,ion_type::DiscreteIonisation,g,model,params)
     total_energy = getEnergy(g)*q - thresh
-    # if rand() > 0.5
-        # other_part_energy = total_energy - ion_type.loss*params.energy_scale*q
-    # else
+    if rand() > 0.5 || :SP in model.meas
         other_part_energy = ion_type.loss*params.energy_scale*q
-    # end
+    else
+        other_part_energy = total_energy - ion_type.loss*params.energy_scale*q
+    end
     part_energy = total_energy - other_part_energy 
     return part_energy, other_part_energy
 end
 
-function getIonisationEnergy(thresh,ion_type::UniformIonisation,g,params)
+function getIonisationEnergy(thresh,ion_type::UniformIonisation,g,model,params)
     total_energy = getEnergy(g)*q - thresh
     other_part_energy = total_energy * rand()
     part_energy = total_energy - other_part_energy 
     return part_energy, other_part_energy
 end
 
-function getIonisationEnergy(thresh,ion_type::RatioIonisation,g,params)
-    total_energy = getEnergy(g)*q - thresh
-    if rand() > 0.5 
-        other_part_energy = total_energy * ion_type.ratio
+function getIonisationEnergy(thresh,ion_type::RatioIonisation,g,model,params)
+    total_energy = getEnergy(g)*q #- thresh
+    if rand() > 0.5 || :SP in model.meas
+        other_part_energy = total_energy * ion_type.ratio(getEnergy(g)/params.energy_scale)
     else
-        other_part_energy = total_energy * (1-ion_type.ratio)
+        other_part_energy = total_energy * (1-ion_type.ratio(getEnergy(g)/params.energy_scale))
     end
     part_energy = total_energy - other_part_energy 
     return part_energy, other_part_energy
@@ -399,6 +412,9 @@ function eventZBin!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
         particle.zbin += 1
     elseif dt.direction == :Down
         particle.zbin -= 1
+    end
+    if :SP_z in model.meas && particle.zbin != 0
+        meas_inner.measg.SP_εs[particle.zbin] = getEnergy(particle.v)
     end
 end
 
@@ -490,14 +506,14 @@ end
 function getZDt(particle,model,params)
     if params.zbins != nothing
         if model.optimise_spatial == true
-            if (particle.v[3] < 0.) #&& (particle.zbin != 1)
+            if (particle.v[3] < 0.) && (particle.zbin != 0)
                 return dt_EVENT((params.zbins[1]-1e-12-particle.r[3])/particle.v[3], :dt_zbin,:Down)
             elseif (particle.zbin < length(params.zbins)) && (particle.v[3] > 0.)
                 return dt_EVENT((params.zbins[end]+1e-12-particle.r[3])/particle.v[3], :dt_zbin, :Up)
             end
         else
             if params.zbins != nothing
-                if (particle.v[3] < 0.) #&& (particle.zbin != 1)
+                if (particle.v[3] < 0.) && (particle.zbin != 0)
                     return dt_EVENT((params.zbins[particle.zbin]-1e-12-particle.r[3])/particle.v[3], :dt_zbin,:Down)
                 elseif (particle.zbin < length(params.zbins)) && (particle.v[3] > 0.)
                     return dt_EVENT((params.zbins[particle.zbin+1]+1e-12-particle.r[3])/particle.v[3], :dt_zbin, :Up)
@@ -511,14 +527,14 @@ end
 function getYDt(particle,model,params)
     if params.ybins != nothing
         if model.optimise_spatial == true
-            if (particle.v[2] < 0.) #&& (particle.ybin != 1)
+            if (particle.v[2] < 0.) && (particle.ybin != 0)
                 return dt_EVENT((params.ybins[1]-1e-12-particle.r[2])/particle.v[2], :dt_ybin,:Down)
             elseif (particle.ybin < length(params.ybins)) && (particle.v[2] > 0.)
                 return dt_EVENT((params.ybins[end]+1e-12-particle.r[2])/particle.v[2], :dt_ybin, :Up)
             end
         else
             if params.ybins != nothing
-                if (particle.v[2] < 0.) #&& (particle.ybin != 1)
+                if (particle.v[2] < 0.) && (particle.ybin != 0)
                     return dt_EVENT((params.ybins[particle.ybin]-1e-12-particle.r[2])/particle.v[2], :dt_ybin,:Down)
                 elseif (particle.ybin < length(params.ybins)) && (particle.v[2] > 0.)
                     return dt_EVENT((params.ybins[particle.ybin+1]+1e-12-particle.r[2])/particle.v[2], :dt_ybin, :Up)
@@ -532,14 +548,14 @@ end
 function getXDt(particle,model,params)
     if params.xbins != nothing
         if model.optimise_spatial == true
-            if (particle.v[1] < 0.) #&& (particle.xbin != 1)
+            if (particle.v[1] < 0.) && (particle.xbin != 0)
                 return dt_EVENT((params.xbins[1]-1e-12-particle.r[1])/particle.v[1], :dt_xbin,:Down)
             elseif (particle.xbin < length(params.xbins)) && (particle.v[1] > 0.)
                 return dt_EVENT((params.xbins[end]+1e-12-particle.r[1])/particle.v[1], :dt_xbin, :Up)
             end
         else
             if params.xbins != nothing
-                if (particle.v[1] < 0.) #&& (particle.xbin != 1)
+                if (particle.v[1] < 0.) && (particle.xbin != 0)
                     return dt_EVENT((params.xbins[particle.xbin]-1e-12-particle.r[1])/particle.v[1], :dt_xbin,:Down)
                 elseif (particle.xbin < length(params.xbins)) && (particle.v[1] > 0.)
                     return dt_EVENT((params.xbins[particle.xbin+1]+1e-12-particle.r[1])/particle.v[1], :dt_xbin, :Up)

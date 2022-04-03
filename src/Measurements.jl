@@ -11,7 +11,7 @@ const ħ = ustrip(float(ReducedPlanckConstant))
 const Td = 1e-21
 
 @xport function process(type::SWARM,meas,params,model)
-    weights!(meas)
+    weights!(meas,model)
     swarmMeas = swarmMeasurements(meas,params,model)
     meas, swarmMeas
 end
@@ -31,11 +31,12 @@ end
     :z in model.meas ? meas.measCell.z ./= model.n : nothing
     :xy in model.meas ? meas.measCell.xy ./= model.n : nothing
     :SP in model.meas ? meas.measg.SP_ε /= model.n : nothing
+    :SP_z in model.meas ? meas.measg.SP_εs /= model.n : nothing
     :SP in model.meas ? meas.measg.SP_r /= model.n : nothing
     meas, SWARMMEAS()
 end
 
-function weights!(meas)
+function weights!(meas,model)
     for i in 1:length(meas.meast.w)
         meas.meast.εᵢ[i] *= 0.5*me/meas.meast.w[i]/q
         meas.meast.v²[i,:] ./= meas.meast.w[i] 
@@ -43,9 +44,12 @@ function weights!(meas)
         meas.meast.r[i,:] ./= meas.meast.w[i] 
         meas.meast.v[i,:] ./= meas.meast.w[i]
         meas.meast.rv[i,:] ./= meas.meast.w[i]
-        meas.measc.r[i,:] ./= meas.meast.w[i] 
-        meas.measc.v[i,:] ./= meas.meast.w[i]
-        meas.measc.rv[i,:] ./= meas.meast.w[i]
+        # meas.measc.r[i,:] ./= meas.meast.w[i] 
+        # meas.measc.v[i,:] ./= meas.meast.w[i]
+        # meas.measc.rv[i,:] ./= meas.meast.w[i]
+        meas.measc.r[i,:] ./= model.n
+        meas.measc.v[i,:] ./= model.n
+        meas.measc.rv[i,:] ./= model.n
     end
 end
 
@@ -76,14 +80,13 @@ function swarmMeasurements(meas,params,model)
         
     end
 
-    SWARMMEAS(mean(εs),
-              εs,mean(bWs),
-              bWs,mean(fWs),
-              fWs,mean(bDts),
-              bDts.*params.n0,mean(fDts)*params.n0,
-              fDts.*params.n0,mean(bDls)*params.n0,
-              bDls.*params.n0,mean(fDls)*params.n0,
-              fDls.*params.n0
+    SWARMMEAS(mean(εs),εs,
+              mean(bWs),bWs,
+              mean(fWs),fWs,
+              mean(bDts)*params.n0,bDts.*params.n0,
+              mean(fDts)*params.n0,fDts.*params.n0,
+              mean(bDls)*params.n0,bDls.*params.n0,
+              mean(fDls)*params.n0,fDls.*params.n0
               )
 end
 

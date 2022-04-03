@@ -46,7 +46,7 @@ abstract type Ionisation end
 @xport @AutoParm mutable struct UniformIonisation <: Ionisation end
 
 @xport @AutoParm mutable struct RatioIonisation <: Ionisation
-    ratio::AUTO = 0.5
+    ratio::AUTO = (e) -> 0.5
 end
 
 @xport @AutoParm mutable struct DiscreteIonisation <: Ionisation
@@ -59,10 +59,14 @@ end
     ε::AUTO = 100.
     axis::AUTO = [0,0,1]
 end
-@xport @AutoParm struct GaussianVelocity <: Velocity
+@xport @AutoParm struct GaussianEnergyVelocity <: Velocity
     ε::AUTO = 10.
     Δε_source::AUTO = 0.5
     axis::AUTO = [0,0,1]
+end
+
+@xport @AutoParm struct GaussianDirectionVelocity <: Velocity
+    ε::AUTO = 10.
 end
 
 @AutoParm mutable struct MODEL
@@ -249,15 +253,19 @@ end
     coll_count::AUTO = COLLCOUNT()
     SP_ε::AUTO = nothing
     SP_r::AUTO = nothing
+    SP_εs::AUTO = nothing
 end
 
 function MEASG(model::MCMODEL,params::MCPARAMS)
-    coschi, coll_count, SP_ε, SP_r = 0., COLLCOUNT(), nothing, nothing
+    coschi, coll_count, SP_ε, SP_r, SP_εs, SP_zs = 0., COLLCOUNT(), nothing, nothing, nothing, nothing
     if :SP ∈ model.meas
         SP_ε = 0.
         SP_r = 0.
     end
-    return MEASG(coschi, coll_count, SP_ε, SP_r)
+    if :SP_z ∈ model.meas
+        SP_εs = zeros(length(params.zbins))
+    end
+    return MEASG(coschi, coll_count, SP_ε, SP_r, SP_εs)
 end
 
 @AutoParm mutable struct MEAST

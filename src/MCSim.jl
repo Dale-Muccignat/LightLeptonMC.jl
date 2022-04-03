@@ -57,7 +57,7 @@ macro jld2save(filename, vars...)
 end
 
 function mc(gas::Gas;S=0.,E=1.,T=0.,N=1000,t=1e-5,meas=[:t],verbose=false)
-    model = MCMODEL(meas=meas,type=SWARM(t),n=N,En0=UniformField(E),T=UniformTemp(T),v_0=InitVelocity(S,[0,0,1]))
+    model = MCMODEL(meas=meas,type=SWARM(t),n=N,En0=UniformField(E),T=UniformTemp(T),ion_type=RatioIonisation(0.7),v_0=InitVelocity(S,[0,0,1]))
     mc(model,initParams(gas,model),verbose=verbose)
 end
 
@@ -105,7 +105,7 @@ function mc(model::MCMODEL,params::MCPARAMS;verbose=false)
     end
     # @show params.rbins
     unscale!(params)
-    unscale!(model.type,params,meas[1])
+    unscale!(model.type,model,params,meas[1])
     return process(model.type,meas[1],params,model)..., params;
 
 end
