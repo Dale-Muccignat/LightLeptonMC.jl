@@ -132,7 +132,7 @@ end
 
 function measureDeath!(type::CELL,particle,model,params,meas_inner,verbose)
     if particle.zbin == length(params.zbins)
-        :xy in model.meas ? meas_inner.measCell.xy[findMinInd(meas_inner.measCell.xybins,(particle.r[1]^2+particle.r[2]^2)/params.length_scale^2)] += particle.weight : nothing
+        :xy in model.meas ? meas_inner.measCell.xy[findMinInd(meas_inner.measCell.xybins,sqrt(particle.r[1]^2+particle.r[2]^2)/params.length_scale)] += particle.weight : nothing
         :e in model.meas ? meas_inner.measCell.ε[findMinInd(params.ebins,getEnergy(particle.v))] += particle.weight : nothing
     end
 end
@@ -289,7 +289,7 @@ end
 @fastmath function ionisationColl!(cs_no,ion_type,g,particle,model,params,meas_inner,verbose)
 
     if dot(g,g)-2*params.splat_gas.thresh[cs_no]/me > 0.
-        part_energy, other_part_energy = getIonisationEnergy(params.splat_gas.thresh[cs_no],ion_type,g,model,params)
+        part_energy, other_part_energy = getIonisationEnergy(params.splat_gas.thresh[cs_no],ion_type,g,particle,model,params)
 
         coschi, sinchi, phi = scatteringAngle(cs_no,g,particle,model,params,verbose)
 
@@ -297,7 +297,7 @@ end
         v2 = shift(v2,g)
         v2 = (me*particle.v + params.splat_gas.m[cs_no]* (g-particle.v + v2)) /(me + params.splat_gas.m[cs_no])
 
-        particle.weight *= 2.
+        particle.type == :electron ? particle.weight *= 2. : nothing
         meas_inner.measg.coschi += dot(particle.v,v2)/(norm(v2)*norm(particle.v))
         meas_inner.measg.coll_count.ionisation += 1
         particle.v = v2
@@ -305,9 +305,9 @@ end
     
 end
 
-function getIonisationEnergy(thresh,ion_type::DiscreteIonisation,g,model,params)
+function getIonisationEnergy(thresh,ion_type::DiscreteIonisation,g,particle,model,params)
     total_energy = getEnergy(g)*q - thresh
-    if rand() > 0.5 || :SP in model.meas
+    if rand() > 0.5 || :SP in model.meas || particle.type == :positron
         other_part_energy = ion_type.loss*params.energy_scale*q
     else
         other_part_energy = total_energy - ion_type.loss*params.energy_scale*q
@@ -316,16 +316,16 @@ function getIonisationEnergy(thresh,ion_type::DiscreteIonisation,g,model,params)
     return part_energy, other_part_energy
 end
 
-function getIonisationEnergy(thresh,ion_type::UniformIonisation,g,model,params)
+function getIonisationEnergy(thresh,ion_type::UniformIonisation,g,particle,model,params)
     total_energy = getEnergy(g)*q - thresh
     other_part_energy = total_energy * rand()
     part_energy = total_energy - other_part_energy 
     return part_energy, other_part_energy
 end
 
-function getIonisationEnergy(thresh,ion_type::RatioIonisation,g,model,params)
+function getIonisationEnergy(thresh,ion_type::RatioIonisation,g,particle,model,params)
     total_energy = getEnergy(g)*q #- thresh
-    if rand() > 0.5 || :SP in model.meas
+    if rand() > 0.5 || :SP in model.meas || particle.type == :positron
         other_part_energy = total_energy * ion_type.ratio(getEnergy(g)/params.energy_scale)
     else
         other_part_energy = total_energy * (1-ion_type.ratio(getEnergy(g)/params.energy_scale))

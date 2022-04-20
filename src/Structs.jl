@@ -77,6 +77,7 @@ end
 
 @AutoParm mutable struct MCMODEL
     type::AUTO = SWARM()
+    particle_type::AUTO = :electron
     n::Int64 = 100
     v_0::AUTO = ZeroVelocity()
     r_0::AUTO = ZeroSpacial()
@@ -144,6 +145,7 @@ end
 
 
 @xport @AutoParm mutable struct PART
+    type::Symbol = :electron
 	v::SArray{Tuple{3},Float64,1,3} = [0.,0.,0.]
 	r::SArray{Tuple{3},Float64,1,3} = [0.,0.,0.]
 	t::Float64 = 0.

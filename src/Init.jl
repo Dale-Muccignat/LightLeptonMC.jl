@@ -339,6 +339,7 @@ end
 function Structs.PART(model,params)
 
     particle = PART()
+    particle.type = model.particle_type
     particle.r = initPartr(model.r_0,params).*params.length_scale
     particle.v = initPartv(model.v_0,params).*params.length_scale ./params.time_scale
     particle.cbin = findMinInd(params.cbins,getEnergy(particle.v))
