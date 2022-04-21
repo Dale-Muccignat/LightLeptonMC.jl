@@ -30,8 +30,7 @@ end
 function flight(particle,model,params,verbose)
     meas_inner = initMeas(model,params)
 
-    alive = true
-    while alive
+    while particle.alive
         verbose && @info "Particle energy before: " getEnergy(particle.v)/params.energy_scale
         verbose && @info "Particle position before: " particle.r
 
@@ -46,7 +45,7 @@ function flight(particle,model,params,verbose)
         verbose && @info "Particle energy after: " getEnergy(particle.v)/params.energy_scale
         verbose && @info "Particle position after: " particle.r
 
-        alive = checkAlive(model.type,particle,model,meas_inner,params,verbose)
+        particle.alive = particle.alive && checkAlive(model.type,particle,model,meas_inner,params,verbose)
         # if verbose && meas_inner.measg.coll_count.elastic > 5 alive = false end
     end
     measureDeath!(model.type,particle,model,params,meas_inner,verbose)
@@ -334,8 +333,19 @@ function getIonisationEnergy(thresh,ion_type::RatioIonisation,g,particle,model,p
     return part_energy, other_part_energy
 end
 
+function getIonisationEnergy(thresh,ion_type::FunctionalIonisation,g,particle,model,params)
+    total_energy = getEnergy(g)*q #- thresh
+    if rand() > 0.5 || :SP in model.meas || particle.type == :positron
+        other_part_energy = total_energy * ion_type.func(getEnergy(g)/params.energy_scale,rand())
+    else
+        other_part_energy = total_energy * (1-ion_type.func(getEnergy(g)/params.energy_scale),rand())
+    end
+    part_energy = total_energy - other_part_energy 
+    return part_energy, other_part_energy
+end
+
 function attachmentColl!(cs_no,g,particle,model,params,meas_inner,verbose)
-    particle.weight /= 2.
+    particle.type == :positron ? particle.alive = false : particle.weight /= 2.
 end
 
 function scatteringAngle(cs_no,g,particle,model,params,verbose)

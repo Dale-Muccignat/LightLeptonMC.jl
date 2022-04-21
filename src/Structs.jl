@@ -1,6 +1,6 @@
 module Structs
 
-using AutoParameters, Gases, StaticArrays, AndExport
+using AutoParameters, Gases, StaticArrays, AndExport, Interpolations, QuadGK
 
 export MCMODEL, MCINIT, MCPARAMS, PART, MEAS, MEAST, MEASS, MEASC, findMinInd
 
@@ -48,6 +48,35 @@ abstract type Ionisation end
 @xport @AutoParm mutable struct RatioIonisation <: Ionisation
     ratio::AUTO = (e) -> 0.5
 end
+
+@xport @AutoParm mutable struct FunctionalIonisation <: Ionisation
+    func::AUTO = (e,R) -> 0.5
+end
+
+@xport function FunctionalIonisationInit(;func=(e,E2) -> 1.)
+    cbins = [0.,(10. .^(-3:0.1:6.))...] #TODO: This is a dubplicate and depends on the initParams funciton
+    cbins2 = [0.,(10. .^(-3:0.1:2.))...]
+    matrix::Matrix{Float64} = zeros(length(cbins),length(cbins2))
+    for i in eachindex(cbins)
+        func2(E2) = func(cbins[i],E2) < 1e-10 ? 1e-10 : func(cbins[i],E2)
+        norm = quadgk(func2,0,cbins2[end])[1]
+        for j in eachindex(cbins2)
+            if j == 1
+                matrix[i,j] = quadgk(func2,0,cbins2[j])[1]/norm
+            elseif j == length(cbins2)
+                matrix[i,j] = 1. - sum(matrix[i,:])
+            else
+                matrix[i,j] = quadgk(func2,cbins2[j-1],cbins2[j])[1]/norm
+            end
+        end
+    end
+    # matrix = replace_0(replace_nan(matrix))
+    matrix = cumsum(matrix,dims=2)
+    spl2 = LinearInterpolation((cbins,cbins2),matrix,extrapolation_bc=Flat())	#2D spline of the matrix
+    spl3 = [LinearInterpolation(Interpolations.deduplicate_knots!(spl2(c,cbins2)),cbins2,extrapolation_bc=Flat()) for c in cbins]
+    return FunctionalIonisation(spl3)
+end
+
 
 @xport @AutoParm mutable struct DiscreteIonisation <: Ionisation
     loss::AUTO = 5.
@@ -146,6 +175,7 @@ end
 
 @xport @AutoParm mutable struct PART
     type::Symbol = :electron
+    alive::Bool = true
 	v::SArray{Tuple{3},Float64,1,3} = [0.,0.,0.]
 	r::SArray{Tuple{3},Float64,1,3} = [0.,0.,0.]
 	t::Float64 = 0.
