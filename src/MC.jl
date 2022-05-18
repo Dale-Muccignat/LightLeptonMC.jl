@@ -1,5 +1,6 @@
 module MC
 
+
 using ..Structs
 using ..Init
 using PhysicalConstants.CODATA2018, Unitful, AutoParameters, Random, StaticArrays, LinearAlgebra, AndExport
@@ -14,6 +15,8 @@ const ħ = ustrip(float(ReducedPlanckConstant))
 
 const electron_v2eV = 0.5 * me / q
 #TODO: Keep the units in
+#TODO: Add TimerOutputs
+#TODO: Only select electrons with position and velocity directed toward detector in LuJ
 
 abstract type Direction end
 abstract type Event end
@@ -33,6 +36,7 @@ function flight(particle,model,params,verbose)
     while particle.alive
         verbose && @info "Particle energy before: " getEnergy(particle.v)/params.energy_scale
         verbose && @info "Particle position before: " particle.r
+        verbose && @info "Particle velocity before: " particle.v
 
         dt = getDt(particle,model,params,verbose)
 
@@ -44,8 +48,10 @@ function flight(particle,model,params,verbose)
 
         verbose && @info "Particle energy after: " getEnergy(particle.v)/params.energy_scale
         verbose && @info "Particle position after: " particle.r
+        verbose && @info "Particle velocity after: " particle.v
 
         particle.alive = particle.alive && checkAlive(model.type,particle,model,meas_inner,params,verbose)
+        measureEvent!(model.type,dt,particle,model,params,meas_inner,verbose)
         # if verbose && meas_inner.measg.coll_count.elastic > 5 alive = false end
     end
     measureDeath!(model.type,particle,model,params,meas_inner,verbose)
@@ -108,6 +114,18 @@ function checkAliveModel(type::CELL,particle,model,meas_inner,params,verbose)
     return alive && getEnergy(particle.v) > type.thresh*params.energy_scale 
 end
 
+function measureEvent!(type::CELL,dt,particle,model,params,meas_inner,verbose)
+    if dt.type == :dt_zbin && dt.direction == :Up && :z in model.meas 
+        if meas_inner.measCell.z[particle.zbin] == 0. 
+            meas_inner.measCell.z[particle.zbin] += particle.weight
+        end
+    end
+
+end
+
+function measureEvent!(type::LμJ,dt,particle,model,params,meas_inner,verbose)
+end
+
 @fastmath function measureCumulative!(dt,particle,En0,n0,model,params,meas_inner,verbose)
 		# e_bin += particle.weight * 0.5*consts.me*(dot(particle.v,particle.v)+2*sum(particle.v.*vars.a)*dt+dot(vars.a,vars.a)*dt^2)*dt
 		meas_inner.measc.r[particle.tbin,:] += particle.weight * (particle.r + 0.5*particle.v*dt + (1/6)*params.a*params.n0*(dt^2))*dt
@@ -125,7 +143,10 @@ function measureDeath!(type::LμJ,particle,model,params,meas_inner,verbose)
     if particle.rbin == length(params.rbins)
         :χ in model.meas ? meas_inner.measLμJ.χ[findMinInd(params.χbins,abs(atan(particle.r[2],particle.r[3])))] += particle.weight : nothing
         :eχ in model.meas ? meas_inner.measLμJ.εχ[findMinInd(params.ebins,getEnergy(particle.v)),findMinInd(params.χbins,abs(atan(particle.r[2],particle.r[3])))] += particle.weight : nothing
-        :e in model.meas ? meas_inner.measLμJ.ε[findMinInd(params.ebins,getEnergy(particle.v))] += particle.weight : nothing
+	if abs(atan(particle.v[2],particle.v[3])) > type.angle_accept[1]*pi/180 && abs(atan(particle.v[2],particle.v[3])) < type.angle_accept[2]*pi/180
+            :e in model.meas ? meas_inner.measLμJ.ε[findMinInd(params.ebins,getEnergy(particle.v))] += particle.weight : nothing
+	end
+    
     end
 end
 
@@ -323,9 +344,10 @@ function getIonisationEnergy(thresh,ion_type::UniformIonisation,g,particle,model
 end
 
 function getIonisationEnergy(thresh,ion_type::RatioIonisation,g,particle,model,params)
-    total_energy = getEnergy(g)*q #- thresh
+    total_energy = getEnergy(g)*q - thresh
     if rand() > 0.5 || :SP in model.meas || particle.type == :positron
         other_part_energy = total_energy * ion_type.ratio(getEnergy(g)/params.energy_scale)
+        # other_part_energy = 0
     else
         other_part_energy = total_energy * (1-ion_type.ratio(getEnergy(g)/params.energy_scale))
     end
@@ -334,13 +356,23 @@ function getIonisationEnergy(thresh,ion_type::RatioIonisation,g,particle,model,p
 end
 
 function getIonisationEnergy(thresh,ion_type::FunctionalIonisation,g,particle,model,params)
-    total_energy = getEnergy(g)*q #- thresh
-    if rand() > 0.5 || :SP in model.meas || particle.type == :positron
-        other_part_energy = total_energy * ion_type.func(getEnergy(g)/params.energy_scale,rand())
-    else
-        other_part_energy = total_energy * (1-ion_type.func(getEnergy(g)/params.energy_scale),rand())
+    total_energy = getEnergy(g)*q - thresh
+    part_energy = -1
+    other_part_energy = 0
+    while part_energy < 0
+        if rand() > 0.5 || :SP in model.meas || particle.type == :positron
+            other_part_energy = ion_type.func[particle.cbin](rand())*params.energy_scale*q
+        else
+            other_part_energy = total_energy - ion_type.func[particle.cbin](rand())*params.energy_scale*q
+        end
+        part_energy = total_energy - other_part_energy 
     end
-    part_energy = total_energy - other_part_energy 
+
+    if part_energy < 0
+        @info "part" part_energy/params.energy_scale/q
+        @info "other" other_part_energy/params.energy_scale/q
+    end
+    
     return part_energy, other_part_energy
 end
 
@@ -352,6 +384,7 @@ function scatteringAngle(cs_no,g,particle,model,params,verbose)
     # coschi = 1-2*rand()
     # @show getEnergy(g)/params.energy_scale
     coschi = params.splat_gas.dcs[cs_no][particle.cbin](rand())::Float64
+    # coschi = 1.
     sinchi = sqrt(1-coschi^2)
     phi = rand()*2*pi
     return coschi, sinchi, phi

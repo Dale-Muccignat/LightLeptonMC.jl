@@ -27,6 +27,7 @@ end
 end
 @xport @AutoParm struct LμJDensity <: Density
     val::AUTO = 1e28
+    background::AUTO = 2e18
 end
 @xport @AutoParm struct CellDensity <: Density
     val::AUTO = 1e28
@@ -53,28 +54,33 @@ end
     func::AUTO = (e,R) -> 0.5
 end
 
-@xport function FunctionalIonisationInit(;func=(e,E2) -> 1.)
+@xport function FunctionalIonisationInit(;func=(e,E2) -> 1.,thresh=10.)
     cbins = [0.,(10. .^(-3:0.1:6.))...] #TODO: This is a dubplicate and depends on the initParams funciton
-    cbins2 = [0.,(10. .^(-3:0.1:2.))...]
+    cbins2 = [0.,(10. .^(-3:0.1:6.))...]
     matrix::Matrix{Float64} = zeros(length(cbins),length(cbins2))
     for i in eachindex(cbins)
         func2(E2) = func(cbins[i],E2) < 1e-10 ? 1e-10 : func(cbins[i],E2)
-        norm = quadgk(func2,0,cbins2[end])[1]
+        if cbins[i] > thresh
+            norm = quadgk(func2,0,cbins[i]-thresh)[1]
+        else
+            norm = 1
+        end
+        
         for j in eachindex(cbins2)
             if j == 1
                 matrix[i,j] = quadgk(func2,0,cbins2[j])[1]/norm
             elseif j == length(cbins2)
-                matrix[i,j] = 1. - sum(matrix[i,:])
+                # matrix[i,j] = 1. - sum(matrix[i,:])
             else
                 matrix[i,j] = quadgk(func2,cbins2[j-1],cbins2[j])[1]/norm
             end
         end
     end
     # matrix = replace_0(replace_nan(matrix))
-    matrix = cumsum(matrix,dims=2)
-    spl2 = LinearInterpolation((cbins,cbins2),matrix,extrapolation_bc=Flat())	#2D spline of the matrix
-    spl3 = [LinearInterpolation(Interpolations.deduplicate_knots!(spl2(c,cbins2)),cbins2,extrapolation_bc=Flat()) for c in cbins]
-    return FunctionalIonisation(spl3)
+    matrix2 = cumsum(matrix,dims=2)
+    spl2 = LinearInterpolation((cbins,cbins2),matrix2,extrapolation_bc=Flat())	#2D spline of the matrix
+    spl3 = [LinearInterpolation(Interpolations.deduplicate_knots!(spl2(c,cbins2),move_knots=true),cbins2,extrapolation_bc=Flat()) for c in cbins]
+    return FunctionalIonisation(spl3)#, matrix,matrix2
 end
 
 
@@ -124,6 +130,7 @@ end
 
 @xport @AutoParm mutable struct LμJ
     Δε_detector::AUTO = 0.9
+    angle_accept::AUTO = (0,180)
     thresh::AUTO = 1.
     jet_width::AUTO = 15e-6
 end
@@ -133,18 +140,19 @@ end
     Δε_detector::AUTO = 0.9
     thresh::AUTO = 1.
     z::AUTO = 15e-6
+    z_n::AUTO = 100
     x::AUTO = 15e-6
     y::AUTO = 15e-6
     bin_no::AUTO = 100
     r::AUTO = 1e-6
 end
 
-@xport function LμJ(;Δε_detector=0.9,thresh=1.,jet_width=15e-6)
-    LμJ(Δε_detector,thresh,jet_width)
+@xport function LμJ(;Δε_detector=0.9,angle_accept=(0,180),thresh=1.,jet_width=15e-6)
+    LμJ(Δε_detector,angle_accept,thresh,jet_width)
 end
 
-@xport function CELL(;Δε_detector=0.9,thresh=1.,z=15e-6,x=15e-6,y=15e-6,bin_no=100,r=1e-6)
-    CELL(Δε_detector,thresh,z,x,y,bin_no,r)
+@xport function CELL(;Δε_detector=0.9,thresh=1.,z=15e-6,z_n=100,x=15e-6,y=15e-6,bin_no=100,r=1e-6)
+    CELL(Δε_detector,thresh,z,z_n,x,y,bin_no,r)
 end
 
 @AutoParm mutable struct MCPARAMS

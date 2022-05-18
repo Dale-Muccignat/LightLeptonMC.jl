@@ -188,7 +188,7 @@ end
         # func3(e,R) = LinearInterpolation(spl2(e,θs),cos.(θs))(R)::Float64	#Interpolates the above vector and evaluates a value of chi for a given R
         # @show typeof(LinearInterpolation(spl2(1.,θs),cos.(θs)))	#Interpolates the above vector and evaluates a value of chi for a given R
         #TODO: Try this with energy dependency aswell
-        push!(dcss,[LinearInterpolation(Interpolations.deduplicate_knots!(spl2(c,θs)),cos.(θs),extrapolation_bc=Flat()) for c in cbins])
+        push!(dcss,[LinearInterpolation(Interpolations.deduplicate_knots!(spl2(c,θs),move_knots=true),cos.(θs),extrapolation_bc=Flat()) for c in cbins])
     end
     
     
@@ -272,7 +272,7 @@ function buildχBins(type::CELL,model)
 end
 
 function buildZBins(type::CELL,model)
-    return LinRange(0.,type.z,200)
+    return LinRange(0.,type.z,type.z_n)
 end
 
 function buildYBins(type::CELL,model)
@@ -283,7 +283,7 @@ function buildXBins(type::CELL,model)
     return LinRange(-type.x,type.x,200)
 end
 function buildRBins(type::LμJ,model,n0::LμJDensity)
-    return [0.,(type.jet_width/2)^2,1e20]
+    return [0.,(type.jet_width/2)^2,0.02^2]
 end
 
 function buildEnBins(type::LμJ,model)
@@ -317,7 +317,7 @@ function buildDensity(n0::UniformDensity,rbins,zbins)
 end
 
 function buildDensity(n0::LμJDensity,rbins,zbins)
-    [n0.val,0.,0.]
+    [n0.val,n0.background,0.]
 end
 
 function buildDensity(n0::CellDensity,rbins,zbins)
@@ -343,6 +343,11 @@ function Structs.PART(model,params)
     particle.r = initPartr(model.r_0,params).*params.length_scale
     particle.v = initPartv(model.v_0,params).*params.length_scale ./params.time_scale
     particle.cbin = findMinInd(params.cbins,getEnergy(particle.v))
+    
+    if params.rbins != nothing
+        particle.rbin = findMinInd(params.rbins,dot(particle.r,particle.r))
+    end
+
     if params.zbins != nothing
         particle.zbin = findMinInd(params.zbins,particle.r[3])
     end

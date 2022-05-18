@@ -15,8 +15,8 @@ module MCSim
 #TODO: Add Density Gradient (this is probably best solved through Danny's code though)
 
 using Reexport, Distributed, JLD2, Dates, AndExport
-@reexport using Gases
-@reexport using FVB
+using Gases
+using FVB
 export mc, MCINIT, MCPARAMS, saveBatch, saveDist
 
 include("Structs.jl")
