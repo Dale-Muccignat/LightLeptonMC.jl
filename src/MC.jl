@@ -1,6 +1,5 @@
 module MC
 
-
 using ..Structs
 using ..Init
 using PhysicalConstants.CODATA2018, Unitful, AutoParameters, Random, StaticArrays, LinearAlgebra, AndExport
@@ -115,24 +114,30 @@ function checkAliveModel(type::CELL,particle,model,meas_inner,params,verbose)
 end
 
 function measureEvent!(type::CELL,dt,particle,model,params,meas_inner,verbose)
-    if dt.type == :dt_zbin && dt.direction == :Up && :z in model.meas 
-        if meas_inner.measCell.z[particle.zbin] == 0. 
-            meas_inner.measCell.z[particle.zbin] += particle.weight
+    if dt.type == :dt_zbin && dt.direction == :Up 
+        if :z in model.meas 
+            if meas_inner.measCell.z[particle.zbin] == 0. 
+                meas_inner.measCell.z[particle.zbin] += particle.weight
+            end
+        end
+        if :ez in model.meas 
+            if sum(meas_inner.measCell.εz[:,particle.zbin]) == 0. 
+                meas_inner.measCell.εz[particle.ebin,particle.zbin] += particle.weight
+            end
         end
     end
-
 end
 
 function measureEvent!(type::LμJ,dt,particle,model,params,meas_inner,verbose)
 end
 
 @fastmath function measureCumulative!(dt,particle,En0,n0,model,params,meas_inner,verbose)
-		# e_bin += particle.weight * 0.5*consts.me*(dot(particle.v,particle.v)+2*sum(particle.v.*vars.a)*dt+dot(vars.a,vars.a)*dt^2)*dt
-		meas_inner.measc.r[particle.tbin,:] += particle.weight * (particle.r + 0.5*particle.v*dt + (1/6)*params.a*params.n0*(dt^2))*dt
-		meas_inner.measc.v[particle.tbin,:] += particle.weight * (particle.v + 0.5*params.a*params.n0*dt)*dt
-		meas_inner.measc.rv[particle.tbin,:] += particle.weight * (particle.r.*particle.v + 0.5*(particle.r.* params.a * params.n0+particle.v.^2)*dt + 0.5*particle.v.* params.a * params.n0*(dt^2) + (1/8)*((params.a * params.n0).^2)*(dt^3))*dt
+    # e_bin += particle.weight * 0.5*consts.me*(dot(particle.v,particle.v)+2*sum(particle.v.*vars.a)*dt+dot(vars.a,vars.a)*dt^2)*dt
+    meas_inner.measc.r[particle.tbin,:] += particle.weight * (particle.r + 0.5*particle.v*dt + (1/6)*params.a*params.n0*(dt^2))*dt
+    meas_inner.measc.v[particle.tbin,:] += particle.weight * (particle.v + 0.5*params.a*params.n0*dt)*dt
+    meas_inner.measc.rv[particle.tbin,:] += particle.weight * (particle.r.*particle.v + 0.5*(particle.r.* params.a * params.n0+particle.v.^2)*dt + 0.5*particle.v.* params.a * params.n0*(dt^2) + (1/8)*((params.a * params.n0).^2)*(dt^3))*dt
 
-		meas_inner.measc.weight[particle.tbin] += particle.weight * dt
+    meas_inner.measc.weight[particle.tbin] += particle.weight * dt
 end
 
 function measureDeath!(type::SWARM,particle,model,params,meas_inner,verbose)
@@ -346,10 +351,10 @@ end
 function getIonisationEnergy(thresh,ion_type::RatioIonisation,g,particle,model,params)
     total_energy = getEnergy(g)*q - thresh
     if rand() > 0.5 || :SP in model.meas || particle.type == :positron
-        other_part_energy = total_energy * ion_type.ratio(getEnergy(g)/params.energy_scale)
+        other_part_energy = total_energy * ion_type.ratio(getEnergy(g)/params.energy_scale)::Float64
         # other_part_energy = 0
     else
-        other_part_energy = total_energy * (1-ion_type.ratio(getEnergy(g)/params.energy_scale))
+        other_part_energy = total_energy * (1-ion_type.ratio(getEnergy(g)/params.energy_scale)::Float64)
     end
     part_energy = total_energy - other_part_energy 
     return part_energy, other_part_energy
@@ -411,15 +416,24 @@ end
 
 function updateCbin!(particle,params)
     ea = getEnergy(particle.v)
-	while ea < params.cbins[particle.cbin]
-		particle.cbin-= 1
-	end
+    while ea < params.cbins[particle.cbin]
+        particle.cbin-= 1
+    end
     if particle.cbin != length(params.cbins)
         while ea > params.cbins[particle.cbin+1]
             particle.cbin+= 1
         end
     end
-    
+    if params.ebins != nothing
+        while ea < params.ebins[particle.ebin] && particle.ebin != 1
+            particle.ebin-= 1
+        end
+        if particle.ebin != length(params.ebins)
+            while ea > params.ebins[particle.ebin+1]
+                particle.ebin+= 1
+            end
+        end
+    end
 end
 
 function eventEnergy!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
@@ -653,33 +667,6 @@ end
     return dts[findMinTime(dt_times,verbose=verbose)]
 end
 
-# @xport function getDt(type::SWARM,particle,model,params,verbose)
-#     verbose && @info "Current time: " particle.t
-#     dt_coll = getCDt(particle,model,params)
-#     dt_energy = getDtCBinsPos(model.En0,model.n0,particle,model,params)
-#     dt_tbin = getTDt(particle,model,params)
-#     dts = (dt_coll,dt_energy,dt_tbin)
-#     verbose && @info dts
-#     dt_times = (dt_coll.time,dt_energy.time,dt_tbin.time)
-#     return dts[findMinTime(dt_times,verbose=verbose)]
-# end
-
-
-
-# @xport function getDt(type::LμJ,particle,model,params,verbose)
-#     verbose && @info "Current time: " particle.t
-#     # @info particle.r ./ params.length_scale
-#     dt_coll = getCDt(particle,model,params)
-#     dt_rbin = getRDt(particle,model,params)
-#     dt_tbin = getTDt(particle,model,params)
-#     dt_zbin = getZDt(particle,model,params)
-#     dt_ybin = getYDt(particle,model,params)
-#     dts = (dt_coll,dt_rbin,dt_zbin,dt_ybin,dt_tbin)
-#     verbose && @info dts
-#     dt_times = (dt_coll.time,dt_rbin.time,dt_zbin.time,dt_ybin.time,dt_tbin.time)
-#     return dts[findMinTime(dt_times,verbose=verbose)]
-# end
-
 function findMinTime(times;verbose)
 
     verbose && @info times
@@ -703,55 +690,46 @@ function findTotalCF(en,model,params)
 
     return CS
 end
+
 #### * Temperature
-
-
 @fastmath function findu(cs_ind,particle,model,params)
     #TODO: make generic function based on inputs
-	w = sqrt(2*k*model.T.val/params.splat_gas.m[cs_ind])
+    w = sqrt(2*k*model.T.val/params.splat_gas.m[cs_ind])
     v = particle.v*params.time_scale/params.length_scale
-    # @show getEnergy(v)
 
-	he = electron_v2eV * (norm(v) + 5. *w)^2 
-	le = max( 1e-25 , electron_v2eV * (norm(v) - 5. *w).^2 )
-    # @show he
-    # @show le
+    he = electron_v2eV * (norm(v) + 5. *w)^2 
+    le = max( 1e-25 , electron_v2eV * (norm(v) - 5. *w).^2 )
 
     #TODO: get actual CF from CS
     
-	# @inbounds hcf = params.splat_gas.cs[cs_ind](he) * sqrt(he/electron_v2eV)
-	# @inbounds lcf = params.splat_gas.cs[cs_ind](le) * sqrt(le/electron_v2eV)
-	@inbounds hcf = findTotalCF(he,model,params)
-	@inbounds lcf = findTotalCF(le,model,params)
-
+    @inbounds hcf = findTotalCF(he,model,params)
+    @inbounds lcf = findTotalCF(le,model,params)
 
     g = copy(v)
 	mcf = max(hcf,lcf)
 	while true
-		# usually it only goes through one while loop iteration
-		u = SArray{Tuple{3},Float64,1,3}(randn(3))*w./sqrt(2.) # could only run this
-		g = v .- u
-        # @show v
-        # @show u
-        # @show g
-		eg = electron_v2eV * dot(g,g) 
-        # @show eg
-		@inbounds ccf = findTotalCF(eg,model,params)
-        # @show lcf
-        # @show hcf
-        # @show ccf
-        # @show mcf
+            # usually it only goes through one while loop iteration
+            u = SArray{Tuple{3},Float64,1,3}(randn(3))*w./sqrt(2.) # could only run this
+            g = v .- u
+            # @show v
+            # @show u
+            # @show g
+            eg = electron_v2eV * dot(g,g) 
+            # @show eg
+            @inbounds ccf = findTotalCF(eg,model,params)
+            # @show lcf
+            # @show hcf
+            # @show ccf
+            # @show mcf
 
-        if ccf/mcf == 0.
-            throw("Zero relative energy")
-        end
-        
-		if rand() < ccf/mcf
-			break
-		end
+            if ccf/mcf == 0.
+                throw("Zero relative energy")
+            end
+            if rand() < ccf/mcf
+                break
+            end
 	end
 	return g*params.length_scale/params.time_scale
 end
-
 
 end

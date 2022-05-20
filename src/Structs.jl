@@ -184,14 +184,15 @@ end
 @xport @AutoParm mutable struct PART
     type::Symbol = :electron
     alive::Bool = true
-	v::SArray{Tuple{3},Float64,1,3} = [0.,0.,0.]
-	r::SArray{Tuple{3},Float64,1,3} = [0.,0.,0.]
-	t::Float64 = 0.
-	weight::Float64 = 1.
-	tbin::Int64 = 1
-	cbin::Int64 = 1
-	zbin::Int64 = 1
-	ybin::Int64 = 1
+    v::SArray{Tuple{3},Float64,1,3} = [0.,0.,0.]
+    r::SArray{Tuple{3},Float64,1,3} = [0.,0.,0.]
+    t::Float64 = 0.
+    weight::Float64 = 1.
+    tbin::Int64 = 1
+    cbin::Int64 = 1
+    ebin::Int64 = 1
+    zbin::Int64 = 1
+    ybin::Int64 = 1
     xbin::Int64 = 1
     rbin::Int64 = 1
 end
@@ -260,6 +261,7 @@ end
 
 @xport @AutoParm mutable struct MEASCELL
     ε::AUTO = nothing
+    εz::AUTO = nothing
     x::AUTO = nothing
     y::AUTO = nothing
     z::AUTO = nothing
@@ -268,9 +270,12 @@ end
 end
 
 function MEASCELL(model::MCMODEL,params::MCPARAMS)
-    ε, x, y, z, xy, xybins = nothing, nothing, nothing, nothing, nothing, nothing
+    ε, εz, x, y, z, xy, xybins = nothing, nothing, nothing, nothing, nothing, nothing, nothing
     if :e ∈ model.meas
         ε = zeros(length(params.ebins))
+    end
+    if :ez ∈ model.meas
+        εz = zeros(length(params.ebins),length(params.zbins))
     end
     if :x ∈ model.meas
         x = zeros(length(params.xbins))
@@ -285,7 +290,7 @@ function MEASCELL(model::MCMODEL,params::MCPARAMS)
         xy = zeros(model.type.bin_no)
         xybins = convert(Vector{Float64},LinRange(0,model.type.r,model.type.bin_no))
     end
-    return MEASCELL(ε,x,y,z,xy,xybins)
+    return MEASCELL(ε,εz,x,y,z,xy,xybins)
 end
 
 @AutoParm mutable struct MEASG

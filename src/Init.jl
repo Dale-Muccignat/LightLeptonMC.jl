@@ -170,15 +170,15 @@ end
     for σ in gases_dcss
         DCS_matrix::Matrix{Float64} = zeros(length(ens),length(θs))
         for i in eachindex(ens)
-            func(chi) = σ(ens[i],chi)*sin(chi) < 1e-10 ? 1e-10 : σ(ens[i],chi)*sin(chi)
-            norm = quadgk(func,0,pi)[1]
+            func(chi)::Float64 = σ(ens[i],chi)*sin(chi) < 1e-10 ? 1e-10 : σ(ens[i],chi)*sin(chi)
+            norm = quadgk(func,0,pi)[1]::Float64
             for j in eachindex(θs)
                 if j == 1
-                    DCS_matrix[i,j] = quadgk(func,0,θs[j])[1]/norm
+                    DCS_matrix[i,j] = quadgk(func,0,θs[j])[1]::Float64/norm
                 elseif j == length(θs)
                     DCS_matrix[i,j] = 1. - sum(DCS_matrix[i,:])
                 else
-                    DCS_matrix[i,j] = quadgk(func,θs[j-1],θs[j])[1]/norm
+                    DCS_matrix[i,j] = quadgk(func,θs[j-1],θs[j])[1]::Float64/norm
                 end
             end
         end
@@ -260,7 +260,8 @@ end
 
 function buildEnBins(type::CELL,model)
     #TODO: Make specific to each velocity type
-    return collect(model.type.thresh:model.type.Δε_detector:(model.v_0.ε+2*model.v_0.Δε_source))
+    #return collect(model.type.thresh:model.type.Δε_detector:(model.v_0.ε+2*model.v_0.Δε_source))
+    return collect(model.type.thresh:10:model.v_0.ε)
 end
 
 function buildTBins(type::CELL,model)
@@ -343,7 +344,10 @@ function Structs.PART(model,params)
     particle.r = initPartr(model.r_0,params).*params.length_scale
     particle.v = initPartv(model.v_0,params).*params.length_scale ./params.time_scale
     particle.cbin = findMinInd(params.cbins,getEnergy(particle.v))
-    
+    if params.ebins != nothing
+        particle.ebin = findMinInd(params.ebins,getEnergy(particle.v))
+    end
+
     if params.rbins != nothing
         particle.rbin = findMinInd(params.rbins,dot(particle.r,particle.r))
     end
