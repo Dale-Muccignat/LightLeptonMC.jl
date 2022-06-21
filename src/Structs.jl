@@ -9,6 +9,7 @@ export MCMODEL, MCINIT, MCPARAMS, PART, MEAS, MEAST, MEASS, MEASC, findMinInd
 @xport abstract type Density end
 @xport abstract type Field end
 @xport abstract type Temp end
+@xport abstract type Ionisation end
 
 @xport struct ZeroSpacial <: Spacial end
 @xport @AutoParm struct InitSpacial <: Spacial
@@ -42,15 +43,13 @@ end
     val::AUTO = 0.
 end
 
-abstract type Ionisation end
+@xport @AutoParm struct UniformIonisation <: Ionisation end
 
-@xport @AutoParm mutable struct UniformIonisation <: Ionisation end
-
-@xport @AutoParm mutable struct RatioIonisation <: Ionisation
+@xport @AutoParm struct RatioIonisation <: Ionisation
     ratio::AUTO = (e) -> 0.5
 end
 
-@xport @AutoParm mutable struct FunctionalIonisation <: Ionisation
+@xport @AutoParm struct FunctionalIonisation <: Ionisation
     func::AUTO = (e) -> 0.5
 end
 
