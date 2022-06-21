@@ -8,6 +8,10 @@ function withinTol(y,ŷ,tol=0.05)
     @info "Values: " y ŷ
     @test y - y*tol <= ŷ<= y+y*tol
 end
+@testset "Individual Checks" begin
+
+end
+
 @testset "MCSim.jl" begin
     @testset "Maxwell" begin
         @info "Elastic (Maxwell) Test"

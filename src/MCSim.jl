@@ -5,9 +5,9 @@ This package takes gases from Gases.jl and performs a Monte Carlo simulation in 
 
 ```julia
     meas, swarm, params = mc(MaxwellModel();E=1.,T=0.,N=1000,S=0.,verbose=false)
-    mean, swarm, params = mc(model,gas)
 ```
 
+For more information, type ?mc
 """
 module MCSim
 #TODO: Add Attachment, super-eleastic, liquid
@@ -65,7 +65,7 @@ function mc(model::MCMODEL,gas::Gas;verbose=false)
     mc(model,initParams(gas,model),verbose=verbose)
 end
 
-function mc(model::MCMODEL,gases::Vector{Gas},indicies;verbose=false,w=1.0,ref_gas=MaxwellModel(),save=false)
+function mc(model::MCMODEL,gases,indicies;verbose=false,w=1.0,ref_gas=MaxwellModel(),save=false,dcs=false)
     distribution_data::Dict{Int64,Tuple{Vector{Float64},Vector{Float64}}} = Dict() 
     # @info "Batch: " indicies[1]
     for i in indicies
@@ -77,7 +77,11 @@ function mc(model::MCMODEL,gases::Vector{Gas},indicies;verbose=false,w=1.0,ref_g
         end
         
         meas, swarm, params= mc(model,params,verbose=verbose)
-        distribution_data[i] = (params.ebins,meas.measLμJ.ε)
+        if dcs
+            distribution_data[i] = (params.χbins[4:end-1],sum(meas.measLμJ.εχ[:,:],dims=1)'[4:end-1])
+        else
+            distribution_data[i] = (params.ebins,meas.measLμJ.ε)
+        end
     end
     if save
         saveBatch(distribution_data,model,indicies,w)
@@ -87,8 +91,23 @@ function mc(model::MCMODEL,gases::Vector{Gas},indicies;verbose=false,w=1.0,ref_g
 end
 
 
+"""
+
+General models
+```julia
+    meas, swarm, params = mc(model::MCMODEL,params::MCPARAMS)
+    mean, swarm, params = mc(model,gas)
+```
+
+Swarm models
+```julia
+    meas, swarm, params = mc(MaxwellModel();E=1.,T=0.,N=1000,S=0.,verbose=false)
+```
+
+"""
 function mc(model::MCMODEL,params::MCPARAMS;verbose=false)
 
+    scale!(model,model.type,params)
     meas = initMeas(model,params)
     scale!(params)
 

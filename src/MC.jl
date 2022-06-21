@@ -3,7 +3,6 @@ module MC
 using ..Structs
 using ..Init
 using PhysicalConstants.CODATA2018, Unitful, AutoParameters, Random, StaticArrays, LinearAlgebra, AndExport
-
 export flight
 
 const amu = ustrip(float(AtomicMassConstant))
@@ -82,7 +81,7 @@ function checkAliveModel(type::LμJ,particle,model,meas_inner,params,verbose)
         verbose && @info "Detected"
     end
 
-    return particle.rbin != length(params.rbins) && getEnergy(particle.v) > type.thresh*params.energy_scale 
+    return particle.rbin != length(params.rbins) && getEnergy(particle.v) > type.thresh*params.energy_scale && sumColl(meas_inner.measg.coll_count) < 2
 end
 
 function checkAliveModel(type::CELL,particle,model,meas_inner,params,verbose)
@@ -120,7 +119,7 @@ function measureEvent!(type::CELL,dt,particle,model,params,meas_inner,verbose)
                 meas_inner.measCell.z[particle.zbin] += particle.weight
             end
         end
-        if :ez in model.meas 
+        if :εz in model.meas 
             if sum(meas_inner.measCell.εz[:,particle.zbin]) == 0. 
                 meas_inner.measCell.εz[particle.ebin,particle.zbin] += particle.weight
             end
@@ -147,10 +146,21 @@ end
 function measureDeath!(type::LμJ,particle,model,params,meas_inner,verbose)
     if particle.rbin == length(params.rbins)
         :χ in model.meas ? meas_inner.measLμJ.χ[findMinInd(params.χbins,abs(atan(particle.r[2],particle.r[3])))] += particle.weight : nothing
-        :eχ in model.meas ? meas_inner.measLμJ.εχ[findMinInd(params.ebins,getEnergy(particle.v)),findMinInd(params.χbins,abs(atan(particle.r[2],particle.r[3])))] += particle.weight : nothing
-	if abs(atan(particle.v[2],particle.v[3])) > type.angle_accept[1]*pi/180 && abs(atan(particle.v[2],particle.v[3])) < type.angle_accept[2]*pi/180
-            :e in model.meas ? meas_inner.measLμJ.ε[findMinInd(params.ebins,getEnergy(particle.v))] += particle.weight : nothing
-	end
+
+        if :εχ in model.meas 
+            if abs(abs(atan(particle.v[2],particle.v[3])) - abs(atan(particle.r[2],particle.r[3]))) < type.Δχ_detector
+                meas_inner.measLμJ.εχ[findMinInd(params.ebins,getEnergy(particle.v)),findMinInd(params.χbins,abs(atan(particle.r[2],particle.r[3])))] += particle.weight
+            else
+                meas_inner.measLμJ.εχ_reject[findMinInd(params.ebins,getEnergy(particle.v)),findMinInd(params.χbins,abs(atan(particle.r[2],particle.r[3])))] += particle.weight
+            end
+        end
+
+        if :ε in model.meas
+            if abs(atan(particle.v[2],particle.v[3])) > (type.χ-type.Δχ_detector)*pi/180 && abs(atan(particle.v[2],particle.v[3])) < (type.χ+type.Δχ_detector)*pi/180
+                meas_inner.measLμJ.ε[findMinInd(params.ebins,getEnergy(particle.v))] += particle.weight
+            end
+        end
+
     
     end
 end
@@ -158,7 +168,7 @@ end
 function measureDeath!(type::CELL,particle,model,params,meas_inner,verbose)
     if particle.zbin == length(params.zbins)
         :xy in model.meas ? meas_inner.measCell.xy[findMinInd(meas_inner.measCell.xybins,sqrt(particle.r[1]^2+particle.r[2]^2)/params.length_scale)] += particle.weight : nothing
-        :e in model.meas ? meas_inner.measCell.ε[findMinInd(params.ebins,getEnergy(particle.v))] += particle.weight : nothing
+        :ε in model.meas ? meas_inner.measCell.ε[findMinInd(params.ebins,getEnergy(particle.v))] += particle.weight : nothing
     end
 end
 
@@ -362,16 +372,29 @@ end
 
 function getIonisationEnergy(thresh,ion_type::FunctionalIonisation,g,particle,model,params)
     total_energy = getEnergy(g)*q - thresh
-    part_energy = -1
-    other_part_energy = 0
-    while part_energy < 0
-        if rand() > 0.5 || :SP in model.meas || particle.type == :positron
-            other_part_energy = ion_type.func[particle.cbin](rand())*params.energy_scale*q
-        else
-            other_part_energy = total_energy - ion_type.func[particle.cbin](rand())*params.energy_scale*q
-        end
-        part_energy = total_energy - other_part_energy 
+    if rand() > 0.5 || :SP in model.meas || particle.type == :positron
+        other_part_energy = ion_type.func[particle.cbin](rand())*params.energy_scale*q
+    else
+        other_part_energy = total_energy - ion_type.func[particle.cbin](rand())*params.energy_scale*q
     end
+    part_energy = total_energy - other_part_energy 
+
+    if part_energy < 0
+        @info "part" part_energy/params.energy_scale/q
+        @info "other" other_part_energy/params.energy_scale/q
+    end
+    
+    return part_energy, other_part_energy
+end
+
+function getIonisationEnergy(thresh,ion_type::DiscreteFunctionalIonisation,g,particle,model,params)
+    total_energy = getEnergy(g)*q - thresh
+    if rand() > 0.5 || :SP in model.meas || particle.type == :positron
+        other_part_energy = ion_type.loss(getEnergy(g)/params.energy_scale)*params.energy_scale*q
+    else
+        other_part_energy = total_energy - ion_type.loss(getEnergy(g)/params.energy_scale)*params.energy_scale*q
+    end
+    part_energy = total_energy - other_part_energy 
 
     if part_energy < 0
         @info "part" part_energy/params.energy_scale/q
@@ -509,9 +532,69 @@ function getEnDt(Eno::ZeroField,n0,particle,model,params)
     return dt_EVENT(Inf, :dt_energy, :Up)
 end
 
-@fastmath function getRDt(particle,model,params)
+@fastmath function getRDt(particle,model,type::LμJ,params)
+    #NOTE: Only for fields of 0
+    up, down = Inf, Inf
+    if params.rbins != nothing
+        p = particle.r
+        if particle.rbin == 2
+             #if particle is inside detector of jet, the time to bin down should be offset by jet_center
+            p -= model.type.jet_center
+        end
+        v = particle.v
+        r21 = params.rbins[particle.rbin]
+        r22 = params.rbins[particle.rbin+1]
+        a = v[3]^2+v[2]^2
+        b = 2*(p[3]*v[3]+v[2]*p[2])
+        c = p[3]^2+p[2]^2-r21+1e-6
+        delta = b^2-4*a*c
+        if (delta > 0.) #&& (c > 0.)
+            t1 = (-b+sqrt(delta))/(2*a)
+            t2 = (-b-sqrt(delta))/(2*a)
+            if t1 <= 0.
+                t1 = Inf
+            end
+            if t2 <= 0.
+                t2 = Inf
+            end
+            down = min(t1,t2)
+            if r21 == 0.
+                down = Inf
+            end
+        end
+        if particle.rbin == 2 
+            # undo offset from above if next moving up to detector
+            p += model.type.jet_center
+        end
+        if particle.rbin == 1 
+            # offset if moving up to jet edge
+            p -= model.type.jet_center
+        end
+        b = 2*(p[3]*v[3]+v[2]*p[2])
+        c = p[3]^2+p[2]^2-r21+1e-6
+        c = c+r21-r22-2e-6
+        delta = b^2-4*a*c
+        if (delta > 0.) #&& (c < 0.)
+            t1 = (-b+sqrt(delta))/(2*a)
+            t2 = (-b-sqrt(delta))/(2*a)
+            if t1 <= 0.
+                t1 = Inf
+            end
+            if t2 <= 0.
+                t2 = Inf
+            end
+            up = min(t1,t2)
+        end
+    end
+    if up == min(up,down)
+        return dt_EVENT(up,:dt_rbin,:Up)
+    else
+        return dt_EVENT(down,:dt_rbin,:Down)
+    end
+end
+@fastmath function getRDt(particle,model,type,params)
 	#NOTE: Only for fields of 0
-	up, down = Inf, Inf
+    up, down = Inf, Inf
     if params.rbins != nothing
         p = particle.r
         v = particle.v
@@ -657,7 +740,7 @@ end
     dt_energy = getEnDt(model.En0,model.n0,particle,model,params)
     dt_tbin = getTDt(particle,model,params)
     #TODO: Restrict the following to 0 field
-    dt_rbin = getRDt(particle,model,params)
+    dt_rbin = getRDt(particle,model,model.type,params)
     dt_zbin = getZDt(particle,model,params)
     dt_ybin = getYDt(particle,model,params)
     dt_xbin = getXDt(particle,model,params)

@@ -51,7 +51,7 @@ abstract type Ionisation end
 end
 
 @xport @AutoParm mutable struct FunctionalIonisation <: Ionisation
-    func::AUTO = (e,R) -> 0.5
+    func::AUTO = (e) -> 0.5
 end
 
 @xport function FunctionalIonisationInit(;func=(e,E2) -> 1.,thresh=10.)
@@ -88,6 +88,10 @@ end
     loss::AUTO = 5.
 end
 
+@xport @AutoParm mutable struct DiscreteFunctionalIonisation <: Ionisation
+    loss::AUTO = (e) -> 5.
+end
+
 @xport struct ZeroVelocity <: Velocity end
 
 @xport @AutoParm struct InitVelocity <: Velocity
@@ -110,6 +114,25 @@ end
     init::AUTO = MCINIT()
 end
 
+"""
+MCMODEL
+
+MCMODEL is the main constructor for MCSim.
+
+```julia
+    type = SWARM()                   # Used to set up specific models: LμJ(), SWARM() or CELL().
+    particle_type = :electron        # Change particle type: :electron or :positron. This will modify ionisation behaviour.
+    n = 100                          # Number of particles to simulate
+    v_0 = ZeroVelocity()             # Initial velocity: ZeroVelocity()...
+    r_0 = ZeroSpacial()              # Initial spacial: ZeroSpacial()...
+    n0 = UniformDensity()            # Density distribution:
+    En0 = UniformField()             # Electric field distribution: 
+    T = UniformTemp()                # Temperature distribution: 
+    ion_type = UniformIonisation()   # Ionisation sharing type:
+    meas = [:t]                      # Variables to measure. There are many possibilities, see ?MEASLμJ, ?MEASCELL or ?MEAST
+```
+
+"""
 @AutoParm mutable struct MCMODEL
     type::AUTO = SWARM()
     particle_type::AUTO = :electron
@@ -128,11 +151,30 @@ end
     t_f::AUTO = 2e-5
 end
 
+"""
+LμJ
+
+This struct is used to initilize a micro-jet simulation. Used in `MCMODEL(type=LμJ())`.
+
+Parameters:
+```julia
+    Δε_detector = 0.9       # Energy bin width for the detector
+    Δχ_detector = 2         # Angle bin width for the detector
+    χ = Inf                 # Only record measurements for a specific angle += resolution
+    thresh = 1.             # Set the minimum energy to simulate electrons too
+    jet_width = 15e-6       # Diameter for the liquid jet
+    jet_center = [0.,0.,0.] # Set's an offset for the jet_center 
+```
+
+For more information, type ?MCMODEL
+"""
 @xport @AutoParm mutable struct LμJ
     Δε_detector::AUTO = 0.9
-    angle_accept::AUTO = (0,180)
+    Δχ_detector::AUTO = 2
+    χ::AUTO = Inf
     thresh::AUTO = 1.
     jet_width::AUTO = 15e-6
+    jet_center::AUTO = [0.,0.,0.]
 end
 
 @xport @AutoParm mutable struct CELL
@@ -147,8 +189,8 @@ end
     r::AUTO = 1e-6
 end
 
-@xport function LμJ(;Δε_detector=0.9,angle_accept=(0,180),thresh=1.,jet_width=15e-6)
-    LμJ(Δε_detector,angle_accept,thresh,jet_width)
+@xport function LμJ(;jet_center=[0.,0.,0.],Δε_detector=0.9,Δχ_detector=2,χ=Inf,thresh=1.,jet_width=15e-6)
+    LμJ(Δε_detector,Δχ_detector,χ,thresh,jet_width,jet_center)
 end
 
 @xport function CELL(;Δε_detector=0.9,thresh=1.,z=15e-6,z_n=100,x=15e-6,y=15e-6,bin_no=100,r=1e-6)
@@ -234,16 +276,17 @@ end
     ε::AUTO = nothing
     χ::AUTO = nothing
     εχ::AUTO = nothing
+    εχ_reject::AUTO = nothing
     zyt::AUTO = nothing
 end
 
 function MEASLμJ(model::MCMODEL,params::MCPARAMS)
-    EELS,χ,zyt,εχ = nothing, nothing, nothing, nothing
+    ε,χ,zyt,εχ = nothing, nothing, nothing, nothing
     if :zyt ∈ model.meas
         zyt= zeros(length(params.zbins),length(params.ybins),length(params.tbins))
     end
     
-    if :e ∈ model.meas
+    if :ε ∈ model.meas
         ε = zeros(length(params.ebins))
     end
 
@@ -251,11 +294,11 @@ function MEASLμJ(model::MCMODEL,params::MCPARAMS)
         χ = zeros(length(params.χbins))
     end
     
-    if :eχ ∈ model.meas
+    if :εχ ∈ model.meas
         εχ = zeros(length(params.ebins),length(params.χbins))
     end
 
-    return MEASLμJ(ε, χ, εχ,zyt)
+    return MEASLμJ(ε, χ, εχ,εχ,zyt)
 
 end
 
@@ -271,10 +314,10 @@ end
 
 function MEASCELL(model::MCMODEL,params::MCPARAMS)
     ε, εz, x, y, z, xy, xybins = nothing, nothing, nothing, nothing, nothing, nothing, nothing
-    if :e ∈ model.meas
+    if :ε ∈ model.meas
         ε = zeros(length(params.ebins))
     end
-    if :ez ∈ model.meas
+    if :εz ∈ model.meas
         εz = zeros(length(params.ebins),length(params.zbins))
     end
     if :x ∈ model.meas

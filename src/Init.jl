@@ -60,6 +60,25 @@ function initParams(input_gas=MaxwellModel(),model::MCMODEL=MCMODEL())
 end
 
 # * Scale functions
+@xport function scale!(model,type::LμJ,params)
+    ls = params.length_scale
+    ts = params.time_scale
+    es = params.energy_scale
+
+    model.type.jet_center .*= ls
+end
+
+@xport function scale!(model::CELL)
+    ls = params.length_scale
+    ts = params.time_scale
+    es = params.energy_scale
+end
+
+@xport function scale!(model::SWARM)
+    ls = params.length_scale
+    ts = params.time_scale
+    es = params.energy_scale
+end
 @xport function scale!(params)
     ls = params.length_scale
     ts = params.time_scale
@@ -117,6 +136,7 @@ end
     ls = 1/params.length_scale
     ts = 1/params.time_scale
     es = 1/params.energy_scale
+    model.type.jet_center .*= ls
 end
 
 @xport function unscale!(type::CELL,model,params,meas::MEAS)
@@ -213,7 +233,7 @@ function generateBins(model)
     m = string.(model.meas)
 
     tbins = 1 ∈ occursin.("t",m) ? buildTBins(model.type,model) : nothing
-    ebins = 1 ∈ occursin.("e",m) ? buildEnBins(model.type,model) : nothing
+    ebins = 1 ∈ occursin.("ε",m) ? buildEnBins(model.type,model) : nothing
     zbins = 1 ∈ occursin.("z",m) ? buildZBins(model.type,model) : nothing
     ybins = 1 ∈ occursin.("y",m) ? buildYBins(model.type,model) : nothing
     xbins = 1 ∈ occursin.("x",m) ? buildXBins(model.type,model) : nothing
@@ -239,7 +259,7 @@ function buildTBins(type::SWARM,model)
 end
 
 function buildχBins(type::SWARM,model)
-    return LinRange(0,π,100)
+    return LinRange(0,π,90)
 end
 
 function buildZBins(type::SWARM,model)
