@@ -4,10 +4,10 @@ MCSim
 This package takes gases from Gases.jl and performs a Monte Carlo simulation in either a swarm or LμJ configuration. An example swarm simulation is included below.
 
 ```julia
-    meas, swarm = mc(MaxwellModel();E=1.,T=0.,N=1000,S=0.,verbose=false)
-    mean, swarm = mc(model,gas)
+    meas, swarm, params = mc(MaxwellModel();E=1.,T=0.,N=1000,S=0.,verbose=false)
 ```
 
+For more information, type ?mc
 """
 module MCSim
 #TODO: Add Attachment, super-eleastic, liquid
@@ -15,8 +15,8 @@ module MCSim
 #TODO: Add Density Gradient (this is probably best solved through Danny's code though)
 
 using Reexport, Distributed, JLD2, Dates, AndExport
-@reexport using Gases
-@reexport using FVB
+using Gases
+using FVB
 export mc, MCINIT, MCPARAMS, saveBatch, saveDist
 
 include("Structs.jl")
@@ -56,8 +56,8 @@ macro jld2save(filename, vars...)
     end
 end
 
-function mc(gas::Gas;S=0.,E=1.,T=0.,N=1000,t=1e-5,verbose=false)
-    model = MCMODEL(type=SWARM(t),n=N,En0=UniformField(E),T=UniformTemp(T),v_0=InitVelocity(S,[0,0,1]))
+function mc(gas::Gas;S=0.,E=1.,T=0.,N=1000,t=1e-5,meas=[:t],verbose=false)
+    model = MCMODEL(meas=meas,type=SWARM(t),n=N,En0=UniformField(E),T=UniformTemp(T),ion_type=RatioIonisation(0.7),v_0=InitVelocity(S,[0,0,1]))
     mc(model,initParams(gas,model),verbose=verbose)
 end
 
@@ -65,7 +65,7 @@ function mc(model::MCMODEL,gas::Gas;verbose=false)
     mc(model,initParams(gas,model),verbose=verbose)
 end
 
-function mc(model::MCMODEL,gases::Vector{Gas},indicies;verbose=false,w=1.0,ref_gas=MaxwellModel(),save=false)
+function mc(model::MCMODEL,gases,indicies;verbose=false,w=1.0,ref_gas=MaxwellModel(),save=false,dcs=false)
     distribution_data::Dict{Int64,Tuple{Vector{Float64},Vector{Float64}}} = Dict() 
     # @info "Batch: " indicies[1]
     for i in indicies
@@ -77,7 +77,11 @@ function mc(model::MCMODEL,gases::Vector{Gas},indicies;verbose=false,w=1.0,ref_g
         end
         
         meas, swarm, params= mc(model,params,verbose=verbose)
-        distribution_data[i] = (params.ebins,meas.measLμJ.ε)
+        if dcs
+            distribution_data[i] = (params.χbins[4:end-1],sum(meas.measLμJ.εχ[:,:],dims=1)'[4:end-1])
+        else
+            distribution_data[i] = (params.ebins,meas.measLμJ.ε)
+        end
     end
     if save
         saveBatch(distribution_data,model,indicies,w)
@@ -87,8 +91,26 @@ function mc(model::MCMODEL,gases::Vector{Gas},indicies;verbose=false,w=1.0,ref_g
 end
 
 
-function mc(model::MCMODEL,params::MCPARAMS;verbose=false)
+"""
 
+General models
+```julia
+    meas, swarm, params = mc(model::MCMODEL,params::MCPARAMS)
+    mean, swarm, params = mc(model,gas)
+```
+
+Swarm models
+```julia
+    meas, swarm, params = mc(MaxwellModel();E=1.,T=0.,N=1000,S=0.,verbose=false)
+```
+
+"""
+function mc(model::MCMODEL,params::MCPARAMS;verbose=false)
+    if verbose
+        model.n=1
+    end
+
+    scale!(model,model.type,params)
     meas = initMeas(model,params)
     scale!(params)
 
@@ -100,23 +122,23 @@ function mc(model::MCMODEL,params::MCPARAMS;verbose=false)
             @info "Progress: "*string(100*n/model.n)*"%"
         end
 
-        meas_inner = flight(PART(model.type,model,params),model,params,verbose)
+        meas_inner = flight(PART(model,params),model,params,verbose)
         [meas_inner]
     end
     # @show params.rbins
     unscale!(params)
-    unscale!(model.type,params,meas[1])
+    unscale!(model.type,model,params,meas[1])
     return process(model.type,meas[1],params,model)..., params;
 
 end
 
 @xport function buildModel()
     println("Welcome to the model builder helper")
-    println("What type of model [LuJ/Swarm]:")
+    println("What type of model [LuJ/Swarm/Cell]:")
     modeltype = readline()
-    while modeltype ∉ ["LuJ","Swarm"]
+    while modeltype ∉ ["LuJ","Swarm","Cell"]
         println("Error: Model not found")
-        println("What type of model [LuJ/Swarm]:")
+        println("What type of model [LuJ/Swarm/Cell]:")
         modeltype = readline()
     end
     
@@ -169,11 +191,12 @@ Base.:/(x::Nothing,y) = nothing
 Base.:+(x::SWARMMEAS,y::SWARMMEAS) = GenericAddition(x,y)::SWARMMEAS
 Base.:+(x::MEAST,y::MEAST) = GenericAddition(x,y)::MEAST
 Base.:+(x::MEASLμJ,y::MEASLμJ) = GenericAddition(x,y)::MEASLμJ
+Base.:+(x::MEASCELL,y::MEASCELL) = GenericAddition(x,y)::MEASCELL
 Base.:+(x::MEASC,y::MEASC) = GenericAddition(x,y)::MEASC
 Base.:+(x::MEASS,y::MEASS) = GenericAddition(x,y)::MEASS
 Base.:+(x::COLLCOUNT,y::COLLCOUNT) = GenericAddition(x,y)::COLLCOUNT
 function Base.:+(x::MEAS,y::MEAS)
-    return MEAS(GenericAddition(x.measLμJ,y.measLμJ),GenericAddition(x.measg,y.measg),GenericAddition(x.meast,y.meast),GenericAddition(x.meass,y.meass),GenericAddition(x.measc,y.measc))
+    return MEAS(GenericAddition(x.measLμJ,y.measLμJ),GenericAddition(x.measCell,y.measCell),GenericAddition(x.measg,y.measg),GenericAddition(x.meast,y.meast),GenericAddition(x.meass,y.meass),GenericAddition(x.measc,y.measc))
 end
 
 function saveBatch(dists,model,indicies,w)

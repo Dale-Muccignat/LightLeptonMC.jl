@@ -3,7 +3,6 @@ module MC
 using ..Structs
 using ..Init
 using PhysicalConstants.CODATA2018, Unitful, AutoParameters, Random, StaticArrays, LinearAlgebra, AndExport
-
 export flight
 
 const amu = ustrip(float(AtomicMassConstant))
@@ -14,6 +13,8 @@ const ħ = ustrip(float(ReducedPlanckConstant))
 
 const electron_v2eV = 0.5 * me / q
 #TODO: Keep the units in
+#TODO: Add TimerOutputs
+#TODO: Only select electrons with position and velocity directed toward detector in LuJ
 
 abstract type Direction end
 abstract type Event end
@@ -30,29 +31,48 @@ end
 function flight(particle,model,params,verbose)
     meas_inner = initMeas(model,params)
 
-    alive = true
-    while alive
+    while particle.alive
+        verbose && @info "Particle before: " particle
         verbose && @info "Particle energy before: " getEnergy(particle.v)/params.energy_scale
+        verbose && @info "Particle position before: " particle.r
+        verbose && @info "Particle velocity before: " particle.v
 
-        dt = getDt(model.type,particle,model,params,verbose)
+        dt = getDt(particle,model,params,verbose)
 
-        updateParticle!(dt.time,particle,model.En0,model.n0,params,verbose)
+        :f in model.meas ? measureCumulative!(dt.time,particle,model.En0,model.n0,model,params,meas_inner,verbose) : nothing
+
+        updateParticle!(dt.time,particle,model.En0,model.n0,model,params,meas_inner,verbose)
 
         event!(dt,particle,model,params,meas_inner,verbose)
 
         verbose && @info "Particle energy after: " getEnergy(particle.v)/params.energy_scale
+        verbose && @info "Particle position after: " particle.r
+        verbose && @info "Particle velocity after: " particle.v
 
-        alive = checkAlive(model.type,particle,model,params,verbose)
+        particle.alive = particle.alive && checkAlive(model.type,particle,model,meas_inner,params,verbose)
+        measureEvent!(model.type,dt,particle,model,params,meas_inner,verbose)
         # if verbose && meas_inner.measg.coll_count.elastic > 5 alive = false end
     end
+    measureDeath!(model.type,particle,model,params,meas_inner,verbose)
     return meas_inner
 end
 
-function checkAlive(type::SWARM,particle,model,params,verbose)
-    return particle.t < model.type.t_f*params.time_scale
+function checkAlive(type,particle,model,meas_inner,params,verbose)
+
+    alive = true
+    if params.tbins != nothing
+        alive = alive && particle.t < model.type.t_f*params.time_scale
+    end
+    
+    return alive && checkAliveModel(type,particle,model,meas_inner,params,verbose)
 end
 
-function checkAlive(type::LμJ,particle,model,params,verbose)
+function checkAliveModel(type::SWARM,particle,model,meas_inner,params,verbose)
+
+    return true
+end
+
+function checkAliveModel(type::LμJ,particle,model,meas_inner,params,verbose)
 
     if getEnergy(particle.v) < type.thresh*params.energy_scale
         verbose && @info "Absorbed"
@@ -62,12 +82,106 @@ function checkAlive(type::LμJ,particle,model,params,verbose)
         verbose && @info "Detected"
     end
 
-    if params.tbins != nothing
-        return particle.rbin != length(params.rbins) && getEnergy(particle.v) > type.thresh*params.energy_scale && particle.t < params.tbins[end]
-    else
-        return particle.rbin != length(params.rbins) && getEnergy(particle.v) > type.thresh*params.energy_scale 
+    return particle.rbin != length(params.rbins) && getEnergy(particle.v) > type.thresh*params.energy_scale && sumColl(meas_inner.measg.coll_count) < 2
+end
+
+function checkAliveModel(type::CELL,particle,model,meas_inner,params,verbose)
+    alive = true
+
+    if getEnergy(particle.v) < type.thresh*params.energy_scale
+        verbose && @info "Absorbed"
     end
-        
+
+    if params.zbins != nothing 
+        # :SP_z in model.meas ? alive = alive && particle.zbin != length(params.zbins) : alive = alive && particle.zbin != length(params.zbins) && particle.zbin != 0
+        alive = alive && particle.zbin != length(params.zbins) && particle.zbin != 0
+        verbose && particle.zbin == length(params.zbins) && @info "Detected Z"
+    end
+
+    if params.ybins != nothing 
+        alive = alive && particle.ybin != length(params.ybins)
+        verbose && particle.ybin == length(params.ybins) && @info "Detected Y"
+    end
+
+    if params.xbins != nothing 
+        alive = alive && particle.xbin != length(params.xbins)
+        verbose && particle.xbin == length(params.xbins) && @info "Detected X"
+    end
+    
+    :SP in model.meas ? alive = alive && sumColl(meas_inner.measg.coll_count) == 0 : nothing
+
+    return alive && getEnergy(particle.v) > type.thresh*params.energy_scale 
+end
+
+function measureEvent!(type::CELL,dt,particle,model,params,meas_inner,verbose)
+    if dt.type == :dt_zbin && dt.direction == :Up 
+        if :z in model.meas 
+            if meas_inner.measCell.z[particle.zbin] == 0. 
+                meas_inner.measCell.z[particle.zbin] += particle.weight
+            end
+        end
+        if :εz in model.meas 
+            if sum(meas_inner.measCell.εz[:,particle.zbin]) == 0. 
+                meas_inner.measCell.εz[particle.ebin,particle.zbin] += particle.weight
+            end
+        end
+    end
+end
+
+function measureEvent!(type::LμJ,dt,particle,model,params,meas_inner,verbose)
+end
+
+@fastmath function measureCumulative!(dt,particle,En0,n0,model,params,meas_inner,verbose)
+    # e_bin += particle.weight * 0.5*consts.me*(dot(particle.v,particle.v)+2*sum(particle.v.*vars.a)*dt+dot(vars.a,vars.a)*dt^2)*dt
+    meas_inner.measc.r[particle.tbin,:] += particle.weight * (particle.r + 0.5*particle.v*dt + (1/6)*params.a*params.n0*(dt^2))*dt
+    meas_inner.measc.v[particle.tbin,:] += particle.weight * (particle.v + 0.5*params.a*params.n0*dt)*dt
+    meas_inner.measc.rv[particle.tbin,:] += particle.weight * (particle.r.*particle.v + 0.5*(particle.r.* params.a * params.n0+particle.v.^2)*dt + 0.5*particle.v.* params.a * params.n0*(dt^2) + (1/8)*((params.a * params.n0).^2)*(dt^3))*dt
+
+    meas_inner.measc.weight[particle.tbin] += particle.weight * dt
+end
+
+function measureDeath!(type::SWARM,particle,model,params,meas_inner,verbose)
+    
+end
+
+function measureDeath!(type::LμJ,particle,model,params,meas_inner,verbose)
+    if particle.rbin == length(params.rbins)
+        :χ in model.meas ? meas_inner.measLμJ.χ[findMinInd(params.χbins,abs(atan(particle.r[2],particle.r[3])))] += particle.weight : nothing
+
+        if :εχ in model.meas 
+            verbose && @info "Velcoity angle: " abs(atand(particle.v[2],particle.v[3]))
+            verbose && @info "Spacial angle: " abs(atand(particle.r[2],particle.r[3]))
+            if abs(abs(atand(particle.v[2],particle.v[3])) - abs(atand(particle.r[2],particle.r[3]))) < type.Δχ_detector
+                meas_inner.measLμJ.εχ[findMinInd(params.ebins,getEnergy(particle.v)),findMinInd(params.χbins,abs(atan(particle.r[2],particle.r[3])))] += particle.weight
+                verbose && @info "accepted"
+            else
+                meas_inner.measLμJ.εχ_reject[findMinInd(params.ebins,getEnergy(particle.v)),findMinInd(params.χbins,abs(atan(particle.r[2],particle.r[3])))] += particle.weight
+                verbose && @info "rejected"
+            end
+        end
+
+        if :ε in model.meas
+            if abs(atan(particle.v[2],particle.v[3])) > (type.χ-type.Δχ_detector)*pi/180 && abs(atan(particle.v[2],particle.v[3])) < (type.χ+type.Δχ_detector)*pi/180
+                meas_inner.measLμJ.ε[findMinInd(params.ebins,getEnergy(particle.v))] += particle.weight
+            end
+        end
+
+    
+    end
+end
+
+function measureDeath!(type::CELL,particle,model,params,meas_inner,verbose)
+    if particle.zbin == length(params.zbins)
+        :xy in model.meas ? meas_inner.measCell.xy[findMinInd(meas_inner.measCell.xybins,sqrt(particle.r[1]^2+particle.r[2]^2)/params.length_scale)] += particle.weight : nothing
+        :ε in model.meas ? meas_inner.measCell.ε[findMinInd(params.ebins,getEnergy(particle.v))] += particle.weight : nothing
+    end
+end
+
+function measureCollision!(energy_loss,particle,model,params,meas_inner,verbose)
+    if :SP in model.meas && sumColl(meas_inner.measg.coll_count) == 1
+        meas_inner.measg.SP_ε = energy_loss
+        meas_inner.measg.SP_r = sqrt(dot(particle.r,particle.r)) # Assumes particle started at [0,0,0]
+    end
 end
 
 function event!(dt,particle,model,params,meas_inner,verbose)
@@ -95,14 +209,13 @@ function event!(dt,particle,model,params,meas_inner,verbose)
     end
 end
 
-@xport @fastmath function updateParticle!(dt,particle,En0::UniformField,n0::UniformDensity,params,verbose)
+@xport @fastmath function updateParticle!(dt,particle,En0::UniformField,n0::UniformDensity,model,params,meas_inner,verbose)
     particle.r += (particle.v + 0.5 * params.a * params.n0 * dt)*dt
     particle.v += params.a * params.n0 * dt
     particle.t += dt
 end
 
-@xport @fastmath function updateParticle!(dt,particle,En0,n0::LμJDensity,params,verbose)
-    #TODO: Make this dependent upon Zero Field only
+@xport @fastmath function updateParticle!(dt,particle,En0::ZeroField,n0,model,params,meas_inner,verbose)
     particle.r += particle.v * dt
     particle.t += dt
 end
@@ -119,6 +232,14 @@ function eventTbin!(dt,particle,model,params,meas_inner,verbose)
     end
 
     :zyt ∈ model.meas ? meas_inner.measLμJ.zyt[particle.zbin,particle.ybin,particle.tbin] += particle.weight : nothing
+
+    if :f ∈ model.meas
+        # @inbounds meas_inner.measc.ε[particle.tbin] ./= meas_inner.measc.weight[particle.tbin]
+        @inbounds meas_inner.measc.r[particle.tbin,:] ./= meas_inner.measc.weight[particle.tbin]
+        @inbounds meas_inner.measc.v[particle.tbin,:] ./= meas_inner.measc.weight[particle.tbin]
+        @inbounds meas_inner.measc.rv[particle.tbin,:] ./= meas_inner.measc.weight[particle.tbin]
+    end
+    
     
     particle.tbin += 1
 end
@@ -129,7 +250,8 @@ end
 function eventCollision!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
     verbose && @info "Collision: " dt
     cs_ind = getCollType(particle,model,params,verbose)
-
+    energy_loss = 0.
+    :SP in model.meas && sumColl(meas_inner.measg.coll_count) == 0 ? energy_loss = getEnergy(particle.v) : nothing
     verbose && @info "Collision Type: " params.splat_gas.type[cs_ind]
 
     if cs_ind == 0
@@ -137,12 +259,17 @@ function eventCollision!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
         elasticColl!(cs_ind,getRelVel(cs_ind,particle,model,params),particle,model,params,meas_inner,verbose)
     elseif params.splat_gas.type[cs_ind] == :EXCITATION
         excitationColl!(cs_ind,getRelVel(cs_ind,particle,model,params),particle,model,params,meas_inner,verbose)
+        # energy_loss = params.splat_gas.thresh[cs_no]
     elseif params.splat_gas.type[cs_ind] == :IONIZATION
         ionisationColl!(cs_ind,model.ion_type,getRelVel(cs_ind,particle,model,params),particle,model,params,meas_inner,verbose)
+        # energy_loss = params.splat_gas.thresh[cs_no]
     elseif params.splat_gas.type[cs_ind] == :ATTACHMENT
         attachmentColl!(cs_ind,getRelVel(cs_ind,particle,model,params),particle,model,params,meas_inner,verbose)
     end
 
+    :SP in model.meas && sumColl(meas_inner.measg.coll_count) == 1 ? energy_loss -= getEnergy(particle.v) : nothing
+
+    measureCollision!(energy_loss,particle,model,params,meas_inner,verbose)
     updateCbin!(particle,params)
 end
 
@@ -202,7 +329,7 @@ end
 @fastmath function ionisationColl!(cs_no,ion_type,g,particle,model,params,meas_inner,verbose)
 
     if dot(g,g)-2*params.splat_gas.thresh[cs_no]/me > 0.
-        part_energy, other_part_energy = getIonisationEnergy(params.splat_gas.thresh[cs_no],ion_type,g)
+        part_energy, other_part_energy = getIonisationEnergy(params.splat_gas.thresh[cs_no],ion_type,g,particle,model,params)
 
         coschi, sinchi, phi = scatteringAngle(cs_no,g,particle,model,params,verbose)
 
@@ -210,7 +337,7 @@ end
         v2 = shift(v2,g)
         v2 = (me*particle.v + params.splat_gas.m[cs_no]* (g-particle.v + v2)) /(me + params.splat_gas.m[cs_no])
 
-        particle.weight *= 2.
+        particle.type == :electron ? particle.weight *= 2. : nothing
         meas_inner.measg.coschi += dot(particle.v,v2)/(norm(v2)*norm(particle.v))
         meas_inner.measg.coll_count.ionisation += 1
         particle.v = v2
@@ -218,31 +345,79 @@ end
     
 end
 
-function getIonisationEnergy(thresh,ion_type::UniformIonisation,g)
+function getIonisationEnergy(thresh,ion_type::DiscreteIonisation,g,particle,model,params)
     total_energy = getEnergy(g)*q - thresh
-    other_part_energy = total_energy * rand()
-    part_energy = total_energy - other_part_energy 
-    return part_energy, other_part_energy
-end
-function getIonisationEnergy(thresh,ion_type::RatioIonisation,g)
-    total_energy = getEnergy(g)*q - thresh
-    if rand() > 0.5 
-        other_part_energy = total_energy * ion_type.ratio
+    if rand() > 0.5 || :SP in model.meas || particle.type == :positron
+        other_part_energy = ion_type.loss*params.energy_scale*q
     else
-        other_part_energy = total_energy * (1-ion_type.ratio)
+        other_part_energy = total_energy - ion_type.loss*params.energy_scale*q
     end
     part_energy = total_energy - other_part_energy 
     return part_energy, other_part_energy
 end
 
+function getIonisationEnergy(thresh,ion_type::UniformIonisation,g,particle,model,params)
+    total_energy = getEnergy(g)*q - thresh
+    other_part_energy = total_energy * rand()
+    part_energy = total_energy - other_part_energy 
+    return part_energy, other_part_energy
+end
+
+function getIonisationEnergy(thresh,ion_type::RatioIonisation,g,particle,model,params)
+    total_energy = getEnergy(g)*q - thresh
+    if rand() > 0.5 || :SP in model.meas || particle.type == :positron
+        other_part_energy = total_energy * ion_type.ratio(getEnergy(g)/params.energy_scale)::Float64
+        # other_part_energy = 0
+    else
+        other_part_energy = total_energy * (1-ion_type.ratio(getEnergy(g)/params.energy_scale)::Float64)
+    end
+    part_energy = total_energy - other_part_energy 
+    return part_energy, other_part_energy
+end
+
+function getIonisationEnergy(thresh,ion_type::FunctionalIonisation,g,particle,model,params)
+    total_energy = getEnergy(g)*q - thresh
+    if rand() > 0.5 || :SP in model.meas || particle.type == :positron
+        other_part_energy = ion_type.func[particle.cbin](rand())*params.energy_scale*q
+    else
+        other_part_energy = total_energy - ion_type.func[particle.cbin](rand())*params.energy_scale*q
+    end
+    part_energy = total_energy - other_part_energy 
+
+    if part_energy < 0
+        @info "part" part_energy/params.energy_scale/q
+        @info "other" other_part_energy/params.energy_scale/q
+    end
+    
+    return part_energy, other_part_energy
+end
+
+function getIonisationEnergy(thresh,ion_type::DiscreteFunctionalIonisation,g,particle,model,params)
+    total_energy = getEnergy(g)*q - thresh
+    if rand() > 0.5 || :SP in model.meas || particle.type == :positron
+        other_part_energy = ion_type.loss(getEnergy(g)/params.energy_scale)*params.energy_scale*q
+    else
+        other_part_energy = total_energy - ion_type.loss(getEnergy(g)/params.energy_scale)*params.energy_scale*q
+    end
+    part_energy = total_energy - other_part_energy 
+
+    if part_energy < 0
+        @info "part" part_energy/params.energy_scale/q
+        @info "other" other_part_energy/params.energy_scale/q
+    end
+    
+    return part_energy, other_part_energy
+end
+
 function attachmentColl!(cs_no,g,particle,model,params,meas_inner,verbose)
-    particle.weight /= 2.
+    particle.type == :positron ? particle.alive = false : particle.weight /= 2.
 end
 
 function scatteringAngle(cs_no,g,particle,model,params,verbose)
     # coschi = 1-2*rand()
     # @show getEnergy(g)/params.energy_scale
     coschi = params.splat_gas.dcs[cs_no][particle.cbin](rand())::Float64
+    # coschi = 1.
     sinchi = sqrt(1-coschi^2)
     phi = rand()*2*pi
     return coschi, sinchi, phi
@@ -269,15 +444,24 @@ end
 
 function updateCbin!(particle,params)
     ea = getEnergy(particle.v)
-	while ea < params.cbins[particle.cbin]
-		particle.cbin-= 1
-	end
+    while ea < params.cbins[particle.cbin]
+        particle.cbin-= 1
+    end
     if particle.cbin != length(params.cbins)
         while ea > params.cbins[particle.cbin+1]
             particle.cbin+= 1
         end
     end
-    
+    if params.ebins != nothing
+        while ea < params.ebins[particle.ebin] && particle.ebin != 1
+            particle.ebin-= 1
+        end
+        if particle.ebin != length(params.ebins)
+            while ea > params.ebins[particle.ebin+1]
+                particle.ebin+= 1
+            end
+        end
+    end
 end
 
 function eventEnergy!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
@@ -296,13 +480,6 @@ function eventRBin!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
     elseif dt.direction == :Down
         particle.rbin -= 1
     end
-
-    if particle.rbin == length(params.rbins)
-        :χ in model.meas ? meas_inner.measLμJ.χ[findMinInd(params.χbins,abs(atan(particle.r[2],particle.r[3])))] += particle.weight : nothing
-        :eχ in model.meas ? meas_inner.measLμJ.εχ[findMinInd(params.ebins,getEnergy(particle.v)),findMinInd(params.χbins,abs(atan(particle.r[2],particle.r[3])))] += particle.weight : nothing
-        :e in model.meas ? meas_inner.measLμJ.ε[findMinInd(params.ebins,getEnergy(particle.v))] += particle.weight : nothing
-    end
-    
 end
 
 function eventYBin!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
@@ -321,11 +498,23 @@ function eventZBin!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
     elseif dt.direction == :Down
         particle.zbin -= 1
     end
+    if :SP_z in model.meas && particle.zbin != 0
+        meas_inner.measg.SP_εs[particle.zbin] = getEnergy(particle.v)
+    end
+end
+
+function eventXBin!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
+    verbose && @info "xBin Bin Change: " dt
+    if dt.direction == :Up
+        particle.xbin += 1
+    elseif dt.direction == :Down
+        particle.xbin -= 1
+    end
 end
 
 # * Get Bin Times
 
-function getDtCBinsPos(En0::UniformField,n0::UniformDensity,particle,model,params)
+function getEnDt(En0::UniformField,n0::UniformDensity,particle,model,params)
 	v_perp = particle.v[1]^2 + particle.v[2]^2 #Seperate out of the vz velocity
 	if (particle.v[3] < 0.) && ((params.cbins[particle.cbin]/electron_v2eV - v_perp) > 0.) && (particle.cbin!= 1)
 		#If the velocity is less than zero, i.e if the energy bin needs to go down
@@ -341,47 +530,113 @@ function getDtCBinsPos(En0::UniformField,n0::UniformDensity,particle,model,param
 		#same as before except with the lower boundry of the next bin up
 		return dt_EVENT(-(particle.v[3]-vf_z) /(params.a[3] * params.n0), :dt_energy,:Up)
 	end
-    return dt_ENERGY(Inf, :dt_energy, Up())
+    return dt_EVENT(Inf, :dt_energy, :Up)
 end
 
-@fastmath function getRDt(particle,model,params)
+function getEnDt(Eno::ZeroField,n0,particle,model,params)
+    return dt_EVENT(Inf, :dt_energy, :Up)
+end
+
+@fastmath function getRDt(particle,model,type::LμJ,params)
+    #NOTE: Only for fields of 0
+    up, down = Inf, Inf
+    if params.rbins != nothing
+        p = particle.r
+        if particle.rbin == 2
+             #if particle is inside detector of jet, the time to bin down should be offset by jet_center
+            p -= model.type.jet_center
+        end
+        v = particle.v
+        r21 = params.rbins[particle.rbin]
+        r22 = params.rbins[particle.rbin+1]
+        a = v[3]^2+v[2]^2
+        b = 2*(p[3]*v[3]+v[2]*p[2])
+        c = p[3]^2+p[2]^2-r21+1e-6
+        delta = b^2-4*a*c
+        if (delta > 0.) #&& (c > 0.)
+            t1 = (-b+sqrt(delta))/(2*a)
+            t2 = (-b-sqrt(delta))/(2*a)
+            if t1 <= 0.
+                t1 = Inf
+            end
+            if t2 <= 0.
+                t2 = Inf
+            end
+            down = min(t1,t2)
+            if r21 == 0.
+                down = Inf
+            end
+        end
+        if particle.rbin == 2 
+            # undo offset from above if next moving up to detector
+            p += model.type.jet_center
+        end
+        if particle.rbin == 1 
+            # offset if moving up to jet edge
+            p -= model.type.jet_center
+        end
+        b = 2*(p[3]*v[3]+v[2]*p[2])
+        c = p[3]^2+p[2]^2-r21+1e-6
+        c = c+r21-r22-2e-6
+        delta = b^2-4*a*c
+        if (delta > 0.) #&& (c < 0.)
+            t1 = (-b+sqrt(delta))/(2*a)
+            t2 = (-b-sqrt(delta))/(2*a)
+            if t1 <= 0.
+                t1 = Inf
+            end
+            if t2 <= 0.
+                t2 = Inf
+            end
+            up = min(t1,t2)
+        end
+    end
+    if up == min(up,down)
+        return dt_EVENT(up,:dt_rbin,:Up)
+    else
+        return dt_EVENT(down,:dt_rbin,:Down)
+    end
+end
+@fastmath function getRDt(particle,model,type,params)
 	#NOTE: Only for fields of 0
-    p = particle.r
-    v = particle.v
-    r21 = params.rbins[particle.rbin]
-    r22 = params.rbins[particle.rbin+1]
-	up, down = Inf, Inf
-	a = v[3]^2+v[2]^2
-	b = 2*(p[3]*v[3]+v[2]*p[2])
-	c = p[3]^2+p[2]^2-r21+1e-6
-    delta = b^2-4*a*c
-	if (delta > 0.) #&& (c > 0.)
-		t1 = (-b+sqrt(delta))/(2*a)
-		t2 = (-b-sqrt(delta))/(2*a)
-		if t1 <= 0.
-			t1 = Inf
-		end
-		if t2 <= 0.
-			t2 = Inf
-		end
-		down = min(t1,t2)
-		if r21 == 0.
-			down = Inf
-		end
-	end
-	c = c+r21-r22-2e-6
-    delta = b^2-4*a*c
-	if (delta > 0.) #&& (c < 0.)
-		t1 = (-b+sqrt(delta))/(2*a)
-		t2 = (-b-sqrt(delta))/(2*a)
-		if t1 <= 0.
-			t1 = Inf
-		end
-		if t2 <= 0.
-			t2 = Inf
-		end
-		up = min(t1,t2)
-	end
+    up, down = Inf, Inf
+    if params.rbins != nothing
+        p = particle.r
+        v = particle.v
+        r21 = params.rbins[particle.rbin]
+        r22 = params.rbins[particle.rbin+1]
+        a = v[3]^2+v[2]^2
+        b = 2*(p[3]*v[3]+v[2]*p[2])
+        c = p[3]^2+p[2]^2-r21+1e-6
+        delta = b^2-4*a*c
+        if (delta > 0.) #&& (c > 0.)
+            t1 = (-b+sqrt(delta))/(2*a)
+            t2 = (-b-sqrt(delta))/(2*a)
+            if t1 <= 0.
+                t1 = Inf
+            end
+            if t2 <= 0.
+                t2 = Inf
+            end
+            down = min(t1,t2)
+            if r21 == 0.
+                down = Inf
+            end
+        end
+        c = c+r21-r22-2e-6
+        delta = b^2-4*a*c
+        if (delta > 0.) #&& (c < 0.)
+            t1 = (-b+sqrt(delta))/(2*a)
+            t2 = (-b-sqrt(delta))/(2*a)
+            if t1 <= 0.
+                t1 = Inf
+            end
+            if t2 <= 0.
+                t2 = Inf
+            end
+            up = min(t1,t2)
+        end
+    end
     if up == min(up,down)
         return dt_EVENT(up,:dt_rbin,:Up)
     else
@@ -395,10 +650,20 @@ end
 
 function getZDt(particle,model,params)
     if params.zbins != nothing
-        if (particle.v[3] < 0.) && (particle.zbin != 1)
-            return dt_EVENT((params.zbins[particle.zbin]-1e-12-particle.r[3])/particle.v[3], :dt_zbin,:Down)
-        elseif (particle.zbin < length(params.zbins)) && (particle.v[3] > 0.)
-            return dt_EVENT((params.zbins[particle.zbin+1]+1e-12-particle.r[3])/particle.v[3], :dt_zbin, :Up)
+        if model.optimise_spatial == true
+            if (particle.v[3] < 0.) && (particle.zbin != 0)
+                return dt_EVENT((params.zbins[1]-1e-12-particle.r[3])/particle.v[3], :dt_zbin,:Down)
+            elseif (particle.zbin < length(params.zbins)) && (particle.v[3] > 0.)
+                return dt_EVENT((params.zbins[end]+1e-12-particle.r[3])/particle.v[3], :dt_zbin, :Up)
+            end
+        else
+            if params.zbins != nothing
+                if (particle.v[3] < 0.) && (particle.zbin != 0)
+                    return dt_EVENT((params.zbins[particle.zbin]-1e-12-particle.r[3])/particle.v[3], :dt_zbin,:Down)
+                elseif (particle.zbin < length(params.zbins)) && (particle.v[3] > 0.)
+                    return dt_EVENT((params.zbins[particle.zbin+1]+1e-12-particle.r[3])/particle.v[3], :dt_zbin, :Up)
+                end
+            end
         end
     end
     return dt_EVENT(Inf,:dt_zbin,:Up)
@@ -406,13 +671,44 @@ end
 
 function getYDt(particle,model,params)
     if params.ybins != nothing
-        if (particle.v[2] < 0.) && (particle.ybin != 1)
-            return dt_EVENT((params.ybins[particle.ybin]-1e-12-particle.r[2])/particle.v[2], :dt_ybin,:Down)
-        elseif (particle.ybin < length(params.ybins)) && (particle.v[2] > 0.)
-            return dt_EVENT((params.ybins[particle.ybin+1]+1e-12-particle.r[2])/particle.v[2], :dt_ybin, :Up)
+        if model.optimise_spatial == true
+            if (particle.v[2] < 0.) && (particle.ybin != 0)
+                return dt_EVENT((params.ybins[1]-1e-12-particle.r[2])/particle.v[2], :dt_ybin,:Down)
+            elseif (particle.ybin < length(params.ybins)) && (particle.v[2] > 0.)
+                return dt_EVENT((params.ybins[end]+1e-12-particle.r[2])/particle.v[2], :dt_ybin, :Up)
+            end
+        else
+            if params.ybins != nothing
+                if (particle.v[2] < 0.) && (particle.ybin != 0)
+                    return dt_EVENT((params.ybins[particle.ybin]-1e-12-particle.r[2])/particle.v[2], :dt_ybin,:Down)
+                elseif (particle.ybin < length(params.ybins)) && (particle.v[2] > 0.)
+                    return dt_EVENT((params.ybins[particle.ybin+1]+1e-12-particle.r[2])/particle.v[2], :dt_ybin, :Up)
+                end
+            end
         end
     end
     return dt_EVENT(Inf,:dt_ybin,:Up)
+end
+
+function getXDt(particle,model,params)
+    if params.xbins != nothing
+        if model.optimise_spatial == true
+            if (particle.v[1] < 0.) && (particle.xbin != 0)
+                return dt_EVENT((params.xbins[1]-1e-12-particle.r[1])/particle.v[1], :dt_xbin,:Down)
+            elseif (particle.xbin < length(params.xbins)) && (particle.v[1] > 0.)
+                return dt_EVENT((params.xbins[end]+1e-12-particle.r[1])/particle.v[1], :dt_xbin, :Up)
+            end
+        else
+            if params.xbins != nothing
+                if (particle.v[1] < 0.) && (particle.xbin != 0)
+                    return dt_EVENT((params.xbins[particle.xbin]-1e-12-particle.r[1])/particle.v[1], :dt_xbin,:Down)
+                elseif (particle.xbin < length(params.xbins)) && (particle.v[1] > 0.)
+                    return dt_EVENT((params.xbins[particle.xbin+1]+1e-12-particle.r[1])/particle.v[1], :dt_xbin, :Up)
+                end
+            end
+        end
+    end
+    return dt_EVENT(Inf,:dt_xbin,:Up)
 end
 
 function getTDt(particle,model,params)
@@ -438,31 +734,24 @@ end
 @xport function getDensity(particle,n0::LμJDensity,params)
     params.n0[particle.rbin]
 end
-
-@xport function getDt(type::SWARM,particle,model,params,verbose)
-    verbose && @info "Current time: " particle.t
-    dt_coll = getCDt(particle,model,params)
-    dt_energy = getDtCBinsPos(model.En0,model.n0,particle,model,params)
-    dt_tbin = getTDt(particle,model,params)
-    dts = (dt_coll,dt_energy,dt_tbin)
-    verbose && @info dts
-    dt_times = (dt_coll.time,dt_energy.time,dt_tbin.time)
-    return dts[findMinTime(dt_times,verbose=verbose)]
+@xport function getDensity(particle,n0::CellDensity,params)
+    params.n0[particle.zbin]
 end
 
-
-
-@xport function getDt(type::LμJ,particle,model,params,verbose)
+@xport function getDt(particle,model,params,verbose)
     verbose && @info "Current time: " particle.t
-    # @info particle.r ./ params.length_scale
+    verbose && @info "Zbin: " particle.zbin
     dt_coll = getCDt(particle,model,params)
-    dt_rbin = getRDt(particle,model,params)
+    dt_energy = getEnDt(model.En0,model.n0,particle,model,params)
     dt_tbin = getTDt(particle,model,params)
+    #TODO: Restrict the following to 0 field
+    dt_rbin = getRDt(particle,model,model.type,params)
     dt_zbin = getZDt(particle,model,params)
     dt_ybin = getYDt(particle,model,params)
-    dts = (dt_coll,dt_rbin,dt_zbin,dt_ybin,dt_tbin)
+    dt_xbin = getXDt(particle,model,params)
+    dts = (dt_coll,dt_energy,dt_tbin,dt_rbin,dt_zbin,dt_ybin,dt_xbin)
     verbose && @info dts
-    dt_times = (dt_coll.time,dt_rbin.time,dt_zbin.time,dt_ybin.time,dt_tbin.time)
+    dt_times = (dt_coll.time,dt_energy.time,dt_tbin.time,dt_rbin.time,dt_zbin.time,dt_ybin.time,dt_xbin.time)
     return dts[findMinTime(dt_times,verbose=verbose)]
 end
 
@@ -489,55 +778,46 @@ function findTotalCF(en,model,params)
 
     return CS
 end
+
 #### * Temperature
-
-
 @fastmath function findu(cs_ind,particle,model,params)
     #TODO: make generic function based on inputs
-	w = sqrt(2*k*model.T.val/params.splat_gas.m[cs_ind])
+    w = sqrt(2*k*model.T.val/params.splat_gas.m[cs_ind])
     v = particle.v*params.time_scale/params.length_scale
-    # @show getEnergy(v)
 
-	he = electron_v2eV * (norm(v) + 5. *w)^2 
-	le = max( 1e-25 , electron_v2eV * (norm(v) - 5. *w).^2 )
-    # @show he
-    # @show le
+    he = electron_v2eV * (norm(v) + 5. *w)^2 
+    le = max( 1e-25 , electron_v2eV * (norm(v) - 5. *w).^2 )
 
     #TODO: get actual CF from CS
     
-	# @inbounds hcf = params.splat_gas.cs[cs_ind](he) * sqrt(he/electron_v2eV)
-	# @inbounds lcf = params.splat_gas.cs[cs_ind](le) * sqrt(le/electron_v2eV)
-	@inbounds hcf = findTotalCF(he,model,params)
-	@inbounds lcf = findTotalCF(le,model,params)
-
+    @inbounds hcf = findTotalCF(he,model,params)
+    @inbounds lcf = findTotalCF(le,model,params)
 
     g = copy(v)
 	mcf = max(hcf,lcf)
 	while true
-		# usually it only goes through one while loop iteration
-		u = SArray{Tuple{3},Float64,1,3}(randn(3))*w./sqrt(2.) # could only run this
-		g = v .- u
-        # @show v
-        # @show u
-        # @show g
-		eg = electron_v2eV * dot(g,g) 
-        # @show eg
-		@inbounds ccf = findTotalCF(eg,model,params)
-        # @show lcf
-        # @show hcf
-        # @show ccf
-        # @show mcf
+            # usually it only goes through one while loop iteration
+            u = SArray{Tuple{3},Float64,1,3}(randn(3))*w./sqrt(2.) # could only run this
+            g = v .- u
+            # @show v
+            # @show u
+            # @show g
+            eg = electron_v2eV * dot(g,g) 
+            # @show eg
+            @inbounds ccf = findTotalCF(eg,model,params)
+            # @show lcf
+            # @show hcf
+            # @show ccf
+            # @show mcf
 
-        if ccf/mcf == 0.
-            throw("Zero relative energy")
-        end
-        
-		if rand() < ccf/mcf
-			break
-		end
+            if ccf/mcf == 0.
+                throw("Zero relative energy")
+            end
+            if rand() < ccf/mcf
+                break
+            end
 	end
 	return g*params.length_scale/params.time_scale
 end
-
 
 end

@@ -13,7 +13,7 @@ const ħ = ustrip(float(ReducedPlanckConstant))
 const Td = 1e-21
 
 @AutoParm struct MCGAS
-    cs::AUTO
+    cs::Vector{Interpolations.Extrapolation{Float64,1,Interpolations.GriddedInterpolation{Float64, 1, Float64, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Tuple{Vector{Float64}}},Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}},Interpolations.Flat{Nothing}}}
     dcs::AUTO
     type::AUTO
     thresh::AUTO
@@ -24,9 +24,10 @@ end
 
 function initParams(input_gas=MaxwellModel(),model::MCMODEL=MCMODEL())
 
-    cbins = [0.,(10. .^(-3:0.1:2.))...]
+    cbins = [0.,(10. .^(-3:0.1:6.))...]
+    # cbins = collect(LinRange(0,101,100))
     tbins, ebins, rbins, χbins, zbins, ybins, xbins = generateBins(model)
-    n0=buildDensity(model.n0,tbins)
+    n0=buildDensity(model.n0,rbins,zbins)
     a=buildField(model.En0)
 
     length_scale = model.n0.val*1e-20
@@ -59,6 +60,25 @@ function initParams(input_gas=MaxwellModel(),model::MCMODEL=MCMODEL())
 end
 
 # * Scale functions
+@xport function scale!(model,type::LμJ,params)
+    ls = params.length_scale
+    ts = params.time_scale
+    es = params.energy_scale
+
+    model.type.jet_center .*= ls
+end
+
+@xport function scale!(model::CELL)
+    ls = params.length_scale
+    ts = params.time_scale
+    es = params.energy_scale
+end
+
+@xport function scale!(model::SWARM)
+    ls = params.length_scale
+    ts = params.time_scale
+    es = params.energy_scale
+end
 @xport function scale!(params)
     ls = params.length_scale
     ts = params.time_scale
@@ -97,7 +117,7 @@ end
     return params
 end
 
-@xport function unscale!(type::SWARM,params,meas::MEAS)
+@xport function unscale!(type::SWARM,model,params,meas::MEAS)
     ls = 1/params.length_scale
     ts = 1/params.time_scale
     es = 1/params.energy_scale
@@ -107,12 +127,25 @@ end
     meas.meast.r .*= ls
     meas.meast.v .*= ls/ts
     meas.meast.rv .*= ls^2/ts
+    meas.measc.r .*= ls
+    meas.measc.v .*= ls/ts
+    meas.measc.rv .*= ls^2/ts
 end
 
-@xport function unscale!(type::LμJ,params,meas::MEAS)
+@xport function unscale!(type::LμJ,model,params,meas::MEAS)
     ls = 1/params.length_scale
     ts = 1/params.time_scale
     es = 1/params.energy_scale
+    model.type.jet_center .*= ls
+end
+
+@xport function unscale!(type::CELL,model,params,meas::MEAS)
+    ls = 1/params.length_scale
+    ts = 1/params.time_scale
+    es = 1/params.energy_scale
+    meas.measg.SP_ε *= es
+    :SP_z in model.meas ? meas.measg.SP_εs .*= es : nothing
+    meas.measg.SP_r *= ls
 end
 
 function initMeas(model,params::MCPARAMS = MCPARAMS())
@@ -139,11 +172,14 @@ end
     gases_dcss = [gas.elastic_DCS...,gas.excitation_DCS...,gas.ionisation_DCS...,gas.attachment_DCS...] 
 
     en_spacing = cbins[end]-cbins[end-1]
-    ens = LinRange(1e-6,cbins[end]+en_spacing+1.,100)
-    ens2 = 1e-6:1e-4:(cbins[end]+en_spacing+1.)
-    θs = LinRange(1e-6,π,100)
+    # ens = LinRange(1e-6,cbins[end]+en_spacing+1.,100)
+    ens = cbins[2:end]
+    # ens2 = 1e-6:1e-4:(cbins[end]+en_spacing+1.)
+    ens2 = cbins[2:end]
+    θs = LinRange(1e-6,π,1000)
 
-    gases_itp::Vector{Interpolations.Extrapolation{Float64, 1, ScaledInterpolation{Float64, 1, Interpolations.BSplineInterpolation{Float64, 1, Vector{Float64}, BSpline{Linear{Throw{OnGrid}}}, Tuple{Base.OneTo{Int64}}}, BSpline{Linear{Throw{OnGrid}}}, Tuple{StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}}}}, BSpline{Linear{Throw{OnGrid}}}, Flat{Nothing}}} = []
+    gases_itp::Vector{Interpolations.Extrapolation{Float64,1,Interpolations.GriddedInterpolation{Float64, 1, Float64, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Tuple{Vector{Float64}}},Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}},Interpolations.Flat{Nothing}}} = []
+    # gases_itp::Vector{Interpolations.Extrapolation{Float64, 1, ScaledInterpolation{Float64, 1, Interpolations.BSplineInterpolation{Float64, 1, Vector{Float64}, BSpline{Linear{Throw{OnGrid}}}, Tuple{Base.OneTo{Int64}}}, BSpline{Linear{Throw{OnGrid}}}, Tuple{StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64}}}, BSpline{Linear{Throw{OnGrid}}}, Flat{Nothing}}} = []
     for gas in gases
         push!(gases_itp, LinearInterpolation(ens2,gas.(ens2),extrapolation_bc=Flat()))
     end
@@ -154,15 +190,15 @@ end
     for σ in gases_dcss
         DCS_matrix::Matrix{Float64} = zeros(length(ens),length(θs))
         for i in eachindex(ens)
-            func(chi) = σ(ens[i],chi)*sin(chi) < 1e-10 ? 1e-10 : σ(ens[i],chi)*sin(chi)
-            norm = quadgk(func,0,pi)[1]
+            func(chi)::Float64 = σ(ens[i],chi)*sin(chi) < 1e-10 ? 1e-10 : σ(ens[i],chi)*sin(chi)
+            norm = quadgk(func,0,pi)[1]::Float64
             for j in eachindex(θs)
                 if j == 1
-                    DCS_matrix[i,j] = quadgk(func,0,θs[j])[1]/norm
+                    DCS_matrix[i,j] = quadgk(func,0,θs[j])[1]::Float64/norm
                 elseif j == length(θs)
                     DCS_matrix[i,j] = 1. - sum(DCS_matrix[i,:])
                 else
-                    DCS_matrix[i,j] = quadgk(func,θs[j-1],θs[j])[1]/norm
+                    DCS_matrix[i,j] = quadgk(func,θs[j-1],θs[j])[1]::Float64/norm
                 end
             end
         end
@@ -172,7 +208,7 @@ end
         # func3(e,R) = LinearInterpolation(spl2(e,θs),cos.(θs))(R)::Float64	#Interpolates the above vector and evaluates a value of chi for a given R
         # @show typeof(LinearInterpolation(spl2(1.,θs),cos.(θs)))	#Interpolates the above vector and evaluates a value of chi for a given R
         #TODO: Try this with energy dependency aswell
-        push!(dcss,[LinearInterpolation(Interpolations.deduplicate_knots!(spl2(c,θs)),cos.(θs),extrapolation_bc=Flat()) for c in cbins])
+        push!(dcss,[LinearInterpolation(Interpolations.deduplicate_knots!(spl2(c,θs),move_knots=true),cos.(θs),extrapolation_bc=Flat()) for c in cbins])
     end
     
     
@@ -197,7 +233,7 @@ function generateBins(model)
     m = string.(model.meas)
 
     tbins = 1 ∈ occursin.("t",m) ? buildTBins(model.type,model) : nothing
-    ebins = 1 ∈ occursin.("e",m) ? buildEnBins(model.type,model) : nothing
+    ebins = 1 ∈ occursin.("ε",m) ? buildEnBins(model.type,model) : nothing
     zbins = 1 ∈ occursin.("z",m) ? buildZBins(model.type,model) : nothing
     ybins = 1 ∈ occursin.("y",m) ? buildYBins(model.type,model) : nothing
     xbins = 1 ∈ occursin.("x",m) ? buildXBins(model.type,model) : nothing
@@ -208,16 +244,67 @@ function generateBins(model)
 
 end
 
+# TODO: Combine these into one function per model
+
 function buildRBins(type::SWARM,model,n0::UniformDensity)
     return LinRange(0,1e-6,10)
 end
 
-function buildRBins(type::LμJ,model,n0::LμJDensity)
-    return [0.,(type.jet_width/2)^2,1e20]
-end
-
 function buildEnBins(type::SWARM,model)
     return 10 .^LinRange(-3,2,1000)
+end
+
+function buildTBins(type::SWARM,model)
+    return LinRange(0,type.t_f,200)
+end
+
+function buildχBins(type::SWARM,model)
+    return LinRange(0,π,90)
+end
+
+function buildZBins(type::SWARM,model)
+    return LinRange(-7.5e-6,-6.5e-6,200)
+end
+
+function buildYBins(type::SWARM,model)
+    return LinRange(-7e-7,7e-7,200)
+end
+
+function buildXBins(type::SWARM,model)
+    return LinRange(-7e-7,7e-7,200)
+end
+
+function buildRBins(type::CELL,model,n0)
+    return LinRange(0,type.r,type.bin_no)
+end
+
+function buildEnBins(type::CELL,model)
+    #TODO: Make specific to each velocity type
+    #return collect(model.type.thresh:model.type.Δε_detector:(model.v_0.ε+2*model.v_0.Δε_source))
+    return collect(model.type.thresh:10:model.v_0.ε)
+end
+
+function buildTBins(type::CELL,model)
+    return LinRange(0,type.t_f,1000)
+end
+
+function buildχBins(type::CELL,model)
+    return LinRange(0,π,100)
+end
+
+function buildZBins(type::CELL,model)
+    return LinRange(0.,type.z,type.z_n)
+end
+
+function buildYBins(type::CELL,model)
+    return LinRange(-type.y,type.y,200)
+end
+
+function buildXBins(type::CELL,model)
+    return LinRange(-type.x,type.x,200)
+end
+function buildRBins(type::LμJ,model,n0::LμJDensity)
+    return [0.,(type.jet_width/2)^2,0.02^2]
 end
 
 function buildEnBins(type::LμJ,model)
@@ -228,15 +315,7 @@ function buildTBins(type::LμJ,model)
     return LinRange(3e-13,320e-13,10)
 end
 
-function buildTBins(type::SWARM,model)
-    return LinRange(0,type.t_f,1000)
-end
-
 function buildχBins(type::LμJ,model)
-    return LinRange(0,π,100)
-end
-
-function buildχBins(type::SWARM,model)
     return LinRange(0,π,100)
 end
 
@@ -244,15 +323,7 @@ function buildZBins(type::LμJ,model)
     return LinRange(-7.5e-6,-6.5e-6,200)
 end
 
-function buildZBins(type::SWARM,model)
-    return LinRange(-7.5e-6,-6.5e-6,200)
-end
-
 function buildYBins(type::LμJ,model)
-    return LinRange(-7e-7,7e-7,200)
-end
-
-function buildYBins(type::SWARM,model)
     return LinRange(-7e-7,7e-7,200)
 end
 
@@ -260,18 +331,18 @@ function buildXBins(type::LμJ,model)
     return LinRange(-7e-7,7e-7,200)
 end
 
-function buildXBins(type::SWARM,model)
-    return LinRange(-7e-7,7e-7,200)
-end
-
 #### Density ####
 
-function buildDensity(n0::UniformDensity,rbins)
+function buildDensity(n0::UniformDensity,rbins,zbins)
     n0.val
 end
 
-function buildDensity(n0::LμJDensity,rbins)
-    [n0.val,0.,0.]
+function buildDensity(n0::LμJDensity,rbins,zbins)
+    [n0.val,n0.background,0.]
+end
+
+function buildDensity(n0::CellDensity,rbins,zbins)
+    n0.val .* ones(length(zbins))   
 end
 #### Electric Field ####
 
@@ -279,43 +350,41 @@ function buildField(En0::UniformField)
     SVector(0.,0.,q*Td*En0.val/me)
 end
 
+function buildField(En0::ZeroField)
+    SVector(0.,0.,0.)
+end
 
 
 #### * PARTICLE
 
-function Structs.PART(type::SWARM,model,params)
+function Structs.PART(model,params)
 
     particle = PART()
+    particle.type = model.particle_type
     particle.r = initPartr(model.r_0,params).*params.length_scale
     particle.v = initPartv(model.v_0,params).*params.length_scale ./params.time_scale
     particle.cbin = findMinInd(params.cbins,getEnergy(particle.v))
+    if params.ebins != nothing
+        particle.ebin = findMinInd(params.ebins,getEnergy(particle.v))
+    end
+
+    if params.rbins != nothing
+        particle.rbin = findMinInd(params.rbins,dot(particle.r,particle.r))
+    end
+
     if params.zbins != nothing
         particle.zbin = findMinInd(params.zbins,particle.r[3])
     end
     
+    if params.xbins != nothing
+        particle.xbin = findMinInd(params.xbins,particle.r[1])
+    end
+
     if params.ybins != nothing
         particle.ybin = findMinInd(params.ybins,particle.r[2])
     end
         
 
-    return particle
-
-end
-function Structs.PART(type::LμJ,model,params)
-
-    particle = PART()
-    particle.r = initPartr(model.r_0,params).*params.length_scale
-    particle.v = initPartv(model.v_0,params).*params.length_scale ./params.time_scale
-    particle.cbin = findMinInd(params.cbins,getEnergy(particle.v))
-    particle.rbin = findMinInd(params.rbins,dot(particle.r,particle.r))
-
-    if params.zbins != nothing
-        particle.zbin = findMinInd(params.zbins,particle.r[3])
-    end
-    
-    if params.ybins != nothing
-        particle.ybin = findMinInd(params.ybins,particle.r[2])
-    end
     return particle
 
 end
@@ -347,14 +416,25 @@ function initPartr(r_0::GaussianLμJSpacial,params)
     val .+ SD*R .* r_0.gaussian_axis .+ r_0.val .* r_0.axis
 end
 function initPartv(v_0::ZeroVelocity,params)
-    [0.,0.,0.]
+    SArray{Tuple{3},Float64,1,3}(0.,0.,0.)
 end
 
 function initPartv(v_0::InitVelocity,params)
+    #TODO: Make all these static arrays
     v_0.axis .* getVelocity(v_0.ε)
 end
 
-function initPartv(v_0::GaussianVelocity,params)
+function initPartv(v_0::GaussianDirectionVelocity,params)
+    electron_v2eV = 0.5 * me / q
+    coschi = 1-2*rand()
+    sinchi = sqrt(1-coschi^2)
+    phi = rand()*2*pi
+
+    sqrt(v_0.ε/electron_v2eV) * SArray{Tuple{3},Float64,1,3}(cos(phi)*sinchi,sin(phi)*sinchi,coschi)
+end
+
+
+function initPartv(v_0::GaussianEnergyVelocity,params)
     SD = v_0.Δε_source/(2*sqrt(2*log(2)))
     electron_v2eV = 0.5 * me / q
 
