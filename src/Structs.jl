@@ -16,7 +16,7 @@ export MCMODEL, MCINIT, MCPARAMS, PART, MEAS, MEAST, MEASS, MEASC, findMinInd
     val::AUTO
     axis::AUTO
 end
-@xport @AutoParm struct GaussianLμJSpacial <: Velocity
+@xport @AutoParm struct GaussianLμJSpacial <: Spacial
     val::AUTO = -7.6e-6
     Δy_source::AUTO = 7.5e-6
     gaussian_axis::AUTO = [0,1,0]
@@ -83,11 +83,11 @@ end
 end
 
 
-@xport @AutoParm mutable struct DiscreteIonisation <: Ionisation
+@xport @AutoParm struct DiscreteIonisation <: Ionisation
     loss::AUTO = 5.
 end
 
-@xport @AutoParm mutable struct DiscreteFunctionalIonisation <: Ionisation
+@xport @AutoParm struct DiscreteFunctionalIonisation <: Ionisation
     loss::AUTO = (e) -> 5.
 end
 
@@ -105,12 +105,6 @@ end
 
 @xport @AutoParm struct GaussianDirectionVelocity <: Velocity
     ε::AUTO = 10.
-end
-
-@AutoParm mutable struct MODEL
-    E::AUTO = UniformField()
-    T::AUTO = 0.
-    init::AUTO = MCINIT()
 end
 
 """
