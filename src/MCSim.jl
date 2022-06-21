@@ -14,11 +14,11 @@ module MCSim
 #TODO: Add Potential
 #TODO: Add Density Gradient (this is probably best solved through Danny's code though)
 
-using Reexport, Distributed, JLD2, Dates, AndExport, Unitful.DefaultSymbols
+using Reexport, Distributed, JLD2, Dates, AndExport
 using Gases
 using FVB
 export mc, MCINIT, MCPARAMS, saveBatch, saveDist
-
+@reexport using MCSimUnits
 
 include("Structs.jl")
 @reexport using .Structs
@@ -57,8 +57,9 @@ macro jld2save(filename, vars...)
     end
 end
 
+
 function mc(gas::Gas;S=0.,E=1.,T=0.,N=1000,t=1e-5,meas=[:t],verbose=false)
-    model = MCMODEL(meas=meas,type=SWARM(t),n=N,En0=UniformField(E),T=UniformTemp(T),ion_type=RatioIonisation(0.7),v_0=InitVelocity(S,[0,0,1]))
+    model = MCMODEL(meas=meas,type=SWARM(t*s),n=N,En0=UniformField(E*Td),T=UniformTemp(T*K),ion_type=RatioIonisation(0.7),v_0=InitVelocity(S*eV,[0,0,1]))
     mc(model,initParams(gas,model),verbose=verbose)
 end
 
@@ -111,9 +112,9 @@ function mc(model::MCMODEL,params::MCPARAMS;verbose=false)
         model.n=1
     end
 
-    scale!(model,model.type,params)
+    #scale!(model,model.type,params)
     meas = initMeas(model,params)
-    scale!(params)
+    #scale!(params)
 
     # @show params.rbins
     # meas = @distributed (+) for n in 1:model.n
@@ -127,8 +128,8 @@ function mc(model::MCMODEL,params::MCPARAMS;verbose=false)
         [meas_inner]
     end
     # @show params.rbins
-    unscale!(params)
-    unscale!(model.type,model,params,meas[1])
+    #unscale!(params)
+    #unscale!(model.type,model,params,meas[1])
     return process(model.type,meas[1],params,model)..., params;
 
 end

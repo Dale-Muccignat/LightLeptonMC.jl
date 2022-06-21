@@ -1,6 +1,6 @@
 module Structs
 
-using AutoParameters, Gases, StaticArrays, AndExport, Interpolations, QuadGK, Unitful, Unitful.DefaultSymbols
+using AutoParameters, Gases, StaticArrays, AndExport, Interpolations, QuadGK, MCSimUnits
 
 export MCMODEL, MCINIT, MCPARAMS, PART, MEAS, MEAST, MEASS, MEASC, findMinInd
 
@@ -29,23 +29,23 @@ end
 end
 
 @xport @AutoParm struct UniformDensity <: Density
-    val::AUTO = 1e23
+    val::AUTO = 1e23m^-3
 end
 @xport @AutoParm struct LμJDensity <: Density
-    val::AUTO = 1e28
-    background::AUTO = 2e18
+    val::AUTO = 1e28m^-3
+    background::AUTO = 2e18m^-3
 end
 @xport @AutoParm struct CellDensity <: Density
-    val::AUTO = 1e28
+    val::AUTO = 1e28m^-3
 end
 @xport @AutoParm struct ZeroField <: Field
-    val::AUTO = 0.
+    val::AUTO = 0. *Td
 end
 @xport @AutoParm struct UniformField <: Field
-    val::AUTO = 1.
+    val::AUTO = 1. *Td
 end
 @xport @AutoParm struct UniformTemp <: Temp
-    val::AUTO = 0.
+    val::AUTO = 0. *K
 end
 
 @xport @AutoParm struct UniformIonisation <: Ionisation end
@@ -59,8 +59,8 @@ end
 end
 
 @xport function FunctionalIonisationInit(;func=(e,E2) -> 1.,thresh=10.)
-    cbins = [0.,(10. .^(-3:0.1:6.))...] #TODO: This is a dubplicate and depends on the initParams funciton
-    cbins2 = [0.,(10. .^(-3:0.1:6.))...]
+    cbins = [0.,(10. .^(-3:0.1:6.))...] .*eV #TODO: This is a dubplicate and depends on the initParams funciton
+    cbins2 = [0.,(10. .^(-3:0.1:6.))...] .*eV
     matrix::Matrix{Float64} = zeros(length(cbins),length(cbins2))
     for i in eachindex(cbins)
         func2(E2) = func(cbins[i],E2) < 1e-10 ? 1e-10 : func(cbins[i],E2)
@@ -89,27 +89,28 @@ end
 
 
 @xport @AutoParm struct DiscreteIonisation <: Ionisation
-    loss::AUTO = 5.
+    loss::AUTO = 5. *eV
 end
 
 @xport @AutoParm struct DiscreteFunctionalIonisation <: Ionisation
-    loss::AUTO = (e) -> 5.
+    loss::AUTO = (e) -> 5. *eV
 end
 
 @xport struct ZeroVelocity <: Velocity end
 
 @xport @AutoParm struct InitVelocity <: Velocity
-    ε::AUTO = 100.
+    ε::AUTO = 100. *eV
     axis::AUTO = [0,0,1]
 end
+
 @xport @AutoParm struct GaussianEnergyVelocity <: Velocity
-    ε::AUTO = 10.
-    Δε_source::AUTO = 0.5
+    ε::AUTO = 10. *eV
+    Δε_source::AUTO = 0.5eV
     axis::AUTO = [0,0,1]
 end
 
 @xport @AutoParm struct GaussianDirectionVelocity <: Velocity
-    ε::AUTO = 10.
+    ε::AUTO = 10. *eV
 end
 
 """
@@ -146,7 +147,7 @@ MCMODEL is the main constructor for MCSim.
 end
 
 @xport @AutoParm mutable struct SWARM
-    t_f::AUTO = 2e-5t
+    t_f::AUTO = 2e-5s
 end
 
 """
@@ -167,12 +168,12 @@ Parameters:
 For more information, type ?MCMODEL
 """
 @xport @AutoParm mutable struct LμJ
-    Δε_detector::AUTO = 0.9
-    Δχ_detector::AUTO = 2
-    χ::AUTO = Inf
-    thresh::AUTO = 1.
-    jet_width::AUTO = 15e-6
-    jet_center::AUTO = [0.,0.,0.]
+    Δε_detector::AUTO = 0.9eV
+    Δχ_detector::AUTO = 2°
+    χ::AUTO = Inf°
+    thresh::AUTO = 1. *eV
+    jet_width::AUTO = 15e-6m
+    jet_center::AUTO = [0.,0.,0.] .*m
 end
 
 """
@@ -192,26 +193,26 @@ Defines the parameters for a cell (rectangular prism) style experiment
 """
 @xport @AutoParm mutable struct CELL
     # Defined spacial parameters for the CELL
-    Δε_detector::AUTO = 0.9
-    thresh::AUTO = 1.
-    z::AUTO = 15e-6
+    Δε_detector::AUTO = 0.9eV
+    thresh::AUTO = 1. *eV
+    z::AUTO = 15e-6m
     z_n::AUTO = 100
-    x::AUTO = 15e-6
-    y::AUTO = 15e-6
+    x::AUTO = 15e-6m
+    y::AUTO = 15e-6m
     bin_no::AUTO = 100
-    r::AUTO = 1e-6
+    r::AUTO = 1e-6m
 end
 
 @xport function LμJ(;jet_center=[0.,0.,0.],Δε_detector=0.9,Δχ_detector=2,χ=Inf,thresh=1.,jet_width=15e-6)
-    LμJ(Δε_detector,Δχ_detector,χ,thresh,jet_width,jet_center)
+    LμJ(Δε_detector*eV,Δχ_detector*°,χ*°,thresh*eV,jet_width*m,jet_center.*m)
 end
 
 @xport function CELL(;Δε_detector=0.9,thresh=1.,z=15e-6,z_n=100,x=15e-6,y=15e-6,bin_no=100,r=1e-6)
-    CELL(Δε_detector,thresh,z,z_n,x,y,bin_no,r)
+    CELL(Δε_detector*eV,thresh*eV,z*m,z_n,x*m,y*m,bin_no,r*m)
 end
 
 @AutoParm mutable struct MCPARAMS
-    cbins::AUTO = [0.,(10. .^(-3:0.01:2))...]
+    cbins::AUTO = [0.,(10. .^(-3:0.01:2))...] .*eV
     ebins::AUTO = nothing
     gas::AUTO = nothing
     splat_gas::AUTO = nothing
@@ -219,19 +220,19 @@ end
     a::AUTO = nothing
     # n0::Union{Vector{Float64},Float64,Nothing} = nothing
     n0::AUTO = nothing
-    rbins::Union{Vector{Float64},Nothing} = nothing
-    χbins::Union{Vector{Float64},Nothing} = nothing
-    tbins::Union{Vector{Float64},Nothing} = collect(LinRange(0,1e-5,10))
-    zbins::Union{Vector{Float64},Nothing} = nothing
-    xbins::Union{Vector{Float64},Nothing} = nothing
-    ybins::Union{Vector{Float64},Nothing} = nothing
+    rbins::AUTO = nothing
+    χbins::AUTO = nothing
+    tbins::AUTO = collect(LinRange(0,1e-5,10)) .*s
+    zbins::AUTO = nothing
+    xbins::AUTO = nothing
+    ybins::AUTO = nothing
     length_scale::AUTO = nothing
     time_scale::AUTO = nothing
     energy_scale::AUTO = nothing
 
 end
 
-function MCPARAMS(;cbins=nothing,ebins=nothing,gas=nothing,splat_gas=nothing,total_freq=nothing,a=nothing,n0=nothing,rbins=nothing,χbins=nothing,tbins=nothing,zbins=nothing,xbins=nothing,ybins=nothing,length_scale=noting,time_scale=nothing,energy_scale=nothing)
+function MCPARAMS(;cbins=nothing,ebins=nothing,gas=nothing,splat_gas=nothing,total_freq=nothing,a=nothing,n0=nothing,rbins=nothing,χbins=nothing,tbins=nothing,zbins=nothing,xbins=nothing,ybins=nothing,length_scale=nothing,time_scale=nothing,energy_scale=nothing)
     MCPARAMS(cbins,ebins,gas,splat_gas,total_freq,a,n0,rbins,χbins,tbins,zbins,xbins,ybins,length_scale,time_scale,energy_scale)
 end
 
@@ -239,10 +240,10 @@ end
 @xport @AutoParm mutable struct PART
     type::Symbol = :electron
     alive::Bool = true
-    v::SArray{Tuple{3},Float64,1,3} = [0.,0.,0.]
-    r::SArray{Tuple{3},Float64,1,3} = [0.,0.,0.]
-    t::Float64 = 0.
-    weight::Float64 = 1.
+    v::AUTO = [0.,0.,0.]
+    r::AUTO = [0.,0.,0.]
+    t::AUTO = 0. *s
+    weight::AUTO = 1. 
     tbin::Int64 = 1
     cbin::Int64 = 1
     ebin::Int64 = 1
@@ -251,6 +252,16 @@ end
     xbin::Int64 = 1
     rbin::Int64 = 1
 end
+
+@xport function PART()
+
+    r = SArray{Tuple{3},Float64,1,3}(0.,0.,0.)
+    r = r*m
+    v = SArray{Tuple{3},Float64,1,3}(0.,0.,0.)
+    v = v*m/s
+    return PART(r=r,v=v)
+end
+
 
 @AutoParm mutable struct MEAS
     measLμJ::AUTO = MEASLμJ()
@@ -383,12 +394,12 @@ end
 
 function MEAST(params)
 
-    MEAST(zeros(length(params.tbins)-1),
-          zeros(length(params.tbins)-1,3),
-          zeros(length(params.tbins)-1,3),
-          zeros(length(params.tbins)-1,3),
-          zeros(length(params.tbins)-1,3),
-          zeros(length(params.tbins)-1,3),
+    MEAST(zeros(length(params.tbins)-1).*eV,
+          zeros(length(params.tbins)-1,3).*m,
+          zeros(length(params.tbins)-1,3).*m/s,
+          zeros(length(params.tbins)-1,3).*m^2,
+          zeros(length(params.tbins)-1,3).*m^2/s^2,
+          zeros(length(params.tbins)-1,3).*m^2/s,
           zeros(length(params.tbins)-1),
           zeros(length(params.tbins)-1)
           )
@@ -418,27 +429,27 @@ end
 
 
 @AutoParm @xport mutable struct SWARMMEAS
-    ε::Float64 = 0.
-    εs::Vector{Float64} = [0.]
-    bW::Float64 = 0.
-    bWs::Vector{Float64} = [0.]
-    fW::Float64 = 0.
-    fWs::Vector{Float64} = [0.]
-    bDt::Float64 = 0.
-    bDts::Vector{Float64} = [0.]
-    fDt::Float64 = 0.
-    fDts::Vector{Float64} = [0.]
-    bDl::Float64 = 0.
-    bDls::Vector{Float64} = [0.]
-    fDl::Float64 = 0.
-    fDls::Vector{Float64} = [0.]
+    ε::AUTO = 0.
+    εs::AUTO = [0.]
+    bW::AUTO = 0.
+    bWs::AUTO = [0.]
+    fW::AUTO = 0.
+    fWs::AUTO = [0.]
+    bDt::AUTO = 0.
+    bDts::AUTO = [0.]
+    fDt::AUTO = 0.
+    fDts::AUTO = [0.]
+    bDl::AUTO = 0.
+    bDls::AUTO = [0.]
+    fDl::AUTO = 0.
+    fDls::AUTO = [0.]
 end
 
-@fastmath function findMinInd(x::Array{Float64,1},y::Float64)::Int64
+@fastmath function findMinInd(x::AbstractArray,y)::Int64
 	left::Int64 = 1
 	right::Int64 = length(x)
-	d::Float64  = Inf
-	dlast::Float64  = -Inf
+        d= Inf*x[1]
+	dlast= -Inf*x[1]
 	c::Int64 = 0
 	while d != dlast
 		# c = Int(round((left+right)/2))

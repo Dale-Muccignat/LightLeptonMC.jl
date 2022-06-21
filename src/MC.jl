@@ -2,16 +2,10 @@ module MC
 
 using ..Structs
 using ..Init
-using PhysicalConstants.CODATA2018, Unitful, AutoParameters, Random, StaticArrays, LinearAlgebra, AndExport
+using AutoParameters, Random, StaticArrays, LinearAlgebra, AndExport, MCSimUnits
 export flight
 
-const amu = ustrip(float(AtomicMassConstant))
-const q = ustrip(float(ElementaryCharge))
-const me = ustrip(float(ElectronMass))
-const k = ustrip(float(BoltzmannConstant))
-const ħ = ustrip(float(ReducedPlanckConstant))
-
-const electron_v2eV = 0.5 * me / q
+const electron_v2eV = 0.5 * me 
 #TODO: Keep the units in
 #TODO: Add TimerOutputs
 #TODO: Only select electrons with position and velocity directed toward detector in LuJ
@@ -22,7 +16,7 @@ struct Down <: Direction end
 struct Up <: Direction end
 
 struct dt_EVENT
-    time::Float64 
+    time::Quantity 
     type::Symbol 
     direction::Symbol
 end
@@ -61,7 +55,7 @@ function checkAlive(type,particle,model,meas_inner,params,verbose)
 
     alive = true
     if params.tbins != nothing
-        alive = alive && particle.t < model.type.t_f*params.time_scale
+        alive = alive && particle.t < model.type.t_f#*params.time_scale
     end
     
     return alive && checkAliveModel(type,particle,model,meas_inner,params,verbose)
@@ -129,6 +123,8 @@ function measureEvent!(type::CELL,dt,particle,model,params,meas_inner,verbose)
 end
 
 function measureEvent!(type::LμJ,dt,particle,model,params,meas_inner,verbose)
+end
+function measureEvent!(type::SWARM,dt,particle,model,params,meas_inner,verbose)
 end
 
 @fastmath function measureCumulative!(dt,particle,En0,n0,model,params,meas_inner,verbose)
@@ -228,7 +224,7 @@ function eventTbin!(dt,particle,model,params,meas_inner,verbose)
         @inbounds @. meas_inner.meast.v[particle.tbin,:] += particle.v * particle.weight
         @inbounds @. meas_inner.meast.rv[particle.tbin,:] += particle.v * particle.r * particle.weight
         @inbounds meas_inner.meast.w[particle.tbin] += particle.weight
-        @inbounds meas_inner.meast.εᵢ[particle.tbin] += dot(particle.v,particle.v) * particle.weight
+        @inbounds meas_inner.meast.εᵢ[particle.tbin] += 0.5*me*dot(particle.v,particle.v) * particle.weight
     end
 
     :zyt ∈ model.meas ? meas_inner.measLμJ.zyt[particle.zbin,particle.ybin,particle.tbin] += particle.weight : nothing
@@ -285,12 +281,12 @@ end
 
 @fastmath function getCollType(particle,model,params,verbose) @inbounds begin
     R = rand()
-    CS = 0.
-    en = getEnergy(particle.v)/params.energy_scale
-    v = sqrt(dot(particle.v,particle.v))/params.length_scale
+    CS = 0. *u"Å^2*m/s"
+    en = getEnergy(particle.v)#/params.energy_scale
+    v = sqrt(dot(particle.v,particle.v))#/params.length_scale
 
     for cs_ind in eachindex(params.splat_gas.cs)
-        @inbounds CS += params.splat_gas.cs[cs_ind](en)*1e-20 * params.splat_gas.w[cs_ind] * v
+        @inbounds CS += params.splat_gas.cs[cs_ind](en) * params.splat_gas.w[cs_ind] * v
         # @show CS
         # @show getTotalFreq(particle,model,params,verbose)
 
@@ -423,7 +419,8 @@ function scatteringAngle(cs_no,g,particle,model,params,verbose)
     return coschi, sinchi, phi
 end
 
-@fastmath function shift(v_new::SArray{Tuple{3},Float64,1,3},v::SArray{Tuple{3},Float64,1,3})::SArray{Tuple{3},Float64,1,3}
+#@fastmath function shift(v_new::SVector{3, Quantity},v::SVector{3, Quantity})
+@fastmath function shift(v_new,v)
     relvel_mag = norm(v)
     orig_costheta = v[3] / relvel_mag
     orig_sintheta = sqrt(1 - orig_costheta^2)
@@ -438,7 +435,7 @@ end
     Ry = @SMatrix [orig_costheta 0. orig_sintheta ; 0. 1. 0. ; -orig_sintheta 0. orig_costheta]
     Rz = @SMatrix [orig_cosphi -orig_sinphi 0. ; orig_sinphi orig_cosphi 0. ; 0. 0. 1.]
 
-	return Rz * Ry * v_new
+	return Rz * Ry * v_new 
 end
 #### * Update Bin numbers
 
@@ -516,7 +513,7 @@ end
 
 function getEnDt(En0::UniformField,n0::UniformDensity,particle,model,params)
 	v_perp = particle.v[1]^2 + particle.v[2]^2 #Seperate out of the vz velocity
-	if (particle.v[3] < 0.) && ((params.cbins[particle.cbin]/electron_v2eV - v_perp) > 0.) && (particle.cbin!= 1)
+        if (particle.v[3] < 0. *m/s) && ((params.cbins[particle.cbin]/electron_v2eV - v_perp) > 0. *(m/s)^2) && (particle.cbin!= 1)
 		#If the velocity is less than zero, i.e if the energy bin needs to go down
 		#The second condition is to ensure that the energy can go down considering the perpindicular velocity... or something along those lines. It just makes sure the squareroot doesn't return an imaginary number
 		vf_z = sqrt(params.cbins[particle.cbin]/electron_v2eV - v_perp)
@@ -530,16 +527,16 @@ function getEnDt(En0::UniformField,n0::UniformDensity,particle,model,params)
 		#same as before except with the lower boundry of the next bin up
 		return dt_EVENT(-(particle.v[3]-vf_z) /(params.a[3] * params.n0), :dt_energy,:Up)
 	end
-    return dt_EVENT(Inf, :dt_energy, :Up)
+    return dt_EVENT(Inf*s, :dt_energy, :Up)
 end
 
 function getEnDt(Eno::ZeroField,n0,particle,model,params)
-    return dt_EVENT(Inf, :dt_energy, :Up)
+    return dt_EVENT(Inf*s, :dt_energy, :Up)
 end
 
 @fastmath function getRDt(particle,model,type::LμJ,params)
     #NOTE: Only for fields of 0
-    up, down = Inf, Inf
+    up, down = Inf*s, Inf*s
     if params.rbins != nothing
         p = particle.r
         if particle.rbin == 2
@@ -557,14 +554,14 @@ end
             t1 = (-b+sqrt(delta))/(2*a)
             t2 = (-b-sqrt(delta))/(2*a)
             if t1 <= 0.
-                t1 = Inf
+                t1 = Inf *s
             end
             if t2 <= 0.
-                t2 = Inf
+                t2 = Inf*s
             end
             down = min(t1,t2)
             if r21 == 0.
-                down = Inf
+                down = Inf*s
             end
         end
         if particle.rbin == 2 
@@ -583,10 +580,10 @@ end
             t1 = (-b+sqrt(delta))/(2*a)
             t2 = (-b-sqrt(delta))/(2*a)
             if t1 <= 0.
-                t1 = Inf
+                t1 = Inf*s
             end
             if t2 <= 0.
-                t2 = Inf
+                t2 = Inf*s
             end
             up = min(t1,t2)
         end
@@ -599,7 +596,7 @@ end
 end
 @fastmath function getRDt(particle,model,type,params)
 	#NOTE: Only for fields of 0
-    up, down = Inf, Inf
+    up, down = Inf*s, Inf*s
     if params.rbins != nothing
         p = particle.r
         v = particle.v
@@ -613,14 +610,14 @@ end
             t1 = (-b+sqrt(delta))/(2*a)
             t2 = (-b-sqrt(delta))/(2*a)
             if t1 <= 0.
-                t1 = Inf
+                t1 = Inf*s
             end
             if t2 <= 0.
-                t2 = Inf
+                t2 = Inf*s
             end
             down = min(t1,t2)
             if r21 == 0.
-                down = Inf
+                down = Inf*s
             end
         end
         c = c+r21-r22-2e-6
@@ -629,10 +626,10 @@ end
             t1 = (-b+sqrt(delta))/(2*a)
             t2 = (-b-sqrt(delta))/(2*a)
             if t1 <= 0.
-                t1 = Inf
+                t1 = Inf*s
             end
             if t2 <= 0.
-                t2 = Inf
+                t2 = Inf*s
             end
             up = min(t1,t2)
         end
@@ -645,7 +642,7 @@ end
 end
 
 function getCDt(particle,model,params)
-    dt_coll = dt_EVENT(randexp()/(getTotalFreq(particle,model,params)*getDensity(particle,model.n0,params)*params.length_scale^3)::Float64,:dt_collision,:Up)
+    dt_coll = dt_EVENT(randexp()/(getTotalFreq(particle,model,params)*getDensity(particle,model.n0,params)),:dt_collision,:Up)
 end
 
 function getZDt(particle,model,params)
@@ -666,7 +663,7 @@ function getZDt(particle,model,params)
             end
         end
     end
-    return dt_EVENT(Inf,:dt_zbin,:Up)
+    return dt_EVENT(Inf*s,:dt_zbin,:Up)
 end
 
 function getYDt(particle,model,params)
@@ -687,7 +684,7 @@ function getYDt(particle,model,params)
             end
         end
     end
-    return dt_EVENT(Inf,:dt_ybin,:Up)
+    return dt_EVENT(Inf*s,:dt_ybin,:Up)
 end
 
 function getXDt(particle,model,params)
@@ -708,7 +705,7 @@ function getXDt(particle,model,params)
             end
         end
     end
-    return dt_EVENT(Inf,:dt_xbin,:Up)
+    return dt_EVENT(Inf*s,:dt_xbin,:Up)
 end
 
 function getTDt(particle,model,params)
@@ -718,7 +715,7 @@ function getTDt(particle,model,params)
         end
     end
     
-    return dt_EVENT(Inf,:dt_tbin,:Up)
+    return dt_EVENT(Inf*s,:dt_tbin,:Up)
 
 end
 
@@ -771,7 +768,7 @@ end
 
 
 function findTotalCF(en,model,params)
-    CS = 0.
+    CS = 0. *u"Å^2*m/s"
     for cs_ind in eachindex(params.splat_gas.cs)
         @inbounds CS += params.splat_gas.cs[cs_ind](en) * params.splat_gas.w[cs_ind] * sqrt(en/electron_v2eV)
     end
@@ -783,10 +780,10 @@ end
 @fastmath function findu(cs_ind,particle,model,params)
     #TODO: make generic function based on inputs
     w = sqrt(2*k*model.T.val/params.splat_gas.m[cs_ind])
-    v = particle.v*params.time_scale/params.length_scale
+    v = particle.v#*params.time_scale/params.length_scale
 
     he = electron_v2eV * (norm(v) + 5. *w)^2 
-    le = max( 1e-25 , electron_v2eV * (norm(v) - 5. *w).^2 )
+    le = max( 1e-25u"kg*m^2/s^2" , electron_v2eV * (norm(v) - 5. *w).^2 )
 
     #TODO: get actual CF from CS
     
@@ -810,14 +807,14 @@ end
             # @show ccf
             # @show mcf
 
-            if ccf/mcf == 0.
+            if ccf/mcf == 0. 
                 throw("Zero relative energy")
             end
             if rand() < ccf/mcf
                 break
             end
 	end
-	return g*params.length_scale/params.time_scale
+	return g#*params.length_scale/params.time_scale
 end
 
 end

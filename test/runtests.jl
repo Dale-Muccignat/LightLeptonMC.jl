@@ -1,6 +1,6 @@
 using Test
 
-using MCSim
+using MCSim, Gases
 
 N = 100000
 tol = 0.01

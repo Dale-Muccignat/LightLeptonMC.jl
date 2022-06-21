@@ -1,14 +1,8 @@
 module Measurements
 
-using AndExport, PhysicalConstants.CODATA2018, Unitful, Statistics, LinearAlgebra
+using AndExport, Statistics, LinearAlgebra, MCSimUnits
 using ..Structs
 
-const amu = ustrip(float(AtomicMassConstant))
-const q = ustrip(float(ElementaryCharge))
-const me = ustrip(float(ElectronMass))
-const k = ustrip(float(BoltzmannConstant))
-const ħ = ustrip(float(ReducedPlanckConstant))
-const Td = 1e-21
 
 @xport function process(type::SWARM,meas,params,model)
     weights!(meas,model)
@@ -40,7 +34,7 @@ end
 
 function weights!(meas,model)
     for i in 1:length(meas.meast.w)
-        meas.meast.εᵢ[i] *= 0.5*me/meas.meast.w[i]/q
+        meas.meast.εᵢ[i] /= meas.meast.w[i]
         meas.meast.v²[i,:] ./= meas.meast.w[i] 
         meas.meast.r²[i,:] ./= meas.meast.w[i] 
         meas.meast.r[i,:] ./= meas.meast.w[i] 
@@ -57,14 +51,14 @@ end
 
 function swarmMeasurements(meas,params,model)
 
-    εs::Vector{Float64} = []
-    bWs::Vector{Float64} = []
-    bDts::Vector{Float64} = []
-    bDls::Vector{Float64} = []
-    fεs::Vector{Float64} = []
-    fWs::Vector{Float64} = []
-    fDts::Vector{Float64} = []
-    fDls::Vector{Float64} = []
+    εs::Vector{Quantity} = []
+    bWs::Vector{Quantity} = []
+    bDts::Vector{Quantity} = []
+    bDls::Vector{Quantity} = []
+    fεs::Vector{Quantity} = []
+    fWs::Vector{Quantity} = []
+    fDts::Vector{Quantity} = []
+    fDls::Vector{Quantity} = []
     bins = length(meas.meast.w[end÷2:end])
     for i in length(meas.meast.w)-bins:length(meas.meast.w)
         push!(εs,meas.meast.εᵢ[i])
@@ -80,6 +74,12 @@ function swarmMeasurements(meas,params,model)
             push!(fDts, 0.5 * (meas.measc.rv[i,2]+meas.measc.rv[i,1]))
         end
         
+    end
+
+    if isempty(fWs)
+        fWs = bWs
+        fDls = bDls
+        fDts = bDts
     end
 
     SWARMMEAS(mean(εs),εs,
