@@ -1,6 +1,6 @@
 module Structs
 
-using AutoParameters, Gases, StaticArrays, AndExport, Interpolations, QuadGK
+using AutoParameters, Gases, StaticArrays, AndExport, Interpolations, QuadGK, Unitful, Unitful.DefaultSymbols
 
 export MCMODEL, MCINIT, MCPARAMS, PART, MEAS, MEAST, MEASS, MEASC, findMinInd
 
@@ -22,8 +22,8 @@ Parent type for each option for velocity. See subtypes for a list of options
     axis::AUTO
 end
 @xport @AutoParm struct GaussianLμJSpacial <: Spacial
-    val::AUTO = -7.6e-6
-    Δy_source::AUTO = 7.5e-6
+    val::AUTO = -7.6e-6m
+    Δy_source::AUTO = 7.5e-6m
     gaussian_axis::AUTO = [0,1,0]
     axis::AUTO = [0,0,1]
 end
@@ -146,7 +146,7 @@ MCMODEL is the main constructor for MCSim.
 end
 
 @xport @AutoParm mutable struct SWARM
-    t_f::AUTO = 2e-5
+    t_f::AUTO = 2e-5t
 end
 
 """

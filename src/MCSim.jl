@@ -14,10 +14,11 @@ module MCSim
 #TODO: Add Potential
 #TODO: Add Density Gradient (this is probably best solved through Danny's code though)
 
-using Reexport, Distributed, JLD2, Dates, AndExport
+using Reexport, Distributed, JLD2, Dates, AndExport, Unitful.DefaultSymbols
 using Gases
 using FVB
 export mc, MCINIT, MCPARAMS, saveBatch, saveDist
+
 
 include("Structs.jl")
 @reexport using .Structs
