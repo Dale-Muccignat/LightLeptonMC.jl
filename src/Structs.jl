@@ -4,6 +4,11 @@ using AutoParameters, Gases, StaticArrays, AndExport, Interpolations, QuadGK
 
 export MCMODEL, MCINIT, MCPARAMS, PART, MEAS, MEAST, MEASS, MEASC, findMinInd
 
+"""
+Velocity
+
+Parent type for each option for velocity. See subtypes for a list of options
+"""
 @xport abstract type Velocity end
 @xport abstract type Spacial end
 @xport abstract type Density end
@@ -152,7 +157,7 @@ This struct is used to initilize a micro-jet simulation. Used in `MCMODEL(type=L
 Parameters:
 ```julia
     Δε_detector = 0.9       # Energy bin width for the detector
-    Δχ_detector = 2         # Angle bin width for the detector
+    Δχ_detector = 2         # Angle bin width for the detector in degrees
     χ = Inf                 # Only record measurements for a specific angle += resolution
     thresh = 1.             # Set the minimum energy to simulate electrons too
     jet_width = 15e-6       # Diameter for the liquid jet

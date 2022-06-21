@@ -32,6 +32,7 @@ function flight(particle,model,params,verbose)
     meas_inner = initMeas(model,params)
 
     while particle.alive
+        verbose && @info "Particle before: " particle
         verbose && @info "Particle energy before: " getEnergy(particle.v)/params.energy_scale
         verbose && @info "Particle position before: " particle.r
         verbose && @info "Particle velocity before: " particle.v
@@ -148,7 +149,9 @@ function measureDeath!(type::LμJ,particle,model,params,meas_inner,verbose)
         :χ in model.meas ? meas_inner.measLμJ.χ[findMinInd(params.χbins,abs(atan(particle.r[2],particle.r[3])))] += particle.weight : nothing
 
         if :εχ in model.meas 
-            if abs(abs(atan(particle.v[2],particle.v[3])) - abs(atan(particle.r[2],particle.r[3]))) < type.Δχ_detector
+            verbose && @info "Velcoity angle: " abs(atand(particle.v[2],particle.v[3]))
+            verbose && @info "Spacial angle: " abs(atand(particle.r[2],particle.r[3]))
+            if abs(abs(atand(particle.v[2],particle.v[3])) - abs(atand(particle.r[2],particle.r[3]))) < type.Δχ_detector
                 meas_inner.measLμJ.εχ[findMinInd(params.ebins,getEnergy(particle.v)),findMinInd(params.χbins,abs(atan(particle.r[2],particle.r[3])))] += particle.weight
                 verbose && @info "accepted"
             else
