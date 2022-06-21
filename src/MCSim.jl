@@ -106,6 +106,9 @@ Swarm models
 
 """
 function mc(model::MCMODEL,params::MCPARAMS;verbose=false)
+    if verbose
+        model.n=1
+    end
 
     scale!(model,model.type,params)
     meas = initMeas(model,params)

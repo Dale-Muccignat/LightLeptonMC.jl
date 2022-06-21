@@ -177,6 +177,21 @@ For more information, type ?MCMODEL
     jet_center::AUTO = [0.,0.,0.]
 end
 
+"""
+CELL
+
+Defines the parameters for a cell (rectangular prism) style experiment
+```julia
+    Δε_detector = 0.9  # energy resolution of the detector
+    thresh = 1.        # minimum energy to simulate
+    z = 15e-6          # depth of the cell
+    z_n = 100          # number of z bins between 0 and z
+    x = 15e-6          # height of cell
+    y = 15e-6          # width of cell
+    bin_no = 100       # no_bins for radial measurement along back surface
+    r = 1e-6           # radius for measurements along the back surface of the cell
+```
+"""
 @xport @AutoParm mutable struct CELL
     # Defined spacial parameters for the CELL
     Δε_detector::AUTO = 0.9
@@ -281,7 +296,7 @@ end
 end
 
 function MEASLμJ(model::MCMODEL,params::MCPARAMS)
-    ε,χ,zyt,εχ = nothing, nothing, nothing, nothing
+    ε,χ,zyt,εχ,εχ_reject = nothing, nothing, nothing, nothing, nothing
     if :zyt ∈ model.meas
         zyt= zeros(length(params.zbins),length(params.ybins),length(params.tbins))
     end
@@ -296,9 +311,10 @@ function MEASLμJ(model::MCMODEL,params::MCPARAMS)
     
     if :εχ ∈ model.meas
         εχ = zeros(length(params.ebins),length(params.χbins))
+        εχ_reject = zeros(length(params.ebins),length(params.χbins))
     end
 
-    return MEASLμJ(ε, χ, εχ,εχ,zyt)
+    return MEASLμJ(ε, χ, εχ,εχ_reject,zyt)
 
 end
 

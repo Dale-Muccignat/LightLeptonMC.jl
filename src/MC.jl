@@ -150,8 +150,10 @@ function measureDeath!(type::LμJ,particle,model,params,meas_inner,verbose)
         if :εχ in model.meas 
             if abs(abs(atan(particle.v[2],particle.v[3])) - abs(atan(particle.r[2],particle.r[3]))) < type.Δχ_detector
                 meas_inner.measLμJ.εχ[findMinInd(params.ebins,getEnergy(particle.v)),findMinInd(params.χbins,abs(atan(particle.r[2],particle.r[3])))] += particle.weight
+                verbose && @info "accepted"
             else
                 meas_inner.measLμJ.εχ_reject[findMinInd(params.ebins,getEnergy(particle.v)),findMinInd(params.χbins,abs(atan(particle.r[2],particle.r[3])))] += particle.weight
+                verbose && @info "rejected"
             end
         end
 
