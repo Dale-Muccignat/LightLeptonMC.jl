@@ -603,7 +603,7 @@ uuid = "bdcacae8-1622-11e9-2a5c-532679323890"
 version = "0.12.118"
 
 [[deps.MCSimUnits]]
-deps = ["PhysicalConstants", "Reexport", "Unitful"]
+deps = ["PhysicalConstants", "Reexport", "Unitful", "UnitfulAngles"]
 path = "/home/dale/ownCloud/OneDrive/Packages/MCSimUnits"
 uuid = "e06958b2-73e9-4a89-a534-b2da2fa04c79"
 version = "0.1.0"
@@ -1030,6 +1030,12 @@ deps = ["ConstructionBase", "Dates", "LinearAlgebra", "Random"]
 git-tree-sha1 = "b649200e887a487468b71821e2644382699f1b0f"
 uuid = "1986cc42-f94f-5a68-af5c-568840ba703d"
 version = "1.11.0"
+
+[[deps.UnitfulAngles]]
+deps = ["Dates", "Unitful"]
+git-tree-sha1 = "d6cfdb6ddeb388af1aea38d2b9905fa014d92d98"
+uuid = "6fb2a4bd-7999-5318-a3b2-8ad61056cd98"
+version = "0.6.2"
 
 [[deps.UnitfulAtomic]]
 deps = ["Unitful"]

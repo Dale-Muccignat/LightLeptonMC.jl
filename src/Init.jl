@@ -171,11 +171,7 @@ end
     ens2 = cbins[2:end]
     θs = LinRange(1e-6,π,1000)
 
-    gases_itp = []
-    # gases_itp::Vector{Interpolations.Extrapolation{Float64, 1, ScaledInterpolation{Float64, 1, Interpolations.BSplineInterpolation{Float64, 1, Vector{Float64}, BSpline{Linear{Throw{OnGrid}}}, Tuple{Base.OneTo{Int64}}}, BSpline{Linear{Throw{OnGrid}}}, Tuple{StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64}}}, BSpline{Linear{Throw{OnGrid}}}, Flat{Nothing}}} = []
-    for gas in gases
-        push!(gases_itp, LinearInterpolation(ens2.*eV,gas.(ens2).*u"Å^2",extrapolation_bc=Flat()))
-    end
+    gases_itp = [LinearInterpolation(ens2.*eV,gas.(ens2).*u"Å^2",extrapolation_bc=Flat()) for gas in gases]
 
     dcss::Vector{Vector{Interpolations.Extrapolation{Float64, 1, Interpolations.GriddedInterpolation{Float64, 1, Float64, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Tuple{Vector{Float64}}}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Interpolations.Flat{Nothing}}}} = []
     # replace_nan(v) = map(x -> isnan(x) ? zero(x)+1e-10 : x, v)

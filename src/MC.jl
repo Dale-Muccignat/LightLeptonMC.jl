@@ -15,8 +15,8 @@ abstract type Event end
 struct Down <: Direction end
 struct Up <: Direction end
 
-struct dt_EVENT
-    time::Quantity 
+struct dt_EVENT{T<:Unitful.Time}
+    time::T
     type::Symbol 
     direction::Symbol
 end
@@ -142,22 +142,22 @@ end
 
 function measureDeath!(type::LμJ,particle,model,params,meas_inner,verbose)
     if particle.rbin == length(params.rbins)
-        :χ in model.meas ? meas_inner.measLμJ.χ[findMinInd(params.χbins,abs(atan(particle.r[2],particle.r[3])))] += particle.weight : nothing
+        :χ in model.meas ? meas_inner.measLμJ.χ[findMinInd(params.χbins,abs(atan(rad,particle.r[2],particle.r[3])))] += particle.weight : nothing
 
         if :εχ in model.meas 
-            verbose && @info "Velcoity angle: " abs(atand(particle.v[2],particle.v[3]))
-            verbose && @info "Spacial angle: " abs(atand(particle.r[2],particle.r[3]))
-            if abs(abs(atand(particle.v[2],particle.v[3])) - abs(atand(particle.r[2],particle.r[3]))) < type.Δχ_detector
+            verbose && @info "Velocity angle: " abs(atan(°,particle.v[2],particle.v[3]))
+            verbose && @info "Spacial angle: " abs(atan(°,particle.r[2],particle.r[3]))
+            if abs(abs(atan(°,particle.v[2],particle.v[3])) - abs(atan(°,particle.r[2],particle.r[3]))) < type.Δχ_detector
                 meas_inner.measLμJ.εχ[findMinInd(params.ebins,getEnergy(particle.v)),findMinInd(params.χbins,abs(atan(particle.r[2],particle.r[3])))] += particle.weight
                 verbose && @info "accepted"
             else
-                meas_inner.measLμJ.εχ_reject[findMinInd(params.ebins,getEnergy(particle.v)),findMinInd(params.χbins,abs(atan(particle.r[2],particle.r[3])))] += particle.weight
+                meas_inner.measLμJ.εχ_reject[findMinInd(params.ebins,getEnergy(particle.v)),findMinInd(params.χbins,abs(atan(rad,particle.r[2],particle.r[3])))] += particle.weight
                 verbose && @info "rejected"
             end
         end
 
         if :ε in model.meas
-            if abs(atan(particle.v[2],particle.v[3])) > (type.χ-type.Δχ_detector)*pi/180 && abs(atan(particle.v[2],particle.v[3])) < (type.χ+type.Δχ_detector)*pi/180
+            if abs(abs(atan(°,particle.v[2],particle.v[3])) - abs(atan(°,particle.r[2],particle.r[3]))) < type.Δχ_detector
                 meas_inner.measLμJ.ε[findMinInd(params.ebins,getEnergy(particle.v))] += particle.weight
             end
         end
@@ -270,7 +270,7 @@ function eventCollision!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
 end
 
 function getRelVel(cs_no,particle,model,params)
-    if model.T.val == 0.
+    if model.T.val == 0. *K
         g = copy(particle.v)
     else
         g = findu(cs_no,particle,model,params)
