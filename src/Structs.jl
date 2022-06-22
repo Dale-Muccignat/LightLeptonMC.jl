@@ -28,6 +28,13 @@ end
     axis::AUTO = [0,0,1]
 end
 
+@xport function GaussianLμJSpacial(;val=-7.5μm,Δy_source=7.5μm,gaussian_axis=[0,1,0],axis=[0,0,1])
+    gaussian_axis = @SVector [gaussian_axis[1],gaussian_axis[2],gaussian_axis[3]]
+    axis = @SVector [axis[1],axis[2],axis[3]]
+    return GaussianLμJSpacial(val,Δy_source,gaussian_axis,axis)
+end
+
+
 @xport @AutoParm struct UniformDensity <: Density
     val::AUTO = 1e23m^-3
 end
@@ -170,7 +177,6 @@ For more information, type ?MCMODEL
 @xport @AutoParm mutable struct LμJ
     Δε_detector::AUTO = 0.9eV
     Δχ_detector::AUTO = 2°
-    χ::AUTO = Inf°
     thresh::AUTO = 1. *eV
     jet_width::AUTO = 15e-6m
     jet_center::AUTO = [0.,0.,0.] .*m
@@ -203,12 +209,12 @@ Defines the parameters for a cell (rectangular prism) style experiment
     r::AUTO = 1e-6m
 end
 
-@xport function LμJ(;jet_center=[0.,0.,0.],Δε_detector=0.9,Δχ_detector=2,χ=Inf,thresh=1.,jet_width=15e-6)
-    LμJ(Δε_detector*eV,Δχ_detector*°,χ*°,thresh*eV,jet_width*m,jet_center.*m)
+@xport function LμJ(;jet_center=[0.,0.,0.].*m,Δε_detector=0.9eV,Δχ_detector=2°,thresh=1. *eV,jet_width=15μm)
+    LμJ(Δε_detector,Δχ_detector,thresh,jet_width,jet_center)
 end
 
-@xport function CELL(;Δε_detector=0.9,thresh=1.,z=15e-6,z_n=100,x=15e-6,y=15e-6,bin_no=100,r=1e-6)
-    CELL(Δε_detector*eV,thresh*eV,z*m,z_n,x*m,y*m,bin_no,r*m)
+@xport function CELL(;Δε_detector=0.9eV,thresh=1. *eV,z=15μm,z_n=100,x=15μm,y=15μm,bin_no=100,r=1μm)
+    CELL(Δε_detector,thresh,z,z_n,x,y,bin_no,r)
 end
 
 @AutoParm mutable struct MCPARAMS

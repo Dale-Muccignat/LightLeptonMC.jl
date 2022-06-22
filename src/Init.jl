@@ -397,7 +397,7 @@ end
 function initPartr(r_0::GaussianLμJSpacial,params)
     SD = r_0.Δy_source/(2*sqrt(2*log(2)))
 
-    val = 0.
+    val = 0.0m
 
     R=randn()
     # while val < -SD*R
@@ -406,8 +406,8 @@ function initPartr(r_0::GaussianLμJSpacial,params)
     val .+ SD*R .* r_0.gaussian_axis .+ r_0.val .* r_0.axis
 end
 function initPartv(v_0::ZeroVelocity,params)
-    v = SArray{Tuple{3},Float64,1,3}(0.,0.,0.)
-    return v*m/s
+    r = SArray{Tuple{3},Float64,1,3}(0.,0.,0.)
+    return r*m/s
 end
 
 function initPartv(v_0::InitVelocity,params)
@@ -417,7 +417,7 @@ function initPartv(v_0::InitVelocity,params)
 end
 
 function initPartv(v_0::GaussianDirectionVelocity,params)
-    electron_v2eV = 0.5 * me / q
+    electron_v2eV = 0.5 * me
     coschi = 1-2*rand()
     sinchi = sqrt(1-coschi^2)
     phi = rand()*2*pi
@@ -428,7 +428,7 @@ end
 
 function initPartv(v_0::GaussianEnergyVelocity,params)
     SD = v_0.Δε_source/(2*sqrt(2*log(2)))
-    electron_v2eV = 0.5 * me / q
+    electron_v2eV = 0.5 * me 
 
     ea = v_0.ε
 

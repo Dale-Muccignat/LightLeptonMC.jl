@@ -68,7 +68,7 @@ end
 
 function checkAliveModel(type::LμJ,particle,model,meas_inner,params,verbose)
 
-    if getEnergy(particle.v) < type.thresh*params.energy_scale
+    if getEnergy(particle.v) < type.thresh#*params.energy_scale
         verbose && @info "Absorbed"
     end
 
@@ -76,7 +76,7 @@ function checkAliveModel(type::LμJ,particle,model,meas_inner,params,verbose)
         verbose && @info "Detected"
     end
 
-    return particle.rbin != length(params.rbins) && getEnergy(particle.v) > type.thresh*params.energy_scale && sumColl(meas_inner.measg.coll_count) < 2
+    return particle.rbin != length(params.rbins) && getEnergy(particle.v) > type.thresh && sumColl(meas_inner.measg.coll_count) < 2
 end
 
 function checkAliveModel(type::CELL,particle,model,meas_inner,params,verbose)
@@ -147,8 +147,10 @@ function measureDeath!(type::LμJ,particle,model,params,meas_inner,verbose)
         if :εχ in model.meas 
             verbose && @info "Velocity angle: " abs(atan(°,particle.v[2],particle.v[3]))
             verbose && @info "Spacial angle: " abs(atan(°,particle.r[2],particle.r[3]))
-            if abs(abs(atan(°,particle.v[2],particle.v[3])) - abs(atan(°,particle.r[2],particle.r[3]))) < type.Δχ_detector
-                meas_inner.measLμJ.εχ[findMinInd(params.ebins,getEnergy(particle.v)),findMinInd(params.χbins,abs(atan(particle.r[2],particle.r[3])))] += particle.weight
+            angle_position = abs(atan(°,particle.r[2],particle.r[3]))
+            angle_velocity = abs(atan(°,particle.v[2],particle.v[3]))
+            if abs(angle_position - angle_velocity) < type.Δχ_detector
+                meas_inner.measLμJ.εχ[findMinInd(params.ebins,getEnergy(particle.v)),findMinInd(params.χbins,angle_position)] += particle.weight
                 verbose && @info "accepted"
             else
                 meas_inner.measLμJ.εχ_reject[findMinInd(params.ebins,getEnergy(particle.v)),findMinInd(params.χbins,abs(atan(rad,particle.r[2],particle.r[3])))] += particle.weight
@@ -310,7 +312,7 @@ end
 
 @fastmath function excitationColl!(cs_no,g,particle,model,params,meas_inner,verbose)
 
-    if dot(g,g)-2*params.splat_gas.thresh[cs_no]/me > 0.
+    if dot(g,g)-2*params.splat_gas.thresh[cs_no]/me > 0m^2/s^2
         coschi, sinchi, phi = scatteringAngle(cs_no,g,particle,model,params,verbose)
         v2 = sqrt(dot(g,g)-2*params.splat_gas.thresh[cs_no]/me) * SArray{Tuple{3},Float64,1,3}(cos(phi)*sinchi,sin(phi)*sinchi,coschi)
         v2 = shift(v2,g)
@@ -324,7 +326,7 @@ end
 
 @fastmath function ionisationColl!(cs_no,ion_type,g,particle,model,params,meas_inner,verbose)
 
-    if dot(g,g)-2*params.splat_gas.thresh[cs_no]/me > 0.
+    if dot(g,g)-2*params.splat_gas.thresh[cs_no]/me > 0m^2/s^2
         part_energy, other_part_energy = getIonisationEnergy(params.splat_gas.thresh[cs_no],ion_type,g,particle,model,params)
 
         coschi, sinchi, phi = scatteringAngle(cs_no,g,particle,model,params,verbose)
@@ -342,7 +344,7 @@ end
 end
 
 function getIonisationEnergy(thresh,ion_type::DiscreteIonisation,g,particle,model,params)
-    total_energy = getEnergy(g)*q - thresh
+    total_energy = getEnergy(g) - thresh
     if rand() > 0.5 || :SP in model.meas || particle.type == :positron
         other_part_energy = ion_type.loss*params.energy_scale*q
     else
@@ -353,14 +355,14 @@ function getIonisationEnergy(thresh,ion_type::DiscreteIonisation,g,particle,mode
 end
 
 function getIonisationEnergy(thresh,ion_type::UniformIonisation,g,particle,model,params)
-    total_energy = getEnergy(g)*q - thresh
+    total_energy = getEnergy(g) - thresh
     other_part_energy = total_energy * rand()
     part_energy = total_energy - other_part_energy 
     return part_energy, other_part_energy
 end
 
 function getIonisationEnergy(thresh,ion_type::RatioIonisation,g,particle,model,params)
-    total_energy = getEnergy(g)*q - thresh
+    total_energy = getEnergy(g) - thresh
     if rand() > 0.5 || :SP in model.meas || particle.type == :positron
         other_part_energy = total_energy * ion_type.ratio(getEnergy(g)/params.energy_scale)::Float64
         # other_part_energy = 0
@@ -372,7 +374,7 @@ function getIonisationEnergy(thresh,ion_type::RatioIonisation,g,particle,model,p
 end
 
 function getIonisationEnergy(thresh,ion_type::FunctionalIonisation,g,particle,model,params)
-    total_energy = getEnergy(g)*q - thresh
+    total_energy = getEnergy(g) - thresh
     if rand() > 0.5 || :SP in model.meas || particle.type == :positron
         other_part_energy = ion_type.func[particle.cbin](rand())*params.energy_scale*q
     else
@@ -389,7 +391,7 @@ function getIonisationEnergy(thresh,ion_type::FunctionalIonisation,g,particle,mo
 end
 
 function getIonisationEnergy(thresh,ion_type::DiscreteFunctionalIonisation,g,particle,model,params)
-    total_energy = getEnergy(g)*q - thresh
+    total_energy = getEnergy(g) - thresh
     if rand() > 0.5 || :SP in model.meas || particle.type == :positron
         other_part_energy = ion_type.loss(getEnergy(g)/params.energy_scale)*params.energy_scale*q
     else
@@ -548,19 +550,19 @@ end
         r22 = params.rbins[particle.rbin+1]
         a = v[3]^2+v[2]^2
         b = 2*(p[3]*v[3]+v[2]*p[2])
-        c = p[3]^2+p[2]^2-r21+1e-6
+        c = p[3]^2+p[2]^2-r21+1e-13m^2
         delta = b^2-4*a*c
-        if (delta > 0.) #&& (c > 0.)
+        if (delta > 0m^4/s^2) #&& (c > 0.)
             t1 = (-b+sqrt(delta))/(2*a)
             t2 = (-b-sqrt(delta))/(2*a)
-            if t1 <= 0.
-                t1 = Inf *s
+            if t1 <= 0s
+                t1 = Inf*s
             end
-            if t2 <= 0.
+            if t2 <= 0s
                 t2 = Inf*s
             end
             down = min(t1,t2)
-            if r21 == 0.
+            if r21 == 0s
                 down = Inf*s
             end
         end
@@ -573,16 +575,15 @@ end
             p -= model.type.jet_center
         end
         b = 2*(p[3]*v[3]+v[2]*p[2])
-        c = p[3]^2+p[2]^2-r21+1e-6
-        c = c+r21-r22-2e-6
+        c = p[3]^2+p[2]^2-r22-1e-13m^2
         delta = b^2-4*a*c
-        if (delta > 0.) #&& (c < 0.)
+        if (delta > 0m^4/s^2) #&& (c < 0.)
             t1 = (-b+sqrt(delta))/(2*a)
             t2 = (-b-sqrt(delta))/(2*a)
-            if t1 <= 0.
+            if t1 <= 0s
                 t1 = Inf*s
             end
-            if t2 <= 0.
+            if t2 <= 0s
                 t2 = Inf*s
             end
             up = min(t1,t2)
