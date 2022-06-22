@@ -605,31 +605,31 @@ end
         r22 = params.rbins[particle.rbin+1]
         a = v[3]^2+v[2]^2
         b = 2*(p[3]*v[3]+v[2]*p[2])
-        c = p[3]^2+p[2]^2-r21+1e-6
+        c = p[3]^2+p[2]^2-r21+1e-13m^2
         delta = b^2-4*a*c
-        if (delta > 0.) #&& (c > 0.)
+        if (delta > 0m^4/s^2) #&& (c > 0.)
             t1 = (-b+sqrt(delta))/(2*a)
             t2 = (-b-sqrt(delta))/(2*a)
-            if t1 <= 0.
+            if t1 <= 0s
                 t1 = Inf*s
             end
-            if t2 <= 0.
+            if t2 <= 0s
                 t2 = Inf*s
             end
             down = min(t1,t2)
-            if r21 == 0.
+            if r21 == 0s
                 down = Inf*s
             end
         end
-        c = c+r21-r22-2e-6
+        c = c+r21-r22-2e-13m^2
         delta = b^2-4*a*c
-        if (delta > 0.) #&& (c < 0.)
+        if (delta > 0m^4/s^2) #&& (c < 0.)
             t1 = (-b+sqrt(delta))/(2*a)
             t2 = (-b-sqrt(delta))/(2*a)
-            if t1 <= 0.
+            if t1 <= 0s
                 t1 = Inf*s
             end
-            if t2 <= 0.
+            if t2 <= 0s
                 t2 = Inf*s
             end
             up = min(t1,t2)
