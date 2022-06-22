@@ -515,7 +515,7 @@ end
 
 function getEnDt(En0::UniformField,n0::UniformDensity,particle,model,params)
 	v_perp = particle.v[1]^2 + particle.v[2]^2 #Seperate out of the vz velocity
-        if (particle.v[3] < 0. *m/s) && ((params.cbins[particle.cbin]/electron_v2eV - v_perp) > 0. *(m/s)^2) && (particle.cbin!= 1)
+        if (particle.v[3] < 0m/s) && ((params.cbins[particle.cbin]/electron_v2eV - v_perp) > 0*(m/s)^2) && (particle.cbin!= 1)
 		#If the velocity is less than zero, i.e if the energy bin needs to go down
 		#The second condition is to ensure that the energy can go down considering the perpindicular velocity... or something along those lines. It just makes sure the squareroot doesn't return an imaginary number
 		vf_z = sqrt(params.cbins[particle.cbin]/electron_v2eV - v_perp)
@@ -649,17 +649,17 @@ end
 function getZDt(particle,model,params)
     if params.zbins != nothing
         if model.optimise_spatial == true
-            if (particle.v[3] < 0.) && (particle.zbin != 0)
-                return dt_EVENT((params.zbins[1]-1e-12-particle.r[3])/particle.v[3], :dt_zbin,:Down)
-            elseif (particle.zbin < length(params.zbins)) && (particle.v[3] > 0.)
-                return dt_EVENT((params.zbins[end]+1e-12-particle.r[3])/particle.v[3], :dt_zbin, :Up)
+            if (particle.v[3] < 0m) && (particle.zbin != 0)
+                return dt_EVENT((params.zbins[1]-1e-12m-particle.r[3])/particle.v[3], :dt_zbin,:Down)
+            elseif (particle.zbin < length(params.zbins)) && (particle.v[3] > 0m/s)
+                return dt_EVENT((params.zbins[end]+1e-12m-particle.r[3])/particle.v[3], :dt_zbin, :Up)
             end
         else
             if params.zbins != nothing
-                if (particle.v[3] < 0.) && (particle.zbin != 0)
-                    return dt_EVENT((params.zbins[particle.zbin]-1e-12-particle.r[3])/particle.v[3], :dt_zbin,:Down)
+                if (particle.v[3] < 0m/s) && (particle.zbin != 0)
+                    return dt_EVENT((params.zbins[particle.zbin]-1e-12m-particle.r[3])/particle.v[3], :dt_zbin,:Down)
                 elseif (particle.zbin < length(params.zbins)) && (particle.v[3] > 0.)
-                    return dt_EVENT((params.zbins[particle.zbin+1]+1e-12-particle.r[3])/particle.v[3], :dt_zbin, :Up)
+                    return dt_EVENT((params.zbins[particle.zbin+1]+1e-12m-particle.r[3])/particle.v[3], :dt_zbin, :Up)
                 end
             end
         end
@@ -670,17 +670,17 @@ end
 function getYDt(particle,model,params)
     if params.ybins != nothing
         if model.optimise_spatial == true
-            if (particle.v[2] < 0.) && (particle.ybin != 0)
-                return dt_EVENT((params.ybins[1]-1e-12-particle.r[2])/particle.v[2], :dt_ybin,:Down)
-            elseif (particle.ybin < length(params.ybins)) && (particle.v[2] > 0.)
-                return dt_EVENT((params.ybins[end]+1e-12-particle.r[2])/particle.v[2], :dt_ybin, :Up)
+            if (particle.v[2] < 0m/s) && (particle.ybin != 0)
+                return dt_EVENT((params.ybins[1]-1e-12m-particle.r[2])/particle.v[2], :dt_ybin,:Down)
+            elseif (particle.ybin < length(params.ybins)) && (particle.v[2] > 0m/s)
+                return dt_EVENT((params.ybins[end]+1e-12m-particle.r[2])/particle.v[2], :dt_ybin, :Up)
             end
         else
             if params.ybins != nothing
-                if (particle.v[2] < 0.) && (particle.ybin != 0)
-                    return dt_EVENT((params.ybins[particle.ybin]-1e-12-particle.r[2])/particle.v[2], :dt_ybin,:Down)
+                if (particle.v[2] < 0m/s) && (particle.ybin != 0)
+                    return dt_EVENT((params.ybins[particle.ybin]-1e-12m-particle.r[2])/particle.v[2], :dt_ybin,:Down)
                 elseif (particle.ybin < length(params.ybins)) && (particle.v[2] > 0.)
-                    return dt_EVENT((params.ybins[particle.ybin+1]+1e-12-particle.r[2])/particle.v[2], :dt_ybin, :Up)
+                    return dt_EVENT((params.ybins[particle.ybin+1]+1e-12m-particle.r[2])/particle.v[2], :dt_ybin, :Up)
                 end
             end
         end
@@ -691,17 +691,17 @@ end
 function getXDt(particle,model,params)
     if params.xbins != nothing
         if model.optimise_spatial == true
-            if (particle.v[1] < 0.) && (particle.xbin != 0)
-                return dt_EVENT((params.xbins[1]-1e-12-particle.r[1])/particle.v[1], :dt_xbin,:Down)
+            if (particle.v[1] < 0m/s) && (particle.xbin != 0)
+                return dt_EVENT((params.xbins[1]-1e-12m-particle.r[1])/particle.v[1], :dt_xbin,:Down)
             elseif (particle.xbin < length(params.xbins)) && (particle.v[1] > 0.)
-                return dt_EVENT((params.xbins[end]+1e-12-particle.r[1])/particle.v[1], :dt_xbin, :Up)
+                return dt_EVENT((params.xbins[end]+1e-12m-particle.r[1])/particle.v[1], :dt_xbin, :Up)
             end
         else
             if params.xbins != nothing
-                if (particle.v[1] < 0.) && (particle.xbin != 0)
-                    return dt_EVENT((params.xbins[particle.xbin]-1e-12-particle.r[1])/particle.v[1], :dt_xbin,:Down)
+                if (particle.v[1] < 0m/s) && (particle.xbin != 0)
+                    return dt_EVENT((params.xbins[particle.xbin]-1e-12m-particle.r[1])/particle.v[1], :dt_xbin,:Down)
                 elseif (particle.xbin < length(params.xbins)) && (particle.v[1] > 0.)
-                    return dt_EVENT((params.xbins[particle.xbin+1]+1e-12-particle.r[1])/particle.v[1], :dt_xbin, :Up)
+                    return dt_EVENT((params.xbins[particle.xbin+1]+1e-12m-particle.r[1])/particle.v[1], :dt_xbin, :Up)
                 end
             end
         end
