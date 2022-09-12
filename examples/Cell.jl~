@@ -1,0 +1,7 @@
+using MCSim
+
+cell = CELL(Δε_detector=0.9, thresh=0.1, z=1, x=1, y=1,r=1e-11)
+
+model = MCMODEL(n=1,type=cell, v_0 = InitVelocity(ε=12.58), r_0 = InitSpacial(0,[0,0,1]), n0 = CellDensity(1e28), En0 = ZeroField(), ion_type = DiscreteIonisation(), meas=[:z,:xy,:SP])
+
+m, s, p = mc(model,Gas(e⁻_H2O),verbose=true);

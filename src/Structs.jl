@@ -76,7 +76,7 @@ end
         else
             norm = 1
         end
-        
+
         for j in eachindex(cbins2)
             if j == 1
                 matrix[i,j] = quadgk(func2,0,cbins2[j])[1]/norm
@@ -132,8 +132,8 @@ MCMODEL is the main constructor for MCSim.
     v_0 = ZeroVelocity()             # Initial velocity: ZeroVelocity()...
     r_0 = ZeroSpacial()              # Initial spacial: ZeroSpacial()...
     n0 = UniformDensity()            # Density distribution:
-    En0 = UniformField()             # Electric field distribution: 
-    T = UniformTemp()                # Temperature distribution: 
+    En0 = UniformField()             # Electric field distribution:
+    T = UniformTemp()                # Temperature distribution:
     ion_type = UniformIonisation()   # Ionisation sharing type:
     meas = [:t]                      # Variables to measure. There are many possibilities, see ?MEASLμJ, ?MEASCELL or ?MEAST
 ```
@@ -169,7 +169,7 @@ Parameters:
     χ = Inf                 # Only record measurements for a specific angle += resolution
     thresh = 1.             # Set the minimum energy to simulate electrons too
     jet_width = 15e-6       # Diameter for the liquid jet
-    jet_center = [0.,0.,0.] # Set's an offset for the jet_center 
+    jet_center = [0.,0.,0.] # Set's an offset for the jet_center
 ```
 
 For more information, type ?MCMODEL
@@ -249,7 +249,7 @@ end
     v::AUTO = [0.,0.,0.]
     r::AUTO = [0.,0.,0.]
     t::AUTO = 0. *s
-    weight::AUTO = 1. 
+    weight::AUTO = 1.
     tbin::Int64 = 1
     cbin::Int64 = 1
     ebin::Int64 = 1
@@ -315,7 +315,7 @@ function MEASLμJ(model::MCMODEL,params::MCPARAMS)
     if :zyt ∈ model.meas
         zyt= zeros(length(params.zbins),length(params.ybins),length(params.tbins))
     end
-    
+
     if :ε ∈ model.meas
         ε = zeros(length(params.ebins))
     end
@@ -323,7 +323,7 @@ function MEASLμJ(model::MCMODEL,params::MCPARAMS)
     if :χ ∈ model.meas
         χ = zeros(length(params.χbins))
     end
-    
+
     if :εχ ∈ model.meas
         εχ = zeros(length(params.ebins),length(params.χbins))
         εχ_reject = zeros(length(params.ebins),length(params.χbins))
@@ -425,11 +425,11 @@ end
 end
 
 function MEASC(params)
-    return MEASC(zeros(length(params.tbins)-1),
-          zeros(length(params.tbins)-1,3),
-          zeros(length(params.tbins)-1,3),
-          zeros(length(params.tbins)-1,3),
-          zeros(length(params.tbins)-1)
+    return MEASC(zeros(length(params.tbins)-1).*eV*s,
+          zeros(length(params.tbins)-1,3).*m*s,
+          zeros(length(params.tbins)-1,3).*m,
+          zeros(length(params.tbins)-1,3).*m^2,
+          zeros(length(params.tbins)-1).*s
           )
 end
 
@@ -437,6 +437,8 @@ end
 @AutoParm @xport mutable struct SWARMMEAS
     ε::AUTO = 0.
     εs::AUTO = [0.]
+    R::AUTO = 0.
+    Rs::AUTO = [0.]
     bW::AUTO = 0.
     bWs::AUTO = [0.]
     fW::AUTO = 0.
@@ -452,10 +454,10 @@ end
 end
 
 @fastmath function findMinInd(x::AbstractArray,y)::Int64
-	left::Int64 = 1
-	right::Int64 = length(x)
-        d= Inf*x[1]
-	dlast= -Inf*x[1]
+    left::Int64 = 1
+    right::Int64 = length(x)
+    d= Inf*x[1]
+    dlast= -Inf*x[1]
 	c::Int64 = 0
 	while d != dlast
 		# c = Int(round((left+right)/2))
@@ -464,40 +466,40 @@ end
 		@inbounds d = x[c]
 		if d < y
 			left = c
-		elseif d >= y
-			right = c
-		end
+        elseif d >= y
+            right = c
+        end
 
-	end
-	if x[right] <= y
-		return right
-	else
-		return left
-	end
+    end
+    if x[right] <= y
+        return right
+    else
+        return left
+    end
 end
 
 @fastmath function findMinInd(x::Array{Int64,1},y::Int64)::Int64
-	left::Int64 = 1
-	right::Int64 = length(x)
-	d::Float64  = Inf
-	dlast::Float64  = -Inf
-	c::Int64 = 0
-	while d != dlast
-		# c = Int(round((left+right)/2))
-		c = div(left+right,2)
-		dlast = d
-		@inbounds d = x[c]
-		if d < y
-			left = c
-		elseif d >= y
-			right = c
-		end
+    left::Int64 = 1
+    right::Int64 = length(x)
+    d::Float64  = Inf
+    dlast::Float64  = -Inf
+    c::Int64 = 0
+    while d != dlast
+        # c = Int(round((left+right)/2))
+        c = div(left+right,2)
+        dlast = d
+        @inbounds d = x[c]
+        if d < y
+            left = c
+        elseif d >= y
+            right = c
+        end
 
-	end
-	if x[right] <= y
-		return right
-	else
-		return left
-	end
+    end
+    if x[right] <= y
+        return right
+    else
+        return left
+    end
 end
 end # module

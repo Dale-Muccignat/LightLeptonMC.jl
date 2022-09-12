@@ -10,11 +10,11 @@ This package takes gases from Gases.jl and performs a Monte Carlo simulation in 
 For more information, type ?mc
 """
 module MCSim
-#TODO: Add Attachment, super-eleastic, liquid
+#TODO: Add super-eleastic, liquid
 #TODO: Add Potential
 #TODO: Add Density Gradient (this is probably best solved through Danny's code though)
 
-using Reexport, Distributed, JLD2, Dates, AndExport
+using Reexport, Distributed, JLD2, Dates, AndExport, Statistics
 using Gases
 using FVB
 export mc, MCINIT, MCPARAMS, saveBatch, saveDist
@@ -58,9 +58,40 @@ macro jld2save(filename, vars...)
 end
 
 
-function mc(gas::Gas;S=0.,E=1.,T=0.,N=1000,t=1e-5,meas=[:t],verbose=false)
-    model = MCMODEL(meas=meas,type=SWARM(t*s),n=N,En0=UniformField(E*Td),T=UniformTemp(T*K),ion_type=RatioIonisation(0.7),v_0=InitVelocity(S*eV,[0,0,1]))
+
+function mc(gas::Gas;S=0.,E=1.,T=0.,N=1000,t=Inf,meas=[:t],verbose=false)
+    if t == Inf
+        t = findSimTime(gas,S,E,T,meas,verbose)
+    end
+
+    model = MCMODEL(meas=meas,type=SWARM(t*s),n=N,En0=UniformField(E*Td),T=UniformTemp(T*K),ion_type=UniformIonisation(),v_0=InitVelocity(S*eV,[0,0,1]))
     mc(model,initParams(gas,model),verbose=verbose)
+end
+
+function findSimTime(gas,S,E,T,meas,verbose)
+    curr_time = 5e-6
+    unconverged = true
+    N = 100
+    while unconverged
+        verbose && @info "Current Time: " curr_time
+        model = MCMODEL(meas=meas,type=SWARM(curr_time*s),n=1000,En0=UniformField(E*Td),T=UniformTemp(T*K),ion_type=UniformIonisation(),v_0=InitVelocity(S*eV,[0,0,1]))
+        measures, swarm, params = mc(model,initParams(gas,model))
+        first, second = mean(measures.meast.εᵢ[1:end÷2]),mean(measures.meast.εᵢ[end÷2:end])
+        verbose && @info "Averages: " first second
+        verbose && @info "Diff: " abs(second-first)/second
+        if abs(second-first)/second > 0.01
+            curr_time *= 2
+        else
+            curr_time *= 2 # For good measure
+            @info "Chose: " curr_time
+            unconverged = false
+        end
+        if curr_time > 1e-4
+            @info "Not Converged"
+            throw("Convergence Failed.")
+        end
+    end
+    return curr_time
 end
 
 function mc(model::MCMODEL,gas::Gas;verbose=false)
@@ -68,7 +99,7 @@ function mc(model::MCMODEL,gas::Gas;verbose=false)
 end
 
 function mc(model::MCMODEL,gases,indicies;verbose=false,w=1.0,ref_gas=MaxwellModel(),save=false,dcs=false)
-    distribution_data::Dict{Int64,Tuple{Vector{Float64},Vector{Float64}}} = Dict() 
+    distribution_data::Dict{Int64,Tuple{Vector{Float64},Vector{Float64}}} = Dict()
     # @info "Batch: " indicies[1]
     for i in indicies
         # @info "Number: " i
@@ -77,7 +108,7 @@ function mc(model::MCMODEL,gases,indicies;verbose=false,w=1.0,ref_gas=MaxwellMod
         else
             params = initParams(gases[i]*w + ref_gas*(1 .-w),model)
         end
-        
+
         meas, swarm, params= mc(model,params,verbose=verbose)
         if dcs
             distribution_data[i] = (params.χbins[4:end-1],sum(meas.measLμJ.εχ[:,:],dims=1)'[4:end-1])
@@ -88,7 +119,7 @@ function mc(model::MCMODEL,gases,indicies;verbose=false,w=1.0,ref_gas=MaxwellMod
     if save
         saveBatch(distribution_data,model,indicies,w)
     end
-    
+
     return distribution_data
 end
 
@@ -143,7 +174,7 @@ end
         println("What type of model [LuJ/Swarm/Cell]:")
         modeltype = readline()
     end
-    
+
     println("How many particles?")
     ns = readline()
     n=0
@@ -160,7 +191,7 @@ end
     println("What initial energy (in eV)?")
     εs = readline()
     ε=Inf
-    while ε == Inf 
+    while ε == Inf
         try
             ε=parse(Float64,εs)
         catch
@@ -173,16 +204,16 @@ end
 
 
 @generated function GenericAddition(this::T,other::T)::T where T
-	expr = Expr(:block)
-	contents_expr = Expr(:tuple)
-	for fname in fieldnames(this)
-		push!(contents_expr.args, :(this.$fname + other.$fname))
-	end
+    expr = Expr(:block)
+    contents_expr = Expr(:tuple)
+    for fname in fieldnames(this)
+        push!(contents_expr.args, :(this.$fname + other.$fname))
+    end
 
-	push!(expr.args, :(contents = $(contents_expr)))
-	push!(expr.args, :(obj = T(contents...)))
+    push!(expr.args, :(contents = $(contents_expr)))
+    push!(expr.args, :(obj = T(contents...)))
 
-	expr
+    expr
 end
 Base.:+(x::Nothing,y::Nothing) = nothing
 Base.:*(x::Nothing,y::Float64) = nothing
@@ -204,7 +235,7 @@ end
 function saveBatch(dists,model,indicies,w)
     i = indicies[1]
     j = indicies[end]
-    en = model.v_0.ε
+    en = ustrip(model.v_0.ε)
     n = model.n
     filename = "ML/"*"$w"*"/"*"$en"*"eV/"*"$en"*"_no"*"$n"*"_#"*"$i"*":"*"$j"*"_" * string(Dates.today()) * "_" * string(Dates.hour(now())) * "-" * string(Dates.minute(now())) * "-" * string(Dates.second(now())) * "-" * string(Dates.millisecond(now()))
     @jld2save filename*"TEMP"*".jld2" dists
@@ -213,7 +244,7 @@ function saveBatch(dists,model,indicies,w)
 end
 
 function saveDist(name,model,params,meas)
-    en = model.v_0.ε
+    en = ustrip(model.v_0.ε)
     n = model.n
     ebins = params.ebins
     dist = meas.measLμJ.ε

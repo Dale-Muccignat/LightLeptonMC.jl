@@ -6,7 +6,7 @@ N = 100000
 tol = 0.01
 function withinTol(y,ŷ,tol=0.05)
     @info "Values: " y ŷ
-    @test y - y*tol <= ŷ<= y+y*tol
+    @test y - y*tol <= ustrip(ŷ)<= y+y*tol
 end
 @testset "Individual Checks" begin
 
@@ -58,6 +58,25 @@ end
         T = 0.
         meas, swarm, params = mc(LucasSaelee(),E=10.,T=T,N=N,t=3e-6)
         sol = pt(LucasSaelee(),E=10.,T=T,lmax=9,N=5000)
+        withinTol(sol.ε̄,swarm.ε)
+        withinTol(sol.DT,swarm.bDt)
+        withinTol(sol.DL,swarm.bDl)
+    end
+    @testset "Ness-Robson" begin
+        @info "Attachment (Ness-Robson) Test"
+        T = 293.
+        meas, swarm, params = mc(PowerLawAttachment(),E=0.4,T=T,N=N,t=3e-5)
+        sol = pt(PowerLawAttachment(),E=0.4,T=T,lmax=9,N=5000)
+        withinTol(sol.ε̄,swarm.ε)
+        withinTol(sol.DT,swarm.bDt)
+        withinTol(sol.DL,swarm.bDl)
+        meas, swarm, params = mc(PowerLawAttachment(a=1//10000),E=0.4,T=T,N=N,t=3e-5)
+        sol = pt(PowerLawAttachment(a=1//10000),E=0.4,T=T,lmax=9,N=5000)
+        withinTol(sol.ε̄,swarm.ε)
+        withinTol(sol.DT,swarm.bDt)
+        withinTol(sol.DL,swarm.bDl)
+        meas, swarm, params = mc(PowerLawAttachment(a=1//10000),E=0.4,T=T,N=N,t=3e-5)
+        sol = pt(PowerLawAttachment(a=1//1000),E=0.4,T=T,lmax=9,N=5000)
         withinTol(sol.ε̄,swarm.ε)
         withinTol(sol.DT,swarm.bDt)
         withinTol(sol.DL,swarm.bDl)

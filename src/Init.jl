@@ -10,7 +10,7 @@ export initParams, initMeas, PART, getEnergy, test
     dcs::AUTO
     type::AUTO
     thresh::AUTO
-    m::AUTO 
+    m::AUTO
     w::AUTO
 end
 
@@ -27,7 +27,7 @@ function initParams(input_gas=MaxwellModel(),model::MCMODEL=MCMODEL())
     time_scale = model.n0.val*1e-20*sqrt(2*q/me)
     energy_scale = (length_scale/time_scale)^2
 
-    splat_gas=splatCS(input_gas,energy_scale,ustrip.(cbins))
+    splat_gas=splatCS(input_gas,model.T.val,energy_scale,ustrip.(cbins))
     total_freq=buildFreq(model,splat_gas,cbins,energy_scale)
 
     params = MCPARAMS(
@@ -76,11 +76,11 @@ end
     ls = params.length_scale
     ts = params.time_scale
     es = params.energy_scale
-    
+
     params.cbins *= es
     params.ebins *= es
     params.total_freq /= ts#/ls^3
-    params.a *= ls^4/ts^2 
+    params.a *= ls^4/ts^2
     params.n0 /= ls^3
     params.rbins *= ls^2
     params.xbins *= ls
@@ -95,7 +95,7 @@ end
     ls = 1/params.length_scale
     ts = 1/params.time_scale
     es = 1/params.energy_scale
-    
+
     params.cbins *= es
     params.ebins *= es
     params.total_freq /= ts#/ls^3
@@ -148,7 +148,6 @@ end
 #### Frequency ####
 
 function buildFreq(model,gas,cbins,energy_scale)
-
     total_freq = zeros(length(cbins)) .*m^3 ./s
     en_spacing = cbins[end]-cbins[end-1]
     for i in 1:length(total_freq)-1
@@ -160,13 +159,31 @@ function buildFreq(model,gas,cbins,energy_scale)
     return total_freq
 end
 
-@xport function splatCS(gas,energy_scale,cbins)
-    gases = [gas.elastic...,gas.excitation...,gas.ionisation...,gas.attachment...]
-    gases_dcss = [gas.elastic_DCS...,gas.excitation_DCS...,gas.ionisation_DCS...,gas.attachment_DCS...] 
+@xport function addSuperElastics(gas,T)
+    excitations_super::Vector{Function} = []
+    excitations::Vector{Function} = []
 
-    en_spacing = cbins[end]-cbins[end-1] 
+    Z_total = Z_T(gas.exlosses,ustrip(T))
+
+    for (i,cs) in enumerate(gas.excitation)
+        push!(excitations_super, (ε)->(ε + gas.exlosses[i])*cs(ε+gas.exlosses[i])*Z(gas.exlosses[i],ustrip(T))./(Z_total * ε))
+        push!(excitations, (ε)->cs(ε)./(Z_total))
+    end
+
+    gases = [gas.elastic...,excitations...,excitations_super...,gas.ionisation...,gas.attachment...]
+
+    gases_dcss = [gas.elastic_DCS...,gas.excitation_DCS...,gas.excitation_DCS...,gas.ionisation_DCS...,gas.attachment_DCS...]
+    return gases, gases_dcss
+end
+
+
+@xport function splatCS(gas,T,energy_scale,cbins)
+    gases, gases_dcss = addSuperElastics(gas,T)
+    #gases = [gas.elastic...,gas.excitation...,gas.ionisation...,gas.attachment...]
+    #gases_dcss = [gas.elastic_DCS...,gas.excitation_DCS...,gas.ionisation_DCS...,gas.attachment_DCS...]
+    en_spacing = cbins[end]-cbins[end-1]
     # ens = LinRange(1e-6,cbins[end]+en_spacing+1.,100)
-    ens = cbins[2:end] 
+    ens = cbins[2:end]
     # ens2 = 1e-6:1e-4:(cbins[end]+en_spacing+1.)
     ens2 = cbins[2:end]
     θs = LinRange(1e-6,π,1000)
@@ -199,15 +216,15 @@ end
         #TODO: Try this with energy dependency aswell
         push!(dcss,[LinearInterpolation(Interpolations.deduplicate_knots!(spl2(c,θs)),cos.(θs),extrapolation_bc=Flat()) for c in cbins])
     end
-    
-    
-    types = [[:ELASTIC for i in 1:length(gas.elastic)]...,[:EXCITATION for i in 1:length(gas.excitation)]...,[:IONIZATION for i in 1:length(gas.ionisation)]...,[:ATTACHMENT for i in 1:length(gas.attachment)]...]
 
-    threshes = [[0. for thresh in gas.elastic]...,[thresh for thresh in gas.exlosses]...,[thresh for thresh in gas.iolosses]...,[0. for thresh in gas.attachment]...].*eV
 
-    masses = [[m for m in gas.Mₑₗ]...,[m for m in gas.Mₑₓ]...,[m for m in gas.Mₐₜ]...,[m for m in gas.Mᵢₒ]...] .* amu
+    types = [[:ELASTIC for i in 1:length(gas.elastic)]...,[:EXCITATION for i in 1:length(gas.excitation)]...,[:EXCITATION for i in 1:length(gas.excitation)]...,[:IONIZATION for i in 1:length(gas.ionisation)]...,[:ATTACHMENT for i in 1:length(gas.attachment)]...]
 
-    ws = [[w for w in gas.wₑₗ]...,[w for w in gas.wₑₓ]...,[w for w in gas.wₐₜ]...,[w for w in gas.wᵢₒ]...]
+    threshes = [[0. for thresh in gas.elastic]...,[thresh for thresh in gas.exlosses]...,[-thresh for thresh in gas.exlosses]...,[thresh for thresh in gas.iolosses]...,[0. for thresh in gas.attachment]...].*eV
+
+    masses = [[m for m in gas.Mₑₗ]...,[m for m in gas.Mₑₓ]...,[m for m in gas.Mₑₓ]...,[m for m in gas.Mₐₜ]...,[m for m in gas.Mᵢₒ]...] .* amu
+
+    ws = [[w for w in gas.wₑₗ]...,[w for w in gas.wₑₓ]...,[w for w in gas.wₑₓ]...,[w for w in gas.wₐₜ]...,[w for w in gas.wᵢₒ]...]
 
 
     MCGAS(gases_itp,dcss,types,threshes,masses,ws)
@@ -244,7 +261,7 @@ function buildEnBins(type::SWARM,model)
 end
 
 function buildTBins(type::SWARM,model)
-    return LinRange(0s,type.t_f,200)
+    return LinRange(type.t_f/2,type.t_f,100)
 end
 
 function buildχBins(type::SWARM,model)
@@ -331,7 +348,7 @@ function buildDensity(n0::LμJDensity,rbins,zbins)
 end
 
 function buildDensity(n0::CellDensity,rbins,zbins)
-    n0.val .* ones(length(zbins))   
+    n0.val .* ones(length(zbins))
 end
 #### Electric Field ####
 
@@ -364,7 +381,7 @@ function Structs.PART(model,params)
     if params.zbins != nothing
         particle.zbin = findMinInd(params.zbins,particle.r[3])
     end
-    
+
     if params.xbins != nothing
         particle.xbin = findMinInd(params.xbins,particle.r[1])
     end
@@ -372,7 +389,7 @@ function Structs.PART(model,params)
     if params.ybins != nothing
         particle.ybin = findMinInd(params.ybins,particle.r[2])
     end
-        
+
 
     return particle
 
@@ -428,7 +445,7 @@ end
 
 function initPartv(v_0::GaussianEnergyVelocity,params)
     SD = v_0.Δε_source/(2*sqrt(2*log(2)))
-    electron_v2eV = 0.5 * me 
+    electron_v2eV = 0.5 * me
 
     ea = v_0.ε
 

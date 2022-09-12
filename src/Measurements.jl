@@ -35,12 +35,12 @@ end
 function weights!(meas,model)
     for i in 1:length(meas.meast.w)
         meas.meast.εᵢ[i] /= meas.meast.w[i]
-        meas.meast.v²[i,:] ./= meas.meast.w[i] 
-        meas.meast.r²[i,:] ./= meas.meast.w[i] 
-        meas.meast.r[i,:] ./= meas.meast.w[i] 
+        meas.meast.v²[i,:] ./= meas.meast.w[i]
+        meas.meast.r²[i,:] ./= meas.meast.w[i]
+        meas.meast.r[i,:] ./= meas.meast.w[i]
         meas.meast.v[i,:] ./= meas.meast.w[i]
         meas.meast.rv[i,:] ./= meas.meast.w[i]
-        # meas.measc.r[i,:] ./= meas.meast.w[i] 
+        # meas.measc.r[i,:] ./= meas.meast.w[i]
         # meas.measc.v[i,:] ./= meas.meast.w[i]
         # meas.measc.rv[i,:] ./= meas.meast.w[i]
         meas.measc.r[i,:] ./= model.n
@@ -52,6 +52,7 @@ end
 function swarmMeasurements(meas,params,model)
 
     εs::Vector{Quantity} = []
+    Rs::Vector{Quantity} = []
     bWs::Vector{Quantity} = []
     bDts::Vector{Quantity} = []
     bDls::Vector{Quantity} = []
@@ -59,21 +60,21 @@ function swarmMeasurements(meas,params,model)
     fWs::Vector{Quantity} = []
     fDts::Vector{Quantity} = []
     fDls::Vector{Quantity} = []
-    bins = length(meas.meast.w[end÷2:end])
-    for i in length(meas.meast.w)-bins:length(meas.meast.w)
+    #bins = length(meas.meast.w[1:end])
+    for i in 2:length(meas.meast.w)
         push!(εs,meas.meast.εᵢ[i])
+        push!(Rs,(log(meas.meast.w[i])-log(meas.meast.w[i-1]))/(params.tbins[2]-params.tbins[1]))
 
-        push!(bWs,(meas.meast.r[i,3]-meas.meast.r[i-1,3])/params.tbins[2])
+        push!(bWs,(meas.meast.r[i,3]-meas.meast.r[i-1,3])/(params.tbins[2]-params.tbins[1]))
 
-		push!(bDls, (1/2 * ( (meas.meast.r²[i,3] - meas.meast.r[i,3]^2) - (meas.meast.r²[i-1,3] - meas.meast.r[i-1,3]^2) )) / (params.tbins[2]))
+        push!(bDls, (1/2 * ( (meas.meast.r²[i,3] - meas.meast.r[i,3]^2) - (meas.meast.r²[i-1,3] - meas.meast.r[i-1,3]^2) )) / (params.tbins[2]-params.tbins[1]))
 
-		push!(bDts, (1/4 * ( (meas.meast.r²[i,2] + meas.meast.r²[i,1]) - (meas.meast.r²[i-1,2] + meas.meast.r²[i-1,1]) )) / (params.tbins[2]))
+        push!(bDts, (1/4 * ( (meas.meast.r²[i,2] + meas.meast.r²[i,1]) - (meas.meast.r²[i-1,2] + meas.meast.r²[i-1,1]) )) / (params.tbins[2]-params.tbins[1]))
         if :f in model.meas
             push!(fWs,sqrt(dot(meas.measc.v[i,:],meas.measc.v[i,:])))
             push!(fDls, meas.measc.rv[i,3] - meas.measc.v[i,3]*meas.measc.r[i,3])
             push!(fDts, 0.5 * (meas.measc.rv[i,2]+meas.measc.rv[i,1]))
         end
-        
     end
 
     if isempty(fWs)
@@ -83,6 +84,7 @@ function swarmMeasurements(meas,params,model)
     end
 
     SWARMMEAS(mean(εs),εs,
+              mean(Rs),Rs,
               mean(bWs),bWs,
               mean(fWs),fWs,
               mean(bDts)*params.n0,bDts.*params.n0,
@@ -92,7 +94,4 @@ function swarmMeasurements(meas,params,model)
               )
 end
 
-
-
-
-end
+end #Module
