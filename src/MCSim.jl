@@ -64,7 +64,7 @@ function mc(gas::Gas;S=0.,E=1.,T=0.,N=1000,t=Inf,meas=[:t],verbose=false)
         t = findSimTime(gas,S,E,T,meas,verbose)
     end
 
-    model = MCMODEL(meas=meas,type=SWARM(t*s),n=N,En0=UniformField(E*Td),T=UniformTemp(T*K),ion_type=UniformIonisation(),v_0=InitVelocity(S*eV,[0,0,1]))
+    model = MCMODEL(meas=meas,type=SWARM(t*s),n=N,En0=UniformField(E*Td),T=UniformTemp(T*K),ion_type=RatioIonisation(),v_0=InitVelocity(S*eV,[0,0,1]))
     mc(model,initParams(gas,model),verbose=verbose)
 end
 

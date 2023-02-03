@@ -8,30 +8,49 @@ export MCMODEL, MCINIT, MCPARAMS, PART, MEAS, MEAST, MEASS, MEASC, findMinInd
 Velocity
 
 Parent type for each option for velocity. See subtypes for a list of options
+```julia
+    ZeroVelocity()
+    InitVelocity()
+    GaussianEnergyVelocity()
+    GaussianDirectionVelocity()
+```
+
 """
 @xport abstract type Velocity end
-@xport abstract type Spacial end
+
+"""
+Spatial
+
+Parent type for each option for spatial config. See subtypes for a list of options
+```julia
+    ZeroSpatial()
+    InitSpatial()
+    GaussianLμJSpatial()
+```
+
+"""
+@xport abstract type Spatial end 
 @xport abstract type Density end
 @xport abstract type Field end
 @xport abstract type Temp end
 @xport abstract type Ionisation end
 
-@xport struct ZeroSpacial <: Spacial end
-@xport @AutoParm struct InitSpacial <: Spacial
+@xport struct ZeroSpatial <: Spatial end
+@xport @AutoParm struct InitSpatial <: Spatial
     val::AUTO
     axis::AUTO
 end
-@xport @AutoParm struct GaussianLμJSpacial <: Spacial
+@xport @AutoParm struct GaussianLμJSpatial <: Spatial
     val::AUTO = -7.6e-6m
     Δy_source::AUTO = 7.5e-6m
     gaussian_axis::AUTO = [0,1,0]
     axis::AUTO = [0,0,1]
 end
 
-@xport function GaussianLμJSpacial(;val=-7.5μm,Δy_source=7.5μm,gaussian_axis=[0,1,0],axis=[0,0,1])
+@xport function GaussianLμJSpatial(;val=-7.5μm,Δy_source=7.5μm,gaussian_axis=[0,1,0],axis=[0,0,1])
     gaussian_axis = @SVector [gaussian_axis[1],gaussian_axis[2],gaussian_axis[3]]
     axis = @SVector [axis[1],axis[2],axis[3]]
-    return GaussianLμJSpacial(val,Δy_source,gaussian_axis,axis)
+    return GaussianLμJSpatial(val,Δy_source,gaussian_axis,axis)
 end
 
 
@@ -130,7 +149,7 @@ MCMODEL is the main constructor for MCSim.
     particle_type = :electron        # Change particle type: :electron or :positron. This will modify ionisation behaviour.
     n = 100                          # Number of particles to simulate
     v_0 = ZeroVelocity()             # Initial velocity: ZeroVelocity()...
-    r_0 = ZeroSpacial()              # Initial spacial: ZeroSpacial()...
+    r_0 = ZeroSpatial()              # Initial spatial: ZeroSpatial()...
     n0 = UniformDensity()            # Density distribution:
     En0 = UniformField()             # Electric field distribution:
     T = UniformTemp()                # Temperature distribution:
@@ -144,7 +163,7 @@ MCMODEL is the main constructor for MCSim.
     particle_type::AUTO = :electron
     n::Int64 = 100
     v_0::AUTO = ZeroVelocity()
-    r_0::AUTO = ZeroSpacial()
+    r_0::AUTO = ZeroSpatial()
     n0::AUTO = UniformDensity()
     En0::AUTO = UniformField()
     T::AUTO = UniformTemp()
@@ -166,7 +185,6 @@ Parameters:
 ```julia
     Δε_detector = 0.9       # Energy bin width for the detector
     Δχ_detector = 2         # Angle bin width for the detector in degrees
-    χ = Inf                 # Only record measurements for a specific angle += resolution
     thresh = 1.             # Set the minimum energy to simulate electrons too
     jet_width = 15e-6       # Diameter for the liquid jet
     jet_center = [0.,0.,0.] # Set's an offset for the jet_center
@@ -198,7 +216,7 @@ Defines the parameters for a cell (rectangular prism) style experiment
 ```
 """
 @xport @AutoParm mutable struct CELL
-    # Defined spacial parameters for the CELL
+    # Defined spatial parameters for the CELL
     Δε_detector::AUTO = 0.9eV
     thresh::AUTO = 1. *eV
     z::AUTO = 15e-6m

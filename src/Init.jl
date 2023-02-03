@@ -17,7 +17,7 @@ end
 
 function initParams(input_gas=MaxwellModel(),model::MCMODEL=MCMODEL())
 
-    cbins = [0.,(10. .^(-3:0.1:6.))...] .*eV
+    cbins = [0.,(10. .^(-6:0.1:6.))...] .*eV
     # cbins = collect(LinRange(0,101,100))
     tbins, ebins, rbins, χbins, zbins, ybins, xbins = generateBins(model)
     n0=buildDensity(model.n0,rbins,zbins)
@@ -190,7 +190,7 @@ end
 
     gases_itp = [LinearInterpolation(ens2.*eV,gas.(ens2).*u"Å^2",extrapolation_bc=Flat()) for gas in gases]
 
-    dcss::Vector{Vector{Interpolations.Extrapolation{Float64, 1, Interpolations.GriddedInterpolation{Float64, 1, Float64, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Tuple{Vector{Float64}}}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Interpolations.Flat{Nothing}}}} = []
+    dcss::Vector{Vector{Interpolations.Extrapolation{Float64, 1, Interpolations.GriddedInterpolation{Float64, 1, Vector{Float64}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Tuple{Vector{Float64}}}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Interpolations.Flat{Nothing}}}} = []
     # replace_nan(v) = map(x -> isnan(x) ? zero(x)+1e-10 : x, v)
     # replace_0(v) = map(x -> x == 0 ? zero(x)+1e-10 : x, v)
     for σ in gases_dcss
@@ -214,7 +214,7 @@ end
         # func3(e,R) = LinearInterpolation(spl2(e,θs),cos.(θs))(R)::Float64	#Interpolates the above vector and evaluates a value of chi for a given R
         # @show typeof(LinearInterpolation(spl2(1.,θs),cos.(θs)))	#Interpolates the above vector and evaluates a value of chi for a given R
         #TODO: Try this with energy dependency aswell
-        push!(dcss,[LinearInterpolation(Interpolations.deduplicate_knots!(spl2(c,θs)),cos.(θs),extrapolation_bc=Flat()) for c in cbins])
+        push!(dcss,[LinearInterpolation(Interpolations.deduplicate_knots!(spl2(c,θs),move_knots=true),cos.(θs),extrapolation_bc=Flat()) for c in cbins])
     end
 
 
@@ -404,14 +404,14 @@ function getVelocity(ε)
 end
 
 
-function initPartr(r_0::ZeroSpacial,params)
+function initPartr(r_0::ZeroSpatial,params)
     r = SArray{Tuple{3},Float64,1,3}(0.,0.,0.)
     return r*m
 end
-function initPartr(r_0::InitSpacial,params)
+function initPartr(r_0::InitSpatial,params)
     r = r_0.axis .* r_0.val
 end
-function initPartr(r_0::GaussianLμJSpacial,params)
+function initPartr(r_0::GaussianLμJSpatial,params)
     SD = r_0.Δy_source/(2*sqrt(2*log(2)))
 
     val = 0.0m
