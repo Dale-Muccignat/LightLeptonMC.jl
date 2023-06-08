@@ -178,9 +178,9 @@ end
 
 
 @xport function splatCS(gas,T,energy_scale,cbins)
-    gases, gases_dcss = addSuperElastics(gas,T)
-    #gases = [gas.elastic...,gas.excitation...,gas.ionisation...,gas.attachment...]
-    #gases_dcss = [gas.elastic_DCS...,gas.excitation_DCS...,gas.ionisation_DCS...,gas.attachment_DCS...]
+    #gases, gases_dcss = addSuperElastics(gas,T)
+    gases = [gas.elastic...,gas.excitation...,gas.ionisation...,gas.attachment...]
+    gases_dcss = [gas.elastic_DCS...,gas.excitation_DCS...,gas.ionisation_DCS...,gas.attachment_DCS...]
     en_spacing = cbins[end]-cbins[end-1]
     # ens = LinRange(1e-6,cbins[end]+en_spacing+1.,100)
     ens = cbins[2:end]

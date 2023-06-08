@@ -69,10 +69,12 @@ function mc(gas::Gas;S=0.,E=1.,T=0.,N=1000,t=Inf,meas=[:t],verbose=false)
 end
 
 function findSimTime(gas,S,E,T,meas,verbose)
-    curr_time = 5e-6
+    curr_time = 1e-7
     unconverged = true
     N = 100
+    iterations = 0
     while unconverged
+        iterations += 1
         verbose && @info "Current Time: " curr_time
         model = MCMODEL(meas=meas,type=SWARM(curr_time*s),n=1000,En0=UniformField(E*Td),T=UniformTemp(T*K),ion_type=UniformIonisation(),v_0=InitVelocity(S*eV,[0,0,1]))
         measures, swarm, params = mc(model,initParams(gas,model))
@@ -86,7 +88,7 @@ function findSimTime(gas,S,E,T,meas,verbose)
             @info "Chose: " curr_time
             unconverged = false
         end
-        if curr_time > 1e-4
+        if iterations > 10
             @info "Not Converged"
             throw("Convergence Failed.")
         end
