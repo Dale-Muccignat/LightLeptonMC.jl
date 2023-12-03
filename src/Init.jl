@@ -164,11 +164,25 @@ end
     excitations_super::Vector{Function} = []
     excitations::Vector{Function} = []
 
-    Z_total = Z_T(gas.exlosses,ustrip(T))
+    # Z_total = Z_T(gas.exlosses,ustrip(T))
 
-    for (i,cs) in enumerate(gas.excitation)
-        push!(excitations_super, (ε)->(ε + gas.exlosses[i])*cs(ε+gas.exlosses[i])*Z(gas.exlosses[i],ustrip(T))./(Z_total * ε))
-        push!(excitations, (ε)->cs(ε)./(Z_total))
+    no_gases = maximum(gas.ex_nos)
+    for j in 1:no_gases
+        Z_total = 1.
+        for (i,cs) in enumerate(gas.excitation) if gas.excitation[i].type === :ROTATION && gas.ex_nos[i] == j
+            Z_total += Z(gas.exlosses[i],ustrip(T))
+        end end
+        for (i,cs) in enumerate(gas.excitation) if gas.excitation[i].type === :ROTATION && gas.ex_nos[i] == j
+            push!(excitations_super, (ε)->(ε + gas.exlosses[i])*cs(ε+gas.exlosses[i])*Z(gas.exlosses[i],ustrip(T))./(Z_total * ε))
+            push!(excitations, (ε)->cs(ε)./(Z_total))
+        end end
+
+        for t in (:VIBRATION, :EXCITATION, :DISSOCIATION)
+            for (i,cs) in enumerate(gas.excitation) if gas.excitation[i].type === t && gas.ex_nos[i] == j
+                push!(excitations_super, (ε)->(ε + gas.exlosses[i])*cs(ε+gas.exlosses[i])*Z(gas.exlosses[i],ustrip(T))./((1+Z(gas.exlosses[i],ustrip(T))) * ε))
+                push!(excitations, (ε)->cs(ε)./(1+Z(gas.exlosses[i],ustrip(T))))
+            end end
+        end
     end
 
     gases = [gas.elastic...,excitations...,excitations_super...,gas.ionisation...,gas.attachment...]
@@ -179,9 +193,9 @@ end
 
 
 @xport function splatCS(gas,T,energy_scale,cbins)
-    #gases, gases_dcss = addSuperElastics(gas,T)
-    gases = [gas.elastic...,gas.excitation...,gas.ionisation...,gas.attachment...]
-    gases_dcss = [gas.elastic_DCS...,gas.excitation_DCS...,gas.ionisation_DCS...,gas.attachment_DCS...]
+    gases, gases_dcss = addSuperElastics(gas,T)
+    # gases = [gas.elastic...,gas.excitation...,gas.ionisation...,gas.attachment...]
+    # gases_dcss = [gas.elastic_DCS...,gas.excitation_DCS...,gas.ionisation_DCS...,gas.attachment_DCS...]
     en_spacing = cbins[end]-cbins[end-1]
     # ens = LinRange(1e-6,cbins[end]+en_spacing+1.,100)
     ens = cbins[2:end]
