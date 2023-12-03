@@ -1,5 +1,6 @@
 module MC
 
+using ..Utils
 using ..Structs
 using ..Init
 using AutoParameters, Random, StaticArrays, LinearAlgebra, AndExport, MCSimUnits
@@ -25,9 +26,8 @@ function flight(particle,model,params,verbose)
     meas_inner = initMeas(model,params)
 
     while particle.alive
-        #verbose && @info "Particle before: " particle
-        verbose && @info "Particle energy before: " uconvert(eV,getEnergy(particle.v))#/params.energy_scale
-        verbose && @info "Particle before: " particle.r particle.v
+        #@debug "Particle before: " particle
+        debugParticle("before",particle)
 
         dt = getDt(particle,model,params,verbose)
 
@@ -37,8 +37,7 @@ function flight(particle,model,params,verbose)
 
         event!(dt,particle,model,params,meas_inner,verbose)
 
-        verbose && @info "Particle energy after: " uconvert(eV,getEnergy(particle.v))#/params.energy_scale
-        verbose && @info "Particle after: " particle.r particle.v
+        debugParticle("after",particle)
 
         particle.alive = particle.alive && checkAlive(model.type,particle,model,meas_inner,params,verbose)
         measureEvent!(model.type,dt,particle,model,params,meas_inner,verbose)
@@ -63,11 +62,11 @@ end
 
 function checkAliveModel(type::LμJ,particle,model,meas_inner,params,verbose)
     if getEnergy(particle.v) < type.thresh#*params.energy_scale
-        verbose && @info "Absorbed"
+        @debug "Absorbed"
     end
 
     if particle.rbin == length(params.rbins)
-        verbose && @info "Detected"
+        @debug "Detected"
     end
 
     return particle.rbin != length(params.rbins) && getEnergy(particle.v) > type.thresh #&& sumColl(meas_inner.measg.coll_count) < 2
@@ -77,7 +76,7 @@ function checkAliveModel(type::CELL,particle,model,meas_inner,params,verbose)
     alive = true
 
     if getEnergy(particle.v) < type.thresh#*params.energy_scale
-        verbose && @info "Absorbed"
+        @debug "Absorbed"
     end
 
     if params.zbins != nothing
@@ -138,16 +137,20 @@ function measureDeath!(type::LμJ,particle,model,params,meas_inner,verbose)
         :χ in model.meas ? meas_inner.measLμJ.χ[findMinInd(params.χbins,abs(atan(rad,particle.r[2],particle.r[3])))] += particle.weight : nothing
 
         if :εχ in model.meas
-            verbose && @info "Velocity angle: " abs(atan(°,particle.v[2],particle.v[3]))
-            verbose && @info "Spatial angle: " abs(atan(°,particle.r[2],particle.r[3]))
+            @debug """
+            Velocity angle:  $(abs(atan(°,particle.v[2],particle.v[3])))
+            Spatial angle:  $(abs(atan(°,particle.r[2],particle.r[3])))
+            Velocity angle:  $(atan(°,particle.v[2],particle.v[3]))
+            Spatial angle:  $(atan(°,particle.r[2],particle.r[3]))
+            """
             angle_position = abs(atan(°,particle.r[2],particle.r[3]))
             angle_velocity = abs(atan(°,particle.v[2],particle.v[3]))
             if abs(angle_position - angle_velocity) < type.Δχ_detector #&& sumColl(meas_inner.measg.coll_count) == 1
                 meas_inner.measLμJ.εχ[findMinInd(params.ebins,getEnergy(particle.v)),findMinInd(params.χbins,angle_position)] += particle.weight
-                verbose && @info "accepted"
+                @debug "accepted"
             else
                 meas_inner.measLμJ.εχ_reject[findMinInd(params.ebins,getEnergy(particle.v)),findMinInd(params.χbins,angle_position)] += particle.weight
-                verbose && @info "rejected"
+                @debug "rejected"
             end
         end
 
@@ -178,24 +181,17 @@ function measureCollision!(energy_loss,particle,model,params,meas_inner,verbose)
 end
 
 function event!(dt,particle,model,params,meas_inner,verbose)
-    verbose && @info "==================================="
     if dt.type == :dt_collision
-        verbose && @info "Collision"
         eventCollision!(dt,particle,model,params,meas_inner,verbose)
     elseif dt.type == :dt_energy
-        verbose && @info "Energy"
         eventEnergy!(dt,particle,model,params,meas_inner,verbose)
     elseif dt.type == :dt_tbin
-        verbose && @info "TBin"
         eventTbin!(dt,particle,model,params,meas_inner,verbose)
     elseif dt.type == :dt_rbin
-        verbose && @info "RBin"
         eventRBin!(dt,particle,model,params,meas_inner,verbose)
     elseif dt.type == :dt_zbin
-        verbose && @info "ZBin"
         eventZBin!(dt,particle,model,params,meas_inner,verbose)
     elseif dt.type == :dt_ybin
-        verbose && @info "YBin"
         eventYBin!(dt,particle,model,params,meas_inner,verbose)
     else
     end
@@ -241,12 +237,13 @@ end
 #### * Collisions
 
 function eventCollision!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
-    verbose && @info "Collision: " dt
     cs_ind = getCollType(particle,model,params,verbose)
     energy_loss = 0.
     :SP in model.meas && sumColl(meas_inner.measg.coll_count) == 0 ? energy_loss = getEnergy(particle.v) : nothing
-    verbose && @info "Collision Type: " params.splat_gas.type[cs_ind]
-
+    @debug """
+    Collision: 
+    $(cs_ind == 0 ? "NULL" : params.splat_gas.type[cs_ind]) $(dt.time)
+    """ 
     if cs_ind == 0
     elseif params.splat_gas.type[cs_ind] == :ELASTIC
         elasticColl!(cs_ind,getRelVel(cs_ind,particle,model,params),particle,model,params,meas_inner,verbose)
@@ -411,9 +408,12 @@ function scatteringAngle(cs_no,g,particle,model,params,verbose)
     # coschi = 1-2*rand()
     coschi = params.splat_gas.dcs[cs_no][particle.cbin](rand())::Float64
     #coschi = -1
-    verbose && @info "Scattering angle: " coschi
     sinchi = sqrt(1-coschi^2)
     phi = rand()*2*pi
+    @debug """
+    Scattering angle: 
+    $coschi $sinchi $phi"
+    """
     return coschi, sinchi, phi
 end
 
@@ -460,37 +460,47 @@ function updateCbin!(particle,params)
 end
 
 function eventEnergy!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
-    verbose && @info "Energy Bin Change: " dt
     if dt.direction == :Up
+        @debug "Energy Bin Up: #$(particle.cbin) $(dt.time)" 
         particle.cbin += 1
     elseif dt.direction == :Down
+        @debug "Energy Bin Down: #$(particle.cbin) $(dt.time)" 
         particle.cbin -= 1
     end
 end
 
 function eventRBin!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
-    verbose && @info "RBin Bin Change: " dt
     if dt.direction == :Up
+        @debug "RBin Up: #$(particle.rbin) $(dt.time)" 
+        if particle.r[2]^2+particle.r[3]^2 < params.rbins[particle.rbin+1]
+            # If particle is going up an Rbin, it can't be less than that bin value
+        end
         particle.rbin += 1
     elseif dt.direction == :Down
+        @debug "RBin Down: #$(particle.rbin) $(dt.time)" 
+        if particle.r[2]^2+particle.r[3]^2 > params.rbins[particle.rbin]
+            # If particle is going down an Rbin, it can't be more than the existing bin value
+        end
         particle.rbin -= 1
     end
 end
 
 function eventYBin!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
-    verbose && @info "yBin Bin Change: " dt
     if dt.direction == :Up
+        @debug "YBin Down: #$(particle.ybin) $(dt.time)" 
         particle.ybin += 1
     elseif dt.direction == :Down
+        @debug "YBin Down: #$(particle.ybin) $(dt.time)" 
         particle.ybin -= 1
     end
 end
 
 function eventZBin!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
-    verbose && @info "zBin Bin Change: " dt
     if dt.direction == :Up
+        @debug "ZBin Down: #$(particle.zbin) $(dt.time)" 
         particle.zbin += 1
     elseif dt.direction == :Down
+        @debug "ZBin Down: #$(particle.zbin) $(dt.time)" 
         particle.zbin -= 1
     end
     if :SP_z in model.meas && particle.zbin != 0
@@ -499,10 +509,11 @@ function eventZBin!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
 end
 
 function eventXBin!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
-    verbose && @info "xBin Bin Change: " dt
     if dt.direction == :Up
+        @debug "XBin Down: #$(particle.xbin) $(dt.time)" 
         particle.xbin += 1
     elseif dt.direction == :Down
+        @debug "XBin Down: #$(particle.xbin) $(dt.time)" 
         particle.xbin -= 1
     end
 end
@@ -563,6 +574,13 @@ end
             end
         end
         if particle.rbin == 2
+        @debug """
+        RBin Debug
+        shifted particle: $p
+        velocity: $v
+        rs: $r21 $r22
+        ts: $t1 $t2
+        """
             # undo offset from above if next moving up to detector
             p += model.type.jet_center
         end
@@ -584,6 +602,13 @@ end
             end
             up = min(t1,t2)
         end
+        @debug """
+        RBin Debug
+        shifted particle: $p
+        velocity: $v
+        rs: $r21 $r22
+        ts: $t1 $t2
+        """
     end
     if up == min(up,down)
         return dt_EVENT(up,:dt_rbin,:Up)
@@ -733,8 +758,6 @@ end
 end
 
 @xport function getDt(particle,model,params,verbose)
-    verbose && @info "Current time: " particle.t
-    verbose && @info "Zbin: " particle.zbin
     dt_coll = getCDt(particle,model,params)
     dt_energy = getEnDt(model.En0,model.n0,particle,model,params)
     dt_tbin = getTDt(particle,model,params)
@@ -744,11 +767,20 @@ end
     dt_ybin = getYDt(particle,model,params)
     dt_xbin = getXDt(particle,model,params)
     dts = (dt_coll,dt_energy,dt_tbin,dt_rbin,dt_zbin,dt_ybin,dt_xbin)
-    #verbose && @info dts
+    #@debug dts
     dt_times = (dt_coll.time,dt_energy.time,dt_tbin.time,dt_rbin.time,dt_zbin.time,dt_ybin.time,dt_xbin.time)
-    verbose && @info ("COLL","ENERGY","TBIN","RBIN","ZBIN","YBIN","XBIN")
-    verbose && @info ("COLL",particle.ebin,particle.tbin,particle.rbin,particle.zbin,particle.ybin,particle.xbin)
-    verbose && @info dt_times
+    @debug """
+
+    Curr: $(particle.t)
+    
+    Coll: #$(particle.cbin) $(dt_times[1])
+    Ener: #$(particle.ebin) $(dt_times[2])
+    tbin: #$(particle.tbin) $(dt_times[3])
+    rbin: #$(particle.rbin) $(dt_times[4])
+    zbin: #$(particle.zbin) $(dt_times[5])
+    ybin: #$(particle.ybin) $(dt_times[6])
+    xbin: #$(particle.xbin) $(dt_times[7])
+    """
     return dts[findMinTime(dt_times,verbose=verbose)]
 end
 

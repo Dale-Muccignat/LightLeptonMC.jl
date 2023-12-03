@@ -20,6 +20,9 @@ using FVB
 export mc, MCINIT, MCPARAMS, saveBatch, saveDist
 @reexport using MCSimUnits
 
+include("Utils.jl")
+@reexport using .Utils
+
 include("Structs.jl")
 @reexport using .Structs
 

@@ -1,5 +1,6 @@
 module Init
 
+using ..Utils
 using ..Structs
 using LinearAlgebra, StaticArrays, AndExport, Gases, LXCatParser, AutoParameters, Interpolations, QuadGK, MCSimUnits
 
@@ -309,8 +310,13 @@ end
 function buildXBins(type::CELL,model)
     return LinRange(-type.x,type.x,200)
 end
+
 function buildRBins(type::LμJ,model,n0::LμJDensity)
     return [0. *m^2,(type.jet_width/2)^2,0.02^2 *m^2]
+end
+
+function buildRBins(type::LμJ,model,n0::LμJDensityGradient)
+    return adaptiveMesh(n0.func,0. *m,0.02 *m,n0.δtol).^2
 end
 
 function buildEnBins(type::LμJ,model)
