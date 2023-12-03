@@ -57,6 +57,16 @@ end
 @xport @AutoParm struct UniformDensity <: Density
     val::AUTO = 1e23m^-3
 end
+@xport @AutoParm struct LμJDensityGradient <: Density
+    val::AUTO = 1e28m^-3
+    background::AUTO = 2e18m^-3
+    func::AUTO = (x) -> 0.5*(1e28m^-3+1e23m^-3)-0.5*(1e28m^-3-1e23m^-3)*tanh(2*ustrip(x)/1e-9)
+    δtol::AUTO = 0.1
+end
+@xport function LμJDensityGradient(;val=1e28m^-3,background=2e18m^-3,jet_width=15μm,δphase=1e-9,δtol=0.1)
+    func = (x) -> 0.5*(val+background)-0.5*(val-background)*tanh(2*ustrip(x-jet_width/2)/δphase)
+    return LμJDensityGradient(val,background,func,δtol)
+end
 @xport @AutoParm struct LμJDensity <: Density
     val::AUTO = 1e28m^-3
     background::AUTO = 2e18m^-3
@@ -342,7 +352,7 @@ function MEASLμJ(model::MCMODEL,params::MCPARAMS)
         χ = zeros(length(params.χbins))
     end
 
-    if :εχ ∈ model.meas
+    if :εχ ∈ model.meas || :εχ_ ∈ model.meas
         εχ = zeros(length(params.ebins),length(params.χbins))
         εχ_reject = zeros(length(params.ebins),length(params.χbins))
     end

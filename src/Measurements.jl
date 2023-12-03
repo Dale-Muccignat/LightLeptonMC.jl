@@ -14,6 +14,8 @@ end
     :ε in model.meas ? meas.measLμJ.ε ./= model.n : nothing
     :εχ in model.meas ? meas.measLμJ.εχ ./= model.n : nothing
     :εχ in model.meas ? meas.measLμJ.εχ_reject ./= model.n : nothing
+    :εχ_ybound in model.meas ? meas.measLμJ.εχ ./= model.n : nothing
+    :εχ_ybound in model.meas ? meas.measLμJ.εχ_reject ./= model.n : nothing
     :χ in model.meas ? meas.measLμJ.χ ./= model.n : nothing
     :zyt in model.meas ? meas.measLμJ.zyt ./= model.n : nothing
     meas, SWARMMEAS()

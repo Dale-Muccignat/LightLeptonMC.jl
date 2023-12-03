@@ -133,7 +133,7 @@ function measureDeath!(type::SWARM,particle,model,params,meas_inner,verbose)
 end
 
 function measureDeath!(type::LμJ,particle,model,params,meas_inner,verbose)
-    if particle.rbin == length(params.rbins)
+    if particle.rbin == length(params.rbins) && sumColl(meas_inner.measg.coll_count) != 0
         :χ in model.meas ? meas_inner.measLμJ.χ[findMinInd(params.χbins,abs(atan(rad,particle.r[2],particle.r[3])))] += particle.weight : nothing
 
         if :εχ in model.meas
@@ -152,13 +152,33 @@ function measureDeath!(type::LμJ,particle,model,params,meas_inner,verbose)
                 meas_inner.measLμJ.εχ_reject[findMinInd(params.ebins,getEnergy(particle.v)),findMinInd(params.χbins,angle_position)] += particle.weight
                 @debug "rejected"
             end
-        end
-
-        if :ε in model.meas
+        elseif :ε in model.meas
             angle_position = abs(atan(°,particle.r[2],particle.r[3]))
             angle_velocity = abs(atan(°,particle.v[2],particle.v[3]))
             if abs(angle_position - angle_velocity) < type.Δχ_detector #&& sumColl(meas_inner.measg.coll_count) == 1
                 meas_inner.measLμJ.ε[findMinInd(params.ebins,getEnergy(particle.v))] += particle.weight
+            end
+        elseif :εχ_ in model.meas
+            angle_position = abs(atan(°,particle.r[2],particle.r[3]))
+            angle_velocity = abs(atan(°,particle.v[2],particle.v[3]))
+            height_position = abs(particle.r[1])
+            @debug """
+            Velocity angle:  $(abs(atan(°,particle.v[2],particle.v[3])))
+            Spatial angle:  $(abs(atan(°,particle.r[2],particle.r[3])))
+            Velocity angle:  $(atan(°,particle.v[2],particle.v[3]))
+            Spatial angle:  $(atan(°,particle.r[2],particle.r[3]))
+            height: $(height_position)
+            """
+            if abs(angle_position - angle_velocity) < type.Δχ_detector && height_position < 5mm
+                # if atan(°,particle.v[2],particle.v[3]) > 0°
+                   meas_inner.measLμJ.εχ[findMinInd(params.ebins,getEnergy(particle.v)),findMinInd(params.χbins,angle_position)] += particle.weight
+                # else
+                   # meas_inner.measLμJ.εχ[findMinInd(params.ebins,getEnergy(particle.v)),findMinInd(params.χbins,angle_position)] -= particle.weight
+                # end
+                @debug "accepted"
+            else
+                meas_inner.measLμJ.εχ_reject[findMinInd(params.ebins,getEnergy(particle.v)),findMinInd(params.χbins,angle_position)] += particle.weight
+                @debug "rejected"
             end
         end
 
@@ -447,15 +467,15 @@ function updateCbin!(particle,params)
             particle.cbin+= 1
         end
     end
-    if params.ebins != nothing
+    if params.ebins !== nothing
         while ea < params.ebins[particle.ebin] && particle.ebin != 1
             particle.ebin-= 1
         end
-        if particle.ebin != length(params.ebins)
-            while ea > params.ebins[particle.ebin+1]
+        # if particle.ebin != length(params.ebins)
+            while particle.ebin != length(params.ebins) && ea > params.ebins[particle.ebin+1]
                 particle.ebin+= 1
             end
-        end
+        # end
     end
 end
 
@@ -546,12 +566,18 @@ end
 @fastmath function getRDt(particle,model,type::LμJ,params)
     #NOTE: Only for fields of 0
     up, down = Inf*s, Inf*s
-    if params.rbins != nothing
+    if params.rbins !== nothing
+        # Equation of circle 
+        # r²=x²+y²
+        # Projectile motion
+        # rₓ=rₓ₀+vₓ₀t
+        # rₓ=rₓ₀+vₓ₀t
+        #
         p = particle.r
-        if particle.rbin == 2
+        # if particle.rbin !== 1 
              #if particle is inside detector of jet, the time to bin down should be offset by jet_center
-            p -= model.type.jet_center
-        end
+        p -= model.type.jet_center
+        # end
         v = particle.v
         r21 = params.rbins[particle.rbin]
         r22 = params.rbins[particle.rbin+1]
@@ -559,6 +585,7 @@ end
         b = 2*(p[3]*v[3]+v[2]*p[2])
         c = p[3]^2+p[2]^2-r21+1e-16m^2
         delta = b^2-4*a*c
+        t1, t2 = Inf*s, Inf*s
         if (delta > 0m^4/s^2) #&& (c > 0.)
             t1 = (-b+sqrt(delta))/(2*a)
             t2 = (-b-sqrt(delta))/(2*a)
@@ -573,7 +600,6 @@ end
                 down = Inf*s
             end
         end
-        if particle.rbin == 2
         @debug """
         RBin Debug
         shifted particle: $p
@@ -581,12 +607,13 @@ end
         rs: $r21 $r22
         ts: $t1 $t2
         """
+        # if particle.rbin !== 1
             # undo offset from above if next moving up to detector
-            p += model.type.jet_center
-        end
-        if particle.rbin == 1
+            # p += model.type.jet_center
+        # end
+        if particle.rbin == length(params.rbins)-1
             # offset if moving up to jet edge
-            p -= model.type.jet_center
+            p += model.type.jet_center
         end
         b = 2*(p[3]*v[3]+v[2]*p[2])
         c = p[3]^2+p[2]^2-r22-1e-16m^2
@@ -671,7 +698,7 @@ function getZDt(particle,model,params)
     if params.zbins != nothing
         if model.optimise_spatial == true
             if (particle.v[3] < 0m) && (particle.zbin != 0)
-                return dt_EVENT((params.zbins[1]-1e-12m-particle.r[3])/particle.v[3], :dt_zbin,:Down)
+                return dt_EVENT((params.zbins[1]-particle.r[3])/particle.v[3], :dt_zbin,:Down)
             elseif (particle.zbin < length(params.zbins)) && (particle.v[3] > 0m/s)
                 return dt_EVENT((params.zbins[end]+1e-12m-particle.r[3])/particle.v[3], :dt_zbin, :Up)
             end
@@ -692,7 +719,7 @@ function getYDt(particle,model,params)
     if params.ybins != nothing
         if model.optimise_spatial == true
             if (particle.v[2] < 0m/s) && (particle.ybin != 0)
-                return dt_EVENT((params.ybins[1]-1e-12m-particle.r[2])/particle.v[2], :dt_ybin,:Down)
+                return dt_EVENT((params.ybins[1]-particle.r[2])/particle.v[2], :dt_ybin,:Down)
             elseif (particle.ybin < length(params.ybins)) && (particle.v[2] > 0m/s)
                 return dt_EVENT((params.ybins[end]+1e-12m-particle.r[2])/particle.v[2], :dt_ybin, :Up)
             end
@@ -713,14 +740,14 @@ function getXDt(particle,model,params)
     if params.xbins != nothing
         if model.optimise_spatial == true
             if (particle.v[1] < 0m/s) && (particle.xbin != 0)
-                return dt_EVENT((params.xbins[1]-1e-12m-particle.r[1])/particle.v[1], :dt_xbin,:Down)
+                return dt_EVENT((params.xbins[1]-particle.r[1])/particle.v[1], :dt_xbin,:Down)
             elseif (particle.xbin < length(params.xbins)) && (particle.v[1] > 0.)
                 return dt_EVENT((params.xbins[end]+1e-12m-particle.r[1])/particle.v[1], :dt_xbin, :Up)
             end
         else
             if params.xbins != nothing
                 if (particle.v[1] < 0m/s) && (particle.xbin != 0)
-                    return dt_EVENT((params.xbins[particle.xbin]-1e-12m-particle.r[1])/particle.v[1], :dt_xbin,:Down)
+                    return dt_EVENT((params.xbins[particle.xbin]m-particle.r[1])/particle.v[1], :dt_xbin,:Down)
                 elseif (particle.xbin < length(params.xbins)) && (particle.v[1] > 0.)
                     return dt_EVENT((params.xbins[particle.xbin+1]+1e-12m-particle.r[1])/particle.v[1], :dt_xbin, :Up)
                 end
@@ -751,6 +778,9 @@ end
     params.n0
 end
 @xport function getDensity(particle,n0::LμJDensity,params)
+    params.n0[particle.rbin]
+end
+@xport function getDensity(particle,n0::LμJDensityGradient,params)
     params.n0[particle.rbin]
 end
 @xport function getDensity(particle,n0::CellDensity,params)

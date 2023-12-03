@@ -349,6 +349,10 @@ function buildDensity(n0::UniformDensity,rbins,zbins)
     n0.val
 end
 
+function buildDensity(n0::LμJDensityGradient,rbins,zbins)
+    n0.func.(sqrt.(rbins))
+end
+
 function buildDensity(n0::LμJDensity,rbins,zbins)
     [n0.val,n0.background,0. *m^-3]
 end
@@ -356,6 +360,7 @@ end
 function buildDensity(n0::CellDensity,rbins,zbins)
     n0.val .* ones(length(zbins))
 end
+
 #### Electric Field ####
 
 function buildField(En0::UniformField)
@@ -401,13 +406,6 @@ function Structs.PART(model,params)
 
 end
 
-function getEnergy(v)
-    0.5*me*dot(v,v)
-end
-
-function getVelocity(ε)
-    sqrt(ε*2/me)
-end
 
 
 function initPartr(r_0::ZeroSpatial,params)
@@ -461,7 +459,7 @@ function initPartv(v_0::GaussianEnergyVelocity,params)
     end
     new_ea=ea+SD*R
 
-    sqrt.(new_ea*v_0.axis/electron_v2eV)
+    sqrt.(new_ea/electron_v2eV)*v_0.axis
 end
 
 
