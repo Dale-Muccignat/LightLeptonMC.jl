@@ -433,12 +433,12 @@ function initPartr(r_0::GaussianLμJSpatial,params)
     SD = r_0.Δy_source/(2*sqrt(2*log(2)))
 
     val = Inf*m .* r_0.gaussian_axis .+ r_0.val .* r_0.axis
-    while -7.5μm < val[2] < -7.5μm 
+    while -7.5μm > val[2] || val[2] > 7.5μm 
         R=randn()
         # while val < -SD*R
             # R=randn()
         # end
-        val .+ SD*R .* r_0.gaussian_axis .+ r_0.val .* r_0.axis
+        val= SD*R .* r_0.gaussian_axis .+ r_0.val .* r_0.axis
     end
     val
 end
