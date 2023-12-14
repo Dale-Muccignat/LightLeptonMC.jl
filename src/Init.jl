@@ -432,13 +432,15 @@ end
 function initPartr(r_0::GaussianLμJSpatial,params)
     SD = r_0.Δy_source/(2*sqrt(2*log(2)))
 
-    val = 0.0m
-
-    R=randn()
-    # while val < -SD*R
-        # R=randn()
-    # end
-    val .+ SD*R .* r_0.gaussian_axis .+ r_0.val .* r_0.axis
+    val = Inf*m .* r_0.gaussian_axis .+ r_0.val .* r_0.axis
+    while -7.5μm < val[2] < -7.5μm 
+        R=randn()
+        # while val < -SD*R
+            # R=randn()
+        # end
+        val .+ SD*R .* r_0.gaussian_axis .+ r_0.val .* r_0.axis
+    end
+    val
 end
 function initPartv(v_0::ZeroVelocity,params)
     r = SArray{Tuple{3},Float64,1,3}(0.,0.,0.)
