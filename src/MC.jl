@@ -874,7 +874,8 @@ end
             break
         end
     end
-    return g#*params.length_scale/params.time_scale
+    @debug "Neutral velocity: x = $(g[1]), y = $(g[2]), z = $(g[3])"
+    return g-+SArray{Tuple{3},Float64,1,3}(1e2,0,0)m/s#*params.length_scale/params.time_scale
 end
 
 end
