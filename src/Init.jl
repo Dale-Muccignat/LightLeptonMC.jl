@@ -308,7 +308,6 @@ end
 function buildTBins(type::CELL,model)
     return LinRange(0s,type.t_f,1000)
 end
-
 function buildχBins(type::CELL,model)
     return LinRange(0,π,100) .*u"rad"
 end
@@ -334,7 +333,7 @@ function buildRBins(type::LμJ,model,n0::LμJDensityGradient)
 end
 
 function buildEnBins(type::LμJ,model)
-    return collect(model.type.thresh:model.type.Δε_detector:(model.v_0.ε+2*model.v_0.Δε_source))
+    return collect(model.type.thresh:0.3eV:(model.v_0.ε+4*model.v_0.Δε_source))
 end
 
 function buildTBins(type::LμJ,model)
