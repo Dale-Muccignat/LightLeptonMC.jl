@@ -329,7 +329,7 @@ function buildRBins(type::LμJ,model,n0::LμJDensity)
 end
 
 function buildRBins(type::LμJ,model,n0::LμJDensityGradient)
-    return adaptiveMesh(n0.func,0. *m,0.02 *m,n0.δtol).^2
+    return adaptiveMeshlog(n0.func,0. *m,0.02 *m,n0.δtol).^2
 end
 
 function buildEnBins(type::LμJ,model)

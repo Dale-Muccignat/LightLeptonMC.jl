@@ -62,10 +62,11 @@ end
     background::AUTO = 2e18m^-3
     func::AUTO = (x) -> 0.5*(1e28m^-3+1e23m^-3)-0.5*(1e28m^-3-1e23m^-3)*tanh(2*ustrip(x)/1e-9)
     δtol::AUTO = 0.1
+    δphase::AUTO = 1nm
 end
-@xport function LμJDensityGradient(;val=1e28m^-3,background=2e18m^-3,jet_width=15μm,δphase=1e-9,δtol=0.1)
-    func = (x) -> 0.5*(val+background)-0.5*(val-background)*tanh(2*ustrip(x-jet_width/2)/δphase)
-    return LμJDensityGradient(val,background,func,δtol)
+@xport function LμJDensityGradient(;val=1e28m^-3,background=2e18m^-3,jet_width=15μm,δphase=2nm,δtol=0.01)
+    func = (x) -> 0.5*(val+background)-0.5*(val-background)*tanh(2*(x-jet_width)/2/δphase)
+    return LμJDensityGradient(val,background,func,δtol,δphase)
 end
 @xport @AutoParm struct LμJDensity <: Density
     val::AUTO = 1e28m^-3

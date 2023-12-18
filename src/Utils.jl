@@ -1,7 +1,7 @@
 module Utils
 
 using MCSimUnits, LinearAlgebra, Roots
-export debugParticle, getEnergy, getVelocity, structprint, adaptiveMesh
+export debugParticle, getEnergy, getVelocity, structprint, adaptiveMesh, adaptiveMeshlog
 
 function debugParticle(header,particle)
     @debug """
@@ -19,6 +19,55 @@ end
 
 function getVelocity(ε)
     sqrt(ε*2/me)
+end
+
+
+function adaptiveMeshlog(func,lower,upper,δ)
+    # Create an adaptive mesh that has a data point for each "δ" change
+    # Start with the lower value
+    # Find the func of that value
+    # Find the value that has a func value δ different to that of the previous step, this value
+    # should be larger
+    # stored_xunit = unit(lower)*0+(1*unit(lower))
+    stored_yunit = unit(func(lower))*0+(1*unit(func(lower)))
+    @debug """
+    $(stored_yunit)
+    """
+    xs = [lower]
+    y = log10(ustrip(func(xs[end])))
+    n = 0
+    @debug """
+    $(xs)
+    $y
+    """
+    while xs[end] < upper
+        n += 1
+        n > 100 && break
+        sol = find_zeros((z) -> func(z)-10^(y*(1+δ))*stored_yunit,xs[end],upper)
+        if isempty(sol)
+            sol = find_zeros((z) -> func(z)-10^(y*(1-δ))*stored_yunit,xs[end],upper)
+            @debug """
+            Adaptive Mesh Down
+            $(xs[end])
+            $(y)
+            $(sol)
+            """
+            y *= 1-δ
+        else
+            @debug """
+            Adaptive Mesh Up
+            $(xs[end])
+            $(y)
+            $(sol)
+            """
+            y *= 1+δ
+        end
+        isempty(sol) && break
+        push!(xs,minimum(sol))
+    end
+    push!(xs,upper)
+     
+    return xs
 end
 
 function adaptiveMesh(func,lower,upper,δ)
