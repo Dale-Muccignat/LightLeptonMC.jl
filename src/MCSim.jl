@@ -144,17 +144,17 @@ Swarm models
 
 """
 function mc(model::MCMODEL,params::MCPARAMS;verbose=false)
-    if verbose
-        model.n=1
-    end
+    @debug model.n=1
 
     #scale!(model,model.type,params)
     meas = initMeas(model,params)
+    @debug "Measurements initialised."
     #scale!(params)
 
     # @show params.rbins
     # meas = @distributed (+) for n in 1:model.n
     meas = @distributed (+) for n in 1:model.n
+        @debug "Distributing..."
 
         if n%(model.n*0.1) == 0.
             @info "Progress: "*string(100*n/model.n)*"%"
@@ -163,6 +163,7 @@ function mc(model::MCMODEL,params::MCPARAMS;verbose=false)
         meas_inner = flight(PART(model,params),model,params,verbose)
         [meas_inner]
     end
+    @debug "Finished Sim"
     # @show params.rbins
     #unscale!(params)
     #unscale!(model.type,model,params,meas[1])

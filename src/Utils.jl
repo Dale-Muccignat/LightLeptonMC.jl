@@ -30,36 +30,36 @@ function adaptiveMeshlog(func,lower,upper,δ)
     # should be larger
     # stored_xunit = unit(lower)*0+(1*unit(lower))
     stored_yunit = unit(func(lower))*0+(1*unit(func(lower)))
-    @debug """
-    $(stored_yunit)
-    """
+    # @debug """
+    # $(stored_yunit)
+    # """
     xs = [lower]
     y = log10(ustrip(func(xs[end])))
     n = 0
-    @debug """
-    $(xs)
-    $y
-    """
+    # @debug """
+    # $(xs)
+    # $y
+    # """
     while xs[end] < upper
         n += 1
         n > 100 && break
         sol = find_zeros((z) -> func(z)-10^(y*(1+δ))*stored_yunit,xs[end],upper)
         if isempty(sol)
             sol = find_zeros((z) -> func(z)-10^(y*(1-δ))*stored_yunit,xs[end],upper)
-            @debug """
-            Adaptive Mesh Down
-            $(xs[end])
-            $(y)
-            $(sol)
-            """
+            # @debug """
+            # Adaptive Mesh Down
+            # $(xs[end])
+            # $(y)
+            # $(sol)
+            # """
             y *= 1-δ
         else
-            @debug """
-            Adaptive Mesh Up
-            $(xs[end])
-            $(y)
-            $(sol)
-            """
+            # @debug """
+            # Adaptive Mesh Up
+            # $(xs[end])
+            # $(y)
+            # $(sol)
+            # """
             y *= 1+δ
         end
         isempty(sol) && break

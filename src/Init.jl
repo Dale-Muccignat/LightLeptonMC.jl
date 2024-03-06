@@ -167,33 +167,44 @@ end
     # Z_total = Z_T(gas.exlosses,ustrip(T))
 
     no_gases = maximum(gas.ex_nos)
+    inds = []
     for j in 1:no_gases
         Z_total = 1.
         for (i,cs) in enumerate(gas.excitation) if gas.excitation[i].type === :ROTATION && gas.ex_nos[i] == j
             Z_total += Z(gas.exlosses[i],ustrip(T))
         end end
         for (i,cs) in enumerate(gas.excitation) if gas.excitation[i].type === :ROTATION && gas.ex_nos[i] == j
+            @debug cs.type cs.energy_loss Z(gas.exlosses[i],ustrip(T))./(Z_total)
             push!(excitations_super, (ε)->(ε + gas.exlosses[i])*cs(ε+gas.exlosses[i])*Z(gas.exlosses[i],ustrip(T))./(Z_total * ε))
             push!(excitations, (ε)->cs(ε)./(Z_total))
+            push!(inds,i)
         end end
 
         for t in (:VIBRATION, :EXCITATION, :DISSOCIATION)
             for (i,cs) in enumerate(gas.excitation) if gas.excitation[i].type === t && gas.ex_nos[i] == j
+                @debug cs.type cs.energy_loss Z(gas.exlosses[i],ustrip(T))./((1+Z(gas.exlosses[i],ustrip(T))))
                 push!(excitations_super, (ε)->(ε + gas.exlosses[i])*cs(ε+gas.exlosses[i])*Z(gas.exlosses[i],ustrip(T))./((1+Z(gas.exlosses[i],ustrip(T))) * ε))
                 push!(excitations, (ε)->cs(ε)./(1+Z(gas.exlosses[i],ustrip(T))))
+                push!(inds,i)
             end end
         end
     end
 
+    threshes = [[0. for thresh in gas.elastic]...,[thresh for thresh in gas.exlosses[inds]]...,[-thresh for thresh in gas.exlosses[inds]]...,[thresh for thresh in gas.iolosses]...,[0. for thresh in gas.attachment]...].*eV
+
+    masses = [[m for m in gas.Mₑₗ]...,[m for m in gas.Mₑₓ[inds]]...,[m for m in gas.Mₑₓ[inds]]...,[m for m in gas.Mₐₜ]...,[m for m in gas.Mᵢₒ]...] .* amu
+
+    ws = [[w for w in gas.wₑₗ]...,[w for w in gas.wₑₓ[inds]]...,[w for w in gas.wₑₓ[inds]]...,[w for w in gas.wₐₜ]...,[w for w in gas.wᵢₒ]...]
+
     gases = [gas.elastic...,excitations...,excitations_super...,gas.ionisation...,gas.attachment...]
 
-    gases_dcss = [gas.elastic_DCS...,gas.excitation_DCS...,gas.excitation_DCS...,gas.ionisation_DCS...,gas.attachment_DCS...]
-    return gases, gases_dcss
+    gases_dcss = [gas.elastic_DCS...,gas.excitation_DCS[inds]...,gas.excitation_DCS[inds]...,gas.ionisation_DCS...,gas.attachment_DCS...]
+    return gases, gases_dcss, threshes, masses, ws
 end
 
 
 @xport function splatCS(gas,T,energy_scale,cbins)
-    gases, gases_dcss = addSuperElastics(gas,T)
+    gases, gases_dcss, threshes, masses, ws = addSuperElastics(gas,T)
     # gases = [gas.elastic...,gas.excitation...,gas.ionisation...,gas.attachment...]
     # gases_dcss = [gas.elastic_DCS...,gas.excitation_DCS...,gas.ionisation_DCS...,gas.attachment_DCS...]
     en_spacing = cbins[end]-cbins[end-1]
@@ -235,11 +246,11 @@ end
 
     types = [[:ELASTIC for i in 1:length(gas.elastic)]...,[:EXCITATION for i in 1:length(gas.excitation)]...,[:EXCITATION for i in 1:length(gas.excitation)]...,[:IONIZATION for i in 1:length(gas.ionisation)]...,[:ATTACHMENT for i in 1:length(gas.attachment)]...]
 
-    threshes = [[0. for thresh in gas.elastic]...,[thresh for thresh in gas.exlosses]...,[-thresh for thresh in gas.exlosses]...,[thresh for thresh in gas.iolosses]...,[0. for thresh in gas.attachment]...].*eV
+    # threshes = [[0. for thresh in gas.elastic]...,[thresh for thresh in gas.exlosses]...,[-thresh for thresh in gas.exlosses]...,[thresh for thresh in gas.iolosses]...,[0. for thresh in gas.attachment]...].*eV
 
-    masses = [[m for m in gas.Mₑₗ]...,[m for m in gas.Mₑₓ]...,[m for m in gas.Mₑₓ]...,[m for m in gas.Mₐₜ]...,[m for m in gas.Mᵢₒ]...] .* amu
+    # masses = [[m for m in gas.Mₑₗ]...,[m for m in gas.Mₑₓ]...,[m for m in gas.Mₑₓ]...,[m for m in gas.Mₐₜ]...,[m for m in gas.Mᵢₒ]...] .* amu
 
-    ws = [[w for w in gas.wₑₗ]...,[w for w in gas.wₑₓ]...,[w for w in gas.wₑₓ]...,[w for w in gas.wₐₜ]...,[w for w in gas.wᵢₒ]...]
+    # ws = [[w for w in gas.wₑₗ]...,[w for w in gas.wₑₓ]...,[w for w in gas.wₑₓ]...,[w for w in gas.wₐₜ]...,[w for w in gas.wᵢₒ]...]
 
 
     MCGAS(gases_itp,dcss,types,threshes,masses,ws)

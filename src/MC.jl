@@ -23,6 +23,7 @@ end
 
 
 function flight(particle,model,params,verbose)
+    @debug "Conductoin flight..."
     meas_inner = initMeas(model,params)
 
     while particle.alive
@@ -169,14 +170,16 @@ function measureDeath!(type::LμJ,particle,model,params,meas_inner,verbose)
             Spatial angle:  $(atan(°,particle.r[2],particle.r[3]))
             height: $(height_position)
             """
-            if abs(angle_position - angle_velocity) < type.Δχ_detector && height_position < 5mm
+            if abs(angle_position - angle_velocity) < type.Δχ_detector #&& height_position < 5mm
                 # TODO: Add detection at +- 1eV
                 inds = findMinInd(params.ebins,getEnergy(particle.v)-type.Δε_detector):findMinInd(params.ebins,getEnergy(particle.v)+type.Δε_detector)
-                meas_inner.measLμJ.εχ[inds,findMinInd(params.χbins,angle_position)] .+= particle.weight
-                @debug "accepted"
+                inds_angle = findMinInd(params.χbins,angle_position-type.Δχ_detector/2):findMinInd(params.χbins,angle_position+type.Δχ_detector/2)
+                meas_inner.measLμJ.εχ[inds,inds_angle] .+= particle.weight
+                @debug "accepted - $(inds) $(inds_angle)"
             else
-                inds = findMinInd(params.ebins,getEnergy(particle.v)-type.Δε_detector):findMinInd(params.ebins,getEnergy(particle.v)+type.Δε_detector)
-                meas_inner.measLμJ.εχ[inds,findMinInd(params.χbins,angle_position)] .+= particle.weight
+                inds = findMinInd(params.ebins,getEnergy(particle.v)-type.Δε_detector/2):findMinInd(params.ebins,getEnergy(particle.v)+type.Δε_detector/2)
+                inds_angle = findMinInd(params.χbins,angle_position-type.Δχ_detector/2):findMinInd(params.χbins,angle_position+type.Δχ_detector/2)
+                meas_inner.measLμJ.εχ[inds,inds_angle] .+= particle.weight
                 @debug "rejected"
             end
         end
