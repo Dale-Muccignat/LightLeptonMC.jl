@@ -404,9 +404,13 @@ function Structs.PART(model,params)
     particle.type = model.particle_type
     particle.r = initPartr(model.r_0,params)#.*params.length_scale
     particle.v = initPartv(model.v_0,params)#.*params.length_scale ./params.time_scale
+    particle.t = initPartt(model.t_0,params)
     particle.cbin = findMinInd(params.cbins,getEnergy(particle.v))
     if params.ebins != nothing
         particle.ebin = findMinInd(params.ebins,getEnergy(particle.v))
+    end
+    if params.tbins != nothing
+        particle.tbin = findMinInd(params.tbins,particle.t)
     end
 
     if params.rbins != nothing
@@ -452,6 +456,20 @@ function initPartr(r_0::GaussianLμJSpatial,params)
     end
     val
 end
+
+function initPartt(t_0::InitTemporal,params)
+    t_0.val
+end
+
+function initPartt(t_0::GaussianTemporal,params)
+    # electron_v2eV = 0.5 * me
+    # coschi = 1-2*rand()
+    # sinchi = sqrt(1-coschi^2)
+    # phi = rand()*2*pi
+    #
+    return t_0.Δt_source/(2*sqrt(2*log(2)))*randn() .+ t_0.val 
+end
+
 function initPartv(v_0::ZeroVelocity,params)
     r = SArray{Tuple{3},Float64,1,3}(0.,0.,0.)
     return r*m/s

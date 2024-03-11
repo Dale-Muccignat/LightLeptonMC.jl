@@ -30,6 +30,7 @@ Parent type for each option for spatial config. See subtypes for a list of optio
 
 """
 @xport abstract type Spatial end 
+@xport abstract type Temporal end 
 @xport abstract type Density end
 @xport abstract type Field end
 @xport abstract type Temp end
@@ -40,6 +41,15 @@ Parent type for each option for spatial config. See subtypes for a list of optio
     val::AUTO
     axis::AUTO
 end
+@xport @AutoParm struct InitTemporal <: Temporal
+    val::AUTO = 0. *s
+end
+
+@xport @AutoParm struct GaussianTemporal <: Spatial
+    val::AUTO = 20. *ns
+    Δt_source::AUTO = 10. *ns
+end
+
 @xport @AutoParm struct GaussianLμJSpatial <: Spatial
     val::AUTO = -7.6e-6m
     Δy_source::AUTO = 7.5e-6m
@@ -175,6 +185,7 @@ MCMODEL is the main constructor for MCSim.
     n::Int64 = 100
     v_0::AUTO = ZeroVelocity()
     r_0::AUTO = ZeroSpatial()
+    t_0::AUTO = InitTemporal()
     n0::AUTO = UniformDensity()
     En0::AUTO = UniformField()
     T::AUTO = UniformTemp()
@@ -236,14 +247,15 @@ Defines the parameters for a cell (rectangular prism) style experiment
     y::AUTO = 15e-6m
     bin_no::AUTO = 100
     r::AUTO = 1e-6m
+    t_f::AUTO = 2e-5s
 end
 
 @xport function LμJ(;jet_center=[0.,0.,0.].*m,Δε_detector=0.9eV,Δχ_detector=2°,thresh=1. *eV,jet_width=15μm)
     LμJ(Δε_detector,Δχ_detector,thresh,jet_width,jet_center)
 end
 
-@xport function CELL(;Δε_detector=0.9eV,thresh=1. *eV,z=15μm,z_n=100,x=15μm,y=15μm,bin_no=100,r=1μm)
-    CELL(Δε_detector,thresh,z,z_n,x,y,bin_no,r)
+@xport function CELL(;Δε_detector=0.9eV,thresh=1. *eV,z=15μm,z_n=100,x=15μm,y=15μm,bin_no=100,r=1μm,t_f=2e-5s)
+    CELL(Δε_detector,thresh,z,z_n,x,y,bin_no,r,t_f)
 end
 
 @AutoParm mutable struct MCPARAMS
@@ -485,6 +497,7 @@ end
 @fastmath function findMinInd(x::AbstractArray,y)::Int64
     left::Int64 = 1
     right::Int64 = length(x)
+    x = collect(x)
     d= Inf*x[1]
     dlast= -Inf*x[1]
 	c::Int64 = 0
