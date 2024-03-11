@@ -144,7 +144,7 @@ Swarm models
 
 """
 function mc(model::MCMODEL,params::MCPARAMS;verbose=false)
-    @debug model.n=1
+    # @debug model.n=1
 
     #scale!(model,model.type,params)
     meas = initMeas(model,params)

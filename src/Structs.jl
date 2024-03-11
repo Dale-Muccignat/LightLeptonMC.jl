@@ -382,10 +382,11 @@ end
     z::AUTO = nothing
     xy::AUTO = nothing
     xybins::AUTO = nothing
+    tz::AUTO = nothing
 end
 
 function MEASCELL(model::MCMODEL,params::MCPARAMS)
-    ε, εz, x, y, z, xy, xybins = nothing, nothing, nothing, nothing, nothing, nothing, nothing
+    ε, εz, x, y, z, xy, xybins, tz = nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing
     if :ε ∈ model.meas
         ε = zeros(length(params.ebins))
     end
@@ -405,7 +406,10 @@ function MEASCELL(model::MCMODEL,params::MCPARAMS)
         xy = zeros(model.type.bin_no)
         xybins = convert(Vector{Float64},LinRange(0,model.type.r,model.type.bin_no))
     end
-    return MEASCELL(ε,εz,x,y,z,xy,xybins)
+    if :tz ∈ model.meas
+        tz = zeros(length(params.tbins),length(params.zbins))
+    end
+    return MEASCELL(ε,εz,x,y,z,xy,xybins,tz)
 end
 
 @AutoParm mutable struct MEASG

@@ -26,6 +26,7 @@ end
     :x in model.meas ? meas.measCell.x ./= model.n : nothing
     :y in model.meas ? meas.measCell.y ./= model.n : nothing
     :z in model.meas ? meas.measCell.z ./= model.n : nothing
+    :tz in model.meas ? meas.measCell.tz ./= model.n : nothing
     :xy in model.meas ? meas.measCell.xy ./= model.n : nothing
     :xy in model.meas ? meas.measCell.xybins ./= model.n : nothing
     :SP in model.meas ? meas.measg.SP_ε /= model.n : nothing

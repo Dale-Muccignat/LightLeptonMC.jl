@@ -189,8 +189,8 @@ function measureDeath!(type::LμJ,particle,model,params,meas_inner,verbose)
 end
 
 function measureDeath!(type::CELL,particle,model,params,meas_inner,verbose)
-    if particle.zbin == length(params.zbins)
-        :xy in model.meas ? meas_inner.measCell.xy[findMinInd(meas_inner.measCell.xybins,sqrt(particle.r[1]^2+particle.r[2]^2)/params.length_scale)] += particle.weight : nothing
+    if :z in model.meas && particle.zbin == length(params.zbins)
+        :xy in model.meas ? meas_inner.measCell.xy[findMinInd(meas_inner.measCell.xybins,sqrt(particle.r[1]^2+particle.r[2]^2))] += particle.weight : nothing
         :ε in model.meas ? meas_inner.measCell.ε[findMinInd(params.ebins,getEnergy(particle.v))] += particle.weight : nothing
     end
 end
@@ -242,6 +242,8 @@ function eventTbin!(dt,particle,model,params,meas_inner,verbose)
     end
 
     :zyt ∈ model.meas ? meas_inner.measLμJ.zyt[particle.zbin,particle.ybin,particle.tbin] += particle.weight : nothing
+
+    :tz ∈ model.meas ? meas_inner.measCell.tz[particle.tbin,particle.zbin] += particle.weight : nothing
 
     if :f ∈ model.meas
         # TODO: Units are weird here.
@@ -519,7 +521,7 @@ end
 
 function eventZBin!(dt::dt_EVENT,particle,model,params,meas_inner,verbose)
     if dt.direction == :Up
-        @debug "ZBin Down: #$(particle.zbin) $(dt.time)" 
+        @debug "ZBin Up: #$(particle.zbin) $(dt.time)" 
         particle.zbin += 1
     elseif dt.direction == :Down
         @debug "ZBin Down: #$(particle.zbin) $(dt.time)" 
@@ -696,7 +698,7 @@ function getCDt(particle,model,params)
     dt_coll = dt_EVENT(randexp()/(getTotalFreq(particle,model,params)*getDensity(particle,model.n0,params)),:dt_collision,:Up)
 end
 
-function getZDt(particle,model,params)
+function getZDt(field::ZeroField,particle,model,params)
     if params.zbins != nothing
         if model.optimise_spatial == true
             if (particle.v[3] < 0m) && (particle.zbin != 0)
@@ -705,13 +707,23 @@ function getZDt(particle,model,params)
                 return dt_EVENT((params.zbins[end]+1e-12m-particle.r[3])/particle.v[3], :dt_zbin, :Up)
             end
         else
-            if params.zbins != nothing
-                if (particle.v[3] < 0m/s) && (particle.zbin != 0)
-                    return dt_EVENT((params.zbins[particle.zbin]-1e-12m-particle.r[3])/particle.v[3], :dt_zbin,:Down)
-                elseif (particle.zbin < length(params.zbins)) && (particle.v[3] > 0.)
-                    return dt_EVENT((params.zbins[particle.zbin+1]+1e-12m-particle.r[3])/particle.v[3], :dt_zbin, :Up)
-                end
+            if (particle.v[3] < 0m/s) && (particle.zbin != 0)
+                return dt_EVENT((params.zbins[particle.zbin]-1e-12m-particle.r[3])/particle.v[3], :dt_zbin,:Down)
+            elseif (particle.zbin < length(params.zbins)) && (particle.v[3] > 0m/s)
+                return dt_EVENT((params.zbins[particle.zbin+1]+1e-12m-particle.r[3])/particle.v[3], :dt_zbin, :Up)
             end
+        end
+    end
+    return dt_EVENT(Inf*s,:dt_zbin,:Up)
+end
+
+function getZDt(field::UniformField,particle,model,params)
+    if params.zbins != nothing
+        if (particle.v[3] < 0m/s) && (( (particle.v[3]^2)/(params.a[3]*params.n0) + 2*params.zbins[particle.zbin]-1e-12m ) > 2*particle.r[3]) && (particle.zbin != 0)
+            return dt_EVENT((- particle.v[3] - sqrt( (particle.v[3])^2 - 2*(params.a[3]*params.n0)*(particle.r[3]-params.zbins[particle.zbin]+1e-12m) ))/(params.a[3]*params.n0), :dt_zbin,:Down)
+        elseif (particle.zbin < length(params.zbins)) 
+            @debug particle.r[3] particle.v[3] params.zbins[particle.zbin:(particle.zbin+1)]
+            return dt_EVENT((- particle.v[3] + sqrt( particle.v[3]^2 - 2*(params.a[3]*params.n0)*(particle.r[3]-params.zbins[particle.zbin+1]-1e-12m) ))/(params.a[3]*params.n0), :dt_zbin, :Up)
         end
     end
     return dt_EVENT(Inf*s,:dt_zbin,:Up)
@@ -762,7 +774,7 @@ end
 function getTDt(particle,model,params)
     if params.tbins != nothing
         if particle.tbin < length(params.tbins) && particle.t > params.tbins[1]
-            return dt_tbin = dt_EVENT(params.tbins[particle.tbin+1] - particle.t, :dt_tbin,:Up)
+            return dt_EVENT(params.tbins[particle.tbin+1] - particle.t, :dt_tbin,:Up)
         end
     end
 
@@ -795,7 +807,7 @@ end
     dt_tbin = getTDt(particle,model,params)
     #TODO: Restrict the following to 0 field
     dt_rbin = getRDt(particle,model,model.type,params)
-    dt_zbin = getZDt(particle,model,params)
+    dt_zbin = getZDt(model.En0,particle,model,params)
     dt_ybin = getYDt(particle,model,params)
     dt_xbin = getXDt(particle,model,params)
     dts = (dt_coll,dt_energy,dt_tbin,dt_rbin,dt_zbin,dt_ybin,dt_xbin)

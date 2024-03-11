@@ -7,6 +7,7 @@ function debugParticle(header,particle)
     @debug """
     Particle $header: 
       ε: $(uconvert(eV,getEnergy(particle.v)))
+      t: $(particle.t)
     pos: x=$(particle.r[1]) y=$(particle.r[2]) z=$(particle.r[3]) 
     vel: x=$(particle.v[1]) y=$(particle.v[2]) z=$(particle.v[3]) 
     rad: $(sqrt(particle.r[2]^2+particle.r[3]^2))
