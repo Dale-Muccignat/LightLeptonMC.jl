@@ -4,7 +4,7 @@ using MCSimUnits, LinearAlgebra, Roots
 export debugParticle, getEnergy, getVelocity, structprint, adaptiveMesh, adaptiveMeshlog
 
 function debugParticle(header,particle)
-    @debug """
+    """
     Particle $header: 
       ε: $(uconvert(eV,getEnergy(particle.v)))
       t: $(particle.t)

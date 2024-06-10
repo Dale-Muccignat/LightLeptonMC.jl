@@ -14,11 +14,12 @@ module MCSim
 #TODO: Add Potential
 #TODO: Add Density Gradient (this is probably best solved through Danny's code though)
 
-using Reexport, Distributed, JLD2, Dates, AndExport, Statistics
+using Reexport, Distributed, JLD2, Dates, AndExport, Statistics, Unitful
 using Gases
 using FVB
 export mc, MCINIT, MCPARAMS, saveBatch, saveDist
 @reexport using MCSimUnits
+
 
 include("Utils.jl")
 @reexport using .Utils
@@ -62,12 +63,12 @@ end
 
 
 
-function mc(gas::Gas;S=0.,E=1.,T=0.,N=1000,t=Inf,meas=[:t],verbose=false)
+function mc(gas::Gas;S=1e-5,E=1.,T=0.,N=1000,t=Inf,meas=[:t],ion_type=RatioIonisation(),verbose=false)
     if t == Inf
         t = findSimTime(gas,S,E,T,meas,verbose)
     end
 
-    model = MCMODEL(meas=meas,type=SWARM(t*s),n=N,En0=UniformField(E*Td),T=UniformTemp(T*K),ion_type=RatioIonisation(),v_0=InitVelocity(S*eV,[0,0,1]))
+    model = MCMODEL(meas=meas,type=SWARM(t*s),n=N,En0=UniformField(E*Td),T=UniformTemp(T*K),ion_type=ion_type,v_0=InitVelocity(S*eV,[0,0,1]))
     mc(model,initParams(gas,model),verbose=verbose)
 end
 
@@ -226,6 +227,8 @@ Base.:*(x::Nothing,y::Float64) = nothing
 Base.:/(x::Nothing,y::Float64) = nothing
 Base.:*(x::Nothing,y) = nothing
 Base.:/(x::Nothing,y) = nothing
+Unitful.upreferred(x::Nothing) = nothing
+Unitful.uconvert(y,x::Nothing) = nothing
 
 Base.:+(x::SWARMMEAS,y::SWARMMEAS) = GenericAddition(x,y)::SWARMMEAS
 Base.:+(x::MEAST,y::MEAST) = GenericAddition(x,y)::MEAST
@@ -233,7 +236,6 @@ Base.:+(x::MEASLμJ,y::MEASLμJ) = GenericAddition(x,y)::MEASLμJ
 Base.:+(x::MEASCELL,y::MEASCELL) = GenericAddition(x,y)::MEASCELL
 Base.:+(x::MEASC,y::MEASC) = GenericAddition(x,y)::MEASC
 Base.:+(x::MEASS,y::MEASS) = GenericAddition(x,y)::MEASS
-Base.:+(x::COLLCOUNT,y::COLLCOUNT) = GenericAddition(x,y)::COLLCOUNT
 function Base.:+(x::MEAS,y::MEAS)
     return MEAS(GenericAddition(x.measLμJ,y.measLμJ),GenericAddition(x.measCell,y.measCell),GenericAddition(x.measg,y.measg),GenericAddition(x.meast,y.meast),GenericAddition(x.meass,y.meass),GenericAddition(x.measc,y.measc))
 end

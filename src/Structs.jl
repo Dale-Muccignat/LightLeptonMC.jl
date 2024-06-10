@@ -5,6 +5,16 @@ using AutoParameters, Gases, StaticArrays, AndExport, Interpolations, QuadGK, MC
 export MCMODEL, MCINIT, MCPARAMS, PART, MEAS, MEAST, MEASS, MEASC, findMinInd
 
 """
+NonConservativeMethod
+
+Parent type of each option for ways to handle non-conservative collisions
+
+"""
+@xport abstract type NonConservativeMethod end
+@xport struct Weighting <: NonConservativeMethod end
+@xport struct Explicit <: NonConservativeMethod end
+
+"""
 Velocity
 
 Parent type for each option for velocity. See subtypes for a list of options
@@ -95,17 +105,21 @@ end
     val::AUTO = 0. *K
 end
 
-@xport @AutoParm struct UniformIonisation <: Ionisation end
+@xport @AutoParm struct UniformIonisation <: Ionisation 
+    method::Symbol = :WEIGHTING
+end
 
 @xport @AutoParm struct RatioIonisation <: Ionisation
+    method::Symbol = :WEIGHTING
     ratio::AUTO = (e) -> 0.5
 end
 
 @xport @AutoParm struct FunctionalIonisation <: Ionisation
+    method::Symbol = :WEIGHTING
     func::AUTO = (e) -> 0.5
 end
 
-@xport function FunctionalIonisationInit(;func=(e,E2) -> 1.,thresh=10.)
+@xport function FunctionalIonisationInit(;func=(e,E2) -> 1.,thresh=10.,method=:WEIGHTING)
     cbins = [0.,(10. .^(-3:0.1:6.))...] .*eV #TODO: This is a dubplicate and depends on the initParams funciton
     cbins2 = [0.,(10. .^(-3:0.1:6.))...] .*eV
     matrix::Matrix{Float64} = zeros(length(cbins),length(cbins2))
@@ -131,15 +145,17 @@ end
     matrix2 = cumsum(matrix,dims=2)
     spl2 = LinearInterpolation((cbins,cbins2),matrix2,extrapolation_bc=Flat())	#2D spline of the matrix
     spl3 = [LinearInterpolation(Interpolations.deduplicate_knots!(spl2(c,cbins2),move_knots=true),cbins2,extrapolation_bc=Flat()) for c in cbins]
-    return FunctionalIonisation(spl3)#, matrix,matrix2
+    return FunctionalIonisation(spl3,method)#, matrix,matrix2
 end
 
 
 @xport @AutoParm struct DiscreteIonisation <: Ionisation
+    method::Symbol = :WEIGHTING
     loss::AUTO = 5. *eV
 end
 
 @xport @AutoParm struct DiscreteFunctionalIonisation <: Ionisation
+    method::Symbol = :WEIGHTING
     loss::AUTO = (e) -> 5. *eV
 end
 
@@ -158,6 +174,45 @@ end
 
 @xport @AutoParm struct GaussianDirectionVelocity <: Velocity
     ε::AUTO = 10. *eV
+end
+
+@xport @AutoParm struct FunctionalEnergy <: Velocity
+    getAxis::AUTO
+    getVelocity::AUTO
+end
+
+@xport function FunctionalEnergy(velocityDist)
+    # takes velocityDist and creates a cumulative distribution function to sample from
+    # assumes isotropic scattering
+    energies = 10. .^(-6:0.01:4) .*eV
+    vals = zeros(length(energies)) .*eV
+
+    norm = quadgk(velocityDist,0eV,energies[end],order=100)[1]
+
+    vals[1] = quadgk(velocityDist,0eV,energies[1],order=100)[1]
+    for i in 2:(length(energies)-1)
+        vals[i] = quadgk(velocityDist,energies[i-1],energies[i],order=100)[1]
+    end
+    @show sum(vals)
+    vals = vals ./ norm
+    @show sum(vals)
+    vals[end] = 1. - sum(vals)
+    vals = cumsum(vals)
+
+    function iso()
+        coschi = 1-2*rand()
+        sinchi = sqrt(1-coschi^2)
+        phi = rand()*2*pi
+        return [cos(phi)*sinchi,sin(phi)*sinchi,coschi]
+    end
+    function delta()
+        return [0,0,1]
+    end
+
+    spl = LinearInterpolation(Interpolations.deduplicate_knots!(vals),energies,extrapolation_bc=Flat())
+
+    # return FunctionalEnergy(delta,spl)
+    return FunctionalEnergy(iso,spl)
 end
 
 """
@@ -190,6 +245,7 @@ MCMODEL is the main constructor for MCSim.
     En0::AUTO = UniformField()
     T::AUTO = UniformTemp()
     ion_type::AUTO = UniformIonisation()
+    non_conservative_method::AUTO = Weighting()
     meas::AUTO = [:t]
     optimise_spatial::AUTO = true
 end
@@ -289,7 +345,7 @@ end
     alive::Bool = true
     v::AUTO = [0.,0.,0.]
     r::AUTO = [0.,0.,0.]
-    t::AUTO = 0. *s
+    t::AUTO = 0. *s̃
     weight::AUTO = 1.
     tbin::Int64 = 1
     cbin::Int64 = 1
@@ -303,9 +359,9 @@ end
 @xport function PART()
 
     r = SArray{Tuple{3},Float64,1,3}(0.,0.,0.)
-    r = r*m
+    r = r*m̃
     v = SArray{Tuple{3},Float64,1,3}(0.,0.,0.)
-    v = v*m/s
+    v = v*m̃/s̃
     return PART(r=r,v=v)
 end
 
@@ -320,7 +376,7 @@ end
 end
 
 function MEAS(type::SWARM,model,params::MCPARAMS=MCPARAMS())
-    MEAS(MEASLμJ(),MEASCELL(),MEASG(),MEAST(params),MEASS(),MEASC(params))
+    MEAS(MEASLμJ(),MEASCELL(),MEASG(model,params),MEAST(params),MEASS(),MEASC(params))
 end
 
 function MEAS(type::LμJ,model,params::MCPARAMS=MCPARAMS())
@@ -328,20 +384,8 @@ function MEAS(type::LμJ,model,params::MCPARAMS=MCPARAMS())
 end
 
 function MEAS(type::CELL,model,params::MCPARAMS=MCPARAMS())
-    MEAS(MEASLμJ(),MEASCELL(model,params),MEASG(model,params),MEAST(),MEASS(),MEASC())
+    MEAS(MEASLμJ(),MEASCELL(model,params),MEASG(model,params),MEAST(params),MEASS(),MEASC(params))
 end
-
-@xport @AutoParm mutable struct COLLCOUNT
-    elastic::AUTO = 0
-    excitation::AUTO = 0
-    ionisation::AUTO = 0
-    attachment::AUTO = 0
-end
-
-@xport function sumColl(collcount::COLLCOUNT)
-    return collcount.elastic+collcount.excitation+collcount.ionisation+collcount.attachment
-end
-
 
 @xport @AutoParm mutable struct MEASLμJ
     ε::AUTO = nothing
@@ -377,6 +421,7 @@ end
 @xport @AutoParm mutable struct MEASCELL
     ε::AUTO = nothing
     εz::AUTO = nothing
+    εz_w::AUTO = nothing
     x::AUTO = nothing
     y::AUTO = nothing
     z::AUTO = nothing
@@ -386,12 +431,13 @@ end
 end
 
 function MEASCELL(model::MCMODEL,params::MCPARAMS)
-    ε, εz, x, y, z, xy, xybins, tz = nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing
+    εz_w, ε, εz, x, y, z, xy, xybins, tz = nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing
     if :ε ∈ model.meas
         ε = zeros(length(params.ebins))
     end
     if :εz ∈ model.meas
-        εz = zeros(length(params.ebins),length(params.zbins))
+        εz = zeros(length(params.zbins)).*eV
+        εz_w = zeros(length(params.zbins))
     end
     if :x ∈ model.meas
         x = zeros(length(params.xbins))
@@ -409,19 +455,20 @@ function MEASCELL(model::MCMODEL,params::MCPARAMS)
     if :tz ∈ model.meas
         tz = zeros(length(params.tbins),length(params.zbins))
     end
-    return MEASCELL(ε,εz,x,y,z,xy,xybins,tz)
+    return MEASCELL(ε,εz,εz_w,x,y,z,xy,xybins,tz)
 end
 
 @AutoParm mutable struct MEASG
     coschi::AUTO = 0.
-    coll_count::AUTO = COLLCOUNT()
+    coll_count::AUTO = []
     SP_ε::AUTO = nothing
     SP_r::AUTO = nothing
     SP_εs::AUTO = nothing
 end
 
 function MEASG(model::MCMODEL,params::MCPARAMS)
-    coschi, coll_count, SP_ε, SP_r, SP_εs, SP_zs = 0., COLLCOUNT(), nothing, nothing, nothing, nothing
+    coschi, coll_count, SP_ε, SP_r, SP_εs, SP_zs = 0., zeros(length(params.splat_gas.cs)), nothing, nothing, nothing, nothing
+    @debug coll_count
     if :SP ∈ model.meas
         SP_ε = 0.
         SP_r = 0.
@@ -462,19 +509,30 @@ end
 end
 
 @AutoParm mutable struct MEASC
+    εᵢ_final::AUTO = nothing
+    r_final::AUTO = nothing
+    v_final::AUTO = nothing
+    rv_final::AUTO = nothing
     εᵢ::AUTO = nothing
     r::AUTO = nothing
     v::AUTO = nothing
     rv::AUTO = nothing
     weight::AUTO = nothing
+    dt::AUTO = nothing
 end
 
 function MEASC(params)
-    return MEASC(zeros(length(params.tbins)-1).*eV*s,
-          zeros(length(params.tbins)-1,3).*m*s,
-          zeros(length(params.tbins)-1,3).*m,
-          zeros(length(params.tbins)-1,3).*m^2,
-          zeros(length(params.tbins)-1).*s
+    return MEASC(
+          zeros(length(params.tbins)).*eV,
+          zeros(length(params.tbins),3).*m,
+          zeros(length(params.tbins),3).*m./s,
+          zeros(length(params.tbins),3).*m^2 ./s,
+          zeros(length(params.tbins)).*eV*s,
+          zeros(length(params.tbins),3).*m*s,
+          zeros(length(params.tbins),3).*m,
+          zeros(length(params.tbins),3).*m^2,
+          zeros(length(params.tbins)).*s,
+          zeros(length(params.tbins)).*s
           )
 end
 

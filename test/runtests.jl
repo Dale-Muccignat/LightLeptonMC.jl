@@ -8,11 +8,8 @@ function withinTol(y,ŷ,tol=0.05)
     @info "Values: " y ŷ
     @test y - y*tol <= ustrip(ŷ)<= y+y*tol
 end
-@testset "Individual Checks" begin
 
-end
-
-@testset "MCSim.jl" begin
+@testset "Swarm Benchmarks" begin
     @testset "Maxwell" begin
         @info "Elastic (Maxwell) Test"
         meas, swarm, params  = mc(MaxwellModel(),E=1.,T=0.,N=N,t=3e-5)
@@ -56,7 +53,7 @@ end
     @testset "Lucas-Saelee" begin
         @info "Ionisation (Lucas-Saelee) Test"
         T = 0.
-        meas, swarm, params = mc(LucasSaelee(),E=10.,T=T,N=N,t=3e-6)
+        meas, swarm, params = mc(LucasSaelee(),E=10.,T=T,N=N,t=5e-7)
         sol = pt(LucasSaelee(),E=10.,T=T,lmax=9,N=5000)
         withinTol(sol.ε̄,swarm.ε)
         withinTol(sol.DT,swarm.bDt)

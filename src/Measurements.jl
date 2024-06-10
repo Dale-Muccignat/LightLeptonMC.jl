@@ -1,6 +1,6 @@
 module Measurements
 
-using AndExport, Statistics, LinearAlgebra, MCSimUnits
+using AndExport, Statistics, LinearAlgebra, MCSimUnits, Measurements
 using ..Structs
 
 
@@ -32,11 +32,14 @@ end
     :SP in model.meas ? meas.measg.SP_ε /= model.n : nothing
     :SP_z in model.meas ? meas.measg.SP_εs /= model.n : nothing
     :SP in model.meas ? meas.measg.SP_r /= model.n : nothing
-    meas, SWARMMEAS()
+    meas.measg.coschi /= model.n
+    weights!(meas,model)
+    swarmMeas = swarmMeasurements(meas,params,model)
+    meas, swarmMeas
 end
 
 function weights!(meas,model)
-    for i in 1:length(meas.meast.w)
+    for i in 1:length(meas.meast.w) if meas.meast.w[i] !== 0.
         meas.meast.εᵢ[i] /= meas.meast.w[i]
         meas.meast.v²[i,:] ./= meas.meast.w[i]
         meas.meast.r²[i,:] ./= meas.meast.w[i]
@@ -46,10 +49,12 @@ function weights!(meas,model)
         # meas.measc.r[i,:] ./= meas.meast.w[i]
         # meas.measc.v[i,:] ./= meas.meast.w[i]
         # meas.measc.rv[i,:] ./= meas.meast.w[i]
-        meas.measc.r[i,:] ./= model.n
-        meas.measc.v[i,:] ./= model.n
-        meas.measc.rv[i,:] ./= model.n
-    end
+    end end
+    for i in 1:length(meas.measc.weight) if meas.measc.weight[i] !== 0. *s
+        meas.measc.r_final[i,:] = meas.measc.r[i,:] ./ meas.measc.weight[i]
+        meas.measc.v_final[i,:] = meas.measc.v[i,:] ./ meas.measc.weight[i]
+        meas.measc.rv_final[i,:] = meas.measc.rv[i,:] ./ meas.measc.weight[i]
+    end end
 end
 
 function swarmMeasurements(meas,params,model)
@@ -74,11 +79,21 @@ function swarmMeasurements(meas,params,model)
 
         push!(bDts, (1/4 * ( (meas.meast.r²[i,2] + meas.meast.r²[i,1]) - (meas.meast.r²[i-1,2] + meas.meast.r²[i-1,1]) )) / (params.tbins[2]-params.tbins[1]))
         if :f in model.meas
-            push!(fWs,sqrt(dot(meas.measc.v[i,:],meas.measc.v[i,:])))
-            push!(fDls, meas.measc.rv[i,3] - meas.measc.v[i,3]*meas.measc.r[i,3])
-            push!(fDts, 0.5 * (meas.measc.rv[i,2]+meas.measc.rv[i,1]))
+            push!(fWs,sqrt(dot(meas.measc.v_final[i,:],meas.measc.v_final[i,:])))
+            push!(fDls, meas.measc.rv_final[i,3] - meas.measc.v_final[i,3]*meas.measc.r_final[i,3])
+            push!(fDts, 0.5 * (meas.measc.rv_final[i,2]+meas.measc.rv_final[i,1]))
         end
     end
+
+    εs = uconvert.(eV,    εs)
+    Rs = uconvert.(s^-1,    Rs)
+    bWs = uconvert.(m/s,    bWs)
+    bDts = uconvert.(m^2/s,    bDts)
+    bDls = uconvert.(m^2/s,    bDls)
+    fεs = uconvert.(eV,    fεs)
+    fWs = uconvert.(m/s,    fWs)
+    fDts = uconvert.(m^2/s,    fDts)
+    fDls = uconvert.(m^2/s,    fDls)
 
     if isempty(fWs)
         fWs = bWs
@@ -86,15 +101,28 @@ function swarmMeasurements(meas,params,model)
         fDts = bDts
     end
 
-    SWARMMEAS(mean(εs),εs,
-              mean(Rs),Rs,
-              mean(bWs),bWs,
-              mean(fWs),fWs,
-              mean(bDts)*params.n0,bDts.*params.n0,
-              mean(fDts)*params.n0,fDts.*params.n0,
-              mean(bDls)*params.n0,bDls.*params.n0,
-              mean(fDls)*params.n0,fDls.*params.n0
-              )
+    swarm=SWARMMEAS(measurement(mean(εs[end÷2:end]),std(εs[end÷2:end])),εs,
+        measurement(mean(Rs[end÷2:end]./uconvert(m^-3,params.n0)),std(Rs[end÷2:end]./uconvert(m^-3,params.n0))),Rs./uconvert(m^-3,params.n0),
+        measurement(mean(bWs[end÷2:end]),std(bWs[end÷2:end])),bWs,
+        measurement(mean(fWs[end÷2:end]),std(fWs[end÷2:end])),fWs,
+        measurement(mean(bDts[end÷2:end].*uconvert(m^-3,params.n0)),std(bDts[end÷2:end].*uconvert(m^-3,params.n0))),bDts.*uconvert(m^-3,params.n0),
+        measurement(mean(fDts[end÷2:end].*uconvert(m^-3,params.n0)),std(fDts[end÷2:end].*uconvert(m^-3,params.n0))),fDts.*uconvert(m^-3,params.n0),
+        measurement(mean(bDls[end÷2:end].*uconvert(m^-3,params.n0)),std(bDls[end÷2:end].*uconvert(m^-3,params.n0))),bDls.*uconvert(m^-3,params.n0),
+        measurement(mean(fDls[end÷2:end].*uconvert(m^-3,params.n0)),std(fDls[end÷2:end].*uconvert(m^-3,params.n0))),fDls.*uconvert(m^-3,params.n0)
+    )
+    println("""
+    Energy: $(swarm.ε)
+    Rate: $(swarm.R)
+    Bulk:
+    W: $(swarm.bW)
+    n₀Dₗ: $(swarm.bDl)
+    n₀Dₜ: $(swarm.bDt)
+    Flux:
+    W: $(swarm.fW)
+    n₀Dₗ: $(swarm.fDl)
+    n₀Dₜ: $(swarm.fDt)
+        """)
+    return swarm
 end
 
 end #Module
