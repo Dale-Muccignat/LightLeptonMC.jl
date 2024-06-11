@@ -24,6 +24,7 @@ end
 
 function flight(particle_og,model,params,verbose)
     @debug "Conducting flight..."
+    :f in model.meas && (params.a[1] > 0m^4/s^2 || params.a[2] > 0m^4/s^2) && @warn "Measuring flux with x or y field, third order will be wrong."
     meas_inner = initMeas(model,params)
 
     measureTbin!(particle_og,model,params,meas_inner) ## measure initial stuff
@@ -183,22 +184,28 @@ end
 
 @fastmath function measureCumulative!(dt,particle,En0,n0,model,params,meas_inner,verbose)
     # e_bin += particle.weight * 0.5*consts.me*(dot(particle.v,particle.v)+2*sum(particle.v.*vars.a)*dt+dot(vars.a,vars.a)*dt^2)*dt
-    meas_inner.measc.r[particle.tbin,:] += particle.weight * (particle.r + 0.5*particle.v*dt + (1/6)*params.a*params.n0*(dt^2))*dt
-    meas_inner.measc.r²[particle.tbin,:] += particle.weight * (particle.r + 0.5*particle.v*dt + (1/6)*params.a*params.n0*(dt^2))*dt
-    meas_inner.measc.v[particle.tbin,:] += particle.weight * (particle.v + 0.5*params.a*params.n0*dt)*dt
-    meas_inner.measc.rv[particle.tbin,:] += particle.weight * (particle.r.*particle.v + 0.5*(particle.r.* params.a * params.n0+particle.v.^2)*dt + 0.5*particle.v.* params.a * params.n0*(dt^2) + (1/8)*((params.a * params.n0).^2)*(dt^3))*dt
-    meas_inner.measc.r²v[particle.tbin,:] += 1/24*dt*particle.weight * (
-        params.a * params.n0 *dt + 2*params.v) * (
-        6*params.r*dt * (params.a*params.n0 + 2*params.v) + dt^2(params.a*params.n0 + 2params.v)^2 + 12params.r^2)
-    meas_inner.measc.rx²vz[particle.tbin,:] += 1/24*dt*particle.weight * (
-        params.a * params.n0 *dt + 2*params.v[3]) * (
-        6*params.r[1]*dt * (params.a*params.n0 + 2*params.v[3]) + dt^2(params.a*params.n0 + 2params.v[3])^2 + 12params.r[1]^2)
-    meas_inner.measc.rzrxvz[particle.tbin,:] += 1/24*dt*particle.weight * (
-        params.a * params.n0 *dt + 2*params.v[3]) * (
-        (params.a * params.n0)^4*dt^4 + 
-        params.a * params.n0 * dt^2(3*params.r[3]*dt + 3*params.r[1]*dt +4dt*params.v[3]) + 
-        6params.r[1](dt*params.v[3]+2params.r[3]) + 
-        2dt*params.v[3](2dt*params.v[3]+3params.r[3]))
+    a = params.a * params.n0
+    meas_inner.measc.r[particle.tbin,:] += particle.weight * (particle.r + 0.5*particle.v*dt + (1/6)*a*(dt^2))*dt
+    meas_inner.measc.r²[particle.tbin,:] += @. particle.weight * dt*(
+        a.^2*dt .^4/20 + 
+        dt^2*(a .*particle.r + particle.v.^2)/3 + 
+        a*dt .^3 .*particle.v/4 + particle.r.^2 + particle.r .*particle.v*dt)
+    meas_inner.measc.v[particle.tbin,:] += particle.weight * (particle.v + 0.5*a*dt)*dt
+    meas_inner.measc.rv[particle.tbin,:] += particle.weight * (particle.r.*particle.v + 0.5*(particle.r.* a+particle.v.^2)*dt + 0.5*particle.v.* a*(dt^2) + (1/8)*((a).^2)*(dt^3))*dt
+    # NOTE: These have been optimised for electric field in z direction
+    meas_inner.measc.r²v[particle.tbin,:] += @. 1/24*dt*particle.weight * (
+        a *dt + 2*particle.v) * (
+        6*particle.r*dt * (a*dt + 2*particle.v) + dt^2*(a*dt + 2particle.v)^2 + 12particle.r.^2)
+    meas_inner.measc.rx²vz[particle.tbin] += 1/12*dt^2*particle.weight * (
+        4*dt*particle.v[1]*(2*a[3]*particle.r[1]+particle.v[3]*particle.v[1]) + 
+        6*particle.r[1]*(a[3]*particle.r[1]+2*particle.v[1]*particle.v[3]) +
+        3*a[3]*dt^2*particle.v[1]^2 + 
+        12*particle.v[3]*particle.r[1]^2/dt)
+    meas_inner.measc.rzrxvx[particle.tbin] += particle.weight * particle.v[1] * dt * (
+        a[3]*particle.v[1]*dt^3/8 +
+        dt^2*(a[3]*particle.r[1]+2*particle.v[1]*particle.v[3])/6 + 
+        dt*(particle.v[1]*particle.r[3]+particle.v[3]*particle.r[1])/2 +
+        particle.r[3]*particle.r[1])
 
     meas_inner.measc.weight[particle.tbin] += particle.weight * dt
     meas_inner.measc.dt[particle.tbin] += dt

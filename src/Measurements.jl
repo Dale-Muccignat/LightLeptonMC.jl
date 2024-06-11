@@ -43,7 +43,6 @@ function weights!(meas,model)
         meas.meast.εᵢ[i] /= meas.meast.w[i]
         meas.meast.v²[i,:] ./= meas.meast.w[i]
         meas.meast.r²[i,:] ./= meas.meast.w[i]
-        meas.meast.r²v[i,:] ./= meas.meast.w[i]
         meas.meast.r[i,:] ./= meas.meast.w[i]
         meas.meast.v[i,:] ./= meas.meast.w[i]
         meas.meast.rv[i,:] ./= meas.meast.w[i]
@@ -53,8 +52,12 @@ function weights!(meas,model)
     end end
     for i in 1:length(meas.measc.weight) if meas.measc.weight[i] !== 0. *s
         meas.measc.r_final[i,:] = meas.measc.r[i,:] ./ meas.measc.weight[i]
+        meas.measc.r²_final[i,:] = meas.measc.r²[i,:] ./ meas.measc.weight[i]
         meas.measc.v_final[i,:] = meas.measc.v[i,:] ./ meas.measc.weight[i]
         meas.measc.rv_final[i,:] = meas.measc.rv[i,:] ./ meas.measc.weight[i]
+        meas.measc.r²v_final[i,:] = meas.measc.r²v[i,:] ./ meas.measc.weight[i]
+        meas.measc.rx²vz_final[i] = meas.measc.rx²vz[i] ./ meas.measc.weight[i]
+        meas.measc.rzrxvx_final[i] = meas.measc.rzrxvx[i] ./ meas.measc.weight[i]
     end end
 end
 
@@ -87,7 +90,7 @@ function swarmMeasurements(meas,params,model)
             push!(fDls, meas.measc.rv_final[i,3] - meas.measc.v_final[i,3]*meas.measc.r_final[i,3])
             push!(fDts, 0.5 * (meas.measc.rv_final[i,2]+meas.measc.rv_final[i,1]))
             push!(fQls, meas.measc.r²v_final[i,3]/2-meas.measc.v_final[i,3]*meas.measc.r²_final[i,3]/2-meas.measc.r_final[i,3]*meas.measc.rv_final[i,3]+meas.measc.r_final[i,3]*meas.measc.r_final[i,3]*meas.measc.v_final[i,3])
-            push!(fQls, meas.measc.rx²vz_final[i]/6-meas.measc.rzrxvx_final[i]/3-meas.measc.v_final[i,3]*meas.measc.r²_final[i,1]/6+meas.measc.r_final[i,3]*meas.measc.rv_final[i,1]/3)
+            push!(fQts, meas.measc.rx²vz_final[i]/6-meas.measc.rzrxvx_final[i]/3-meas.measc.v_final[i,3]*meas.measc.r²_final[i,1]/6+meas.measc.r_final[i,3]*meas.measc.rv_final[i,1]/3)
         end
     end
 
@@ -107,6 +110,8 @@ function swarmMeasurements(meas,params,model)
         fWs = bWs
         fDls = bDls
         fDts = bDts
+        fQls = [1m^3/s,1m^3/s]
+        fQts = [1m^3/s,1m^3/s]
     end
 
     swarm=SWARMMEAS(measurement(mean(εs[end÷2:end]),std(εs[end÷2:end])),εs,
@@ -116,8 +121,8 @@ function swarmMeasurements(meas,params,model)
         measurement(mean(bDts[end÷2:end].*uconvert(m^-3,params.n0)),std(bDts[end÷2:end].*uconvert(m^-3,params.n0))),bDts.*uconvert(m^-3,params.n0),
         measurement(mean(fDts[end÷2:end].*uconvert(m^-3,params.n0)),std(fDts[end÷2:end].*uconvert(m^-3,params.n0))),fDts.*uconvert(m^-3,params.n0),
         measurement(mean(bDls[end÷2:end].*uconvert(m^-3,params.n0)),std(bDls[end÷2:end].*uconvert(m^-3,params.n0))),bDls.*uconvert(m^-3,params.n0),
-        measurement(mean(fDls[end÷2:end].*uconvert(m^-3,params.n0)),std(fDls[end÷2:end].*uconvert(m^-3,params.n0))),fDls.*uconvert(m^-3,params.n0)
-        measurement(mean(fQls[end÷2:end].*uconvert(m^-3,params.n0).^2),std(fQls[end÷2:end].*uconvert(m^-3,params.n0).^2)),fQls.*uconvert(m^-3,params.n0).^2
+        measurement(mean(fDls[end÷2:end].*uconvert(m^-3,params.n0)),std(fDls[end÷2:end].*uconvert(m^-3,params.n0))),fDls.*uconvert(m^-3,params.n0),
+        measurement(mean(fQls[end÷2:end].*uconvert(m^-3,params.n0).^2),std(fQls[end÷2:end].*uconvert(m^-3,params.n0).^2)),fQls.*uconvert(m^-3,params.n0).^2,
         measurement(mean(fQts[end÷2:end].*uconvert(m^-3,params.n0).^2),std(fQts[end÷2:end].*uconvert(m^-3,params.n0).^2)),fQts.*uconvert(m^-3,params.n0).^2,
     )
     println("""
