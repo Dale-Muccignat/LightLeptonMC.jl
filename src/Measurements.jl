@@ -43,6 +43,7 @@ function weights!(meas,model)
         meas.meast.εᵢ[i] /= meas.meast.w[i]
         meas.meast.v²[i,:] ./= meas.meast.w[i]
         meas.meast.r²[i,:] ./= meas.meast.w[i]
+        meas.meast.r²v[i,:] ./= meas.meast.w[i]
         meas.meast.r[i,:] ./= meas.meast.w[i]
         meas.meast.v[i,:] ./= meas.meast.w[i]
         meas.meast.rv[i,:] ./= meas.meast.w[i]
@@ -64,6 +65,8 @@ function swarmMeasurements(meas,params,model)
     bWs::Vector{Quantity} = []
     bDts::Vector{Quantity} = []
     bDls::Vector{Quantity} = []
+    fQts::Vector{Quantity} = []
+    fQls::Vector{Quantity} = []
     fεs::Vector{Quantity} = []
     fWs::Vector{Quantity} = []
     fDts::Vector{Quantity} = []
@@ -78,10 +81,13 @@ function swarmMeasurements(meas,params,model)
         push!(bDls, (1/2 * ( (meas.meast.r²[i,3] - meas.meast.r[i,3]^2) - (meas.meast.r²[i-1,3] - meas.meast.r[i-1,3]^2) )) / (params.tbins[2]-params.tbins[1]))
 
         push!(bDts, (1/4 * ( (meas.meast.r²[i,2] + meas.meast.r²[i,1]) - (meas.meast.r²[i-1,2] + meas.meast.r²[i-1,1]) )) / (params.tbins[2]-params.tbins[1]))
+
         if :f in model.meas
             push!(fWs,sqrt(dot(meas.measc.v_final[i,:],meas.measc.v_final[i,:])))
             push!(fDls, meas.measc.rv_final[i,3] - meas.measc.v_final[i,3]*meas.measc.r_final[i,3])
             push!(fDts, 0.5 * (meas.measc.rv_final[i,2]+meas.measc.rv_final[i,1]))
+            push!(fQls, meas.measc.r²v_final[i,3]/2-meas.measc.v_final[i,3]*meas.measc.r²_final[i,3]/2-meas.measc.r_final[i,3]*meas.measc.rv_final[i,3]+meas.measc.r_final[i,3]*meas.measc.r_final[i,3]*meas.measc.v_final[i,3])
+            push!(fQls, meas.measc.rx²vz_final[i]/6-meas.measc.rzrxvx_final[i]/3-meas.measc.v_final[i,3]*meas.measc.r²_final[i,1]/6+meas.measc.r_final[i,3]*meas.measc.rv_final[i,1]/3)
         end
     end
 

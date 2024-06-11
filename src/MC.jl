@@ -184,8 +184,21 @@ end
 @fastmath function measureCumulative!(dt,particle,En0,n0,model,params,meas_inner,verbose)
     # e_bin += particle.weight * 0.5*consts.me*(dot(particle.v,particle.v)+2*sum(particle.v.*vars.a)*dt+dot(vars.a,vars.a)*dt^2)*dt
     meas_inner.measc.r[particle.tbin,:] += particle.weight * (particle.r + 0.5*particle.v*dt + (1/6)*params.a*params.n0*(dt^2))*dt
+    meas_inner.measc.r²[particle.tbin,:] += particle.weight * (particle.r + 0.5*particle.v*dt + (1/6)*params.a*params.n0*(dt^2))*dt
     meas_inner.measc.v[particle.tbin,:] += particle.weight * (particle.v + 0.5*params.a*params.n0*dt)*dt
     meas_inner.measc.rv[particle.tbin,:] += particle.weight * (particle.r.*particle.v + 0.5*(particle.r.* params.a * params.n0+particle.v.^2)*dt + 0.5*particle.v.* params.a * params.n0*(dt^2) + (1/8)*((params.a * params.n0).^2)*(dt^3))*dt
+    meas_inner.measc.r²v[particle.tbin,:] += 1/24*dt*particle.weight * (
+        params.a * params.n0 *dt + 2*params.v) * (
+        6*params.r*dt * (params.a*params.n0 + 2*params.v) + dt^2(params.a*params.n0 + 2params.v)^2 + 12params.r^2)
+    meas_inner.measc.rx²vz[particle.tbin,:] += 1/24*dt*particle.weight * (
+        params.a * params.n0 *dt + 2*params.v[3]) * (
+        6*params.r[1]*dt * (params.a*params.n0 + 2*params.v[3]) + dt^2(params.a*params.n0 + 2params.v[3])^2 + 12params.r[1]^2)
+    meas_inner.measc.rzrxvz[particle.tbin,:] += 1/24*dt*particle.weight * (
+        params.a * params.n0 *dt + 2*params.v[3]) * (
+        (params.a * params.n0)^4*dt^4 + 
+        params.a * params.n0 * dt^2(3*params.r[3]*dt + 3*params.r[1]*dt +4dt*params.v[3]) + 
+        6params.r[1](dt*params.v[3]+2params.r[3]) + 
+        2dt*params.v[3](2dt*params.v[3]+3params.r[3]))
 
     meas_inner.measc.weight[particle.tbin] += particle.weight * dt
     meas_inner.measc.dt[particle.tbin] += dt

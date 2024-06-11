@@ -511,12 +511,20 @@ end
 @AutoParm mutable struct MEASC
     εᵢ_final::AUTO = nothing
     r_final::AUTO = nothing
+    r²_final::AUTO = nothing
     v_final::AUTO = nothing
     rv_final::AUTO = nothing
+    r²v_final::AUTO = nothing
+    rx²vz_final::AUTO = nothing
+    rzrxvx_final::AUTO = nothing
     εᵢ::AUTO = nothing
     r::AUTO = nothing
+    r²::AUTO = nothing
     v::AUTO = nothing
     rv::AUTO = nothing
+    r²v::AUTO = nothing
+    rx²vz::AUTO = nothing
+    rzrxvx::AUTO = nothing
     weight::AUTO = nothing
     dt::AUTO = nothing
 end
@@ -525,12 +533,20 @@ function MEASC(params)
     return MEASC(
           zeros(length(params.tbins)).*eV,
           zeros(length(params.tbins),3).*m,
+          zeros(length(params.tbins),3).*m.^2,
           zeros(length(params.tbins),3).*m./s,
           zeros(length(params.tbins),3).*m^2 ./s,
+          zeros(length(params.tbins)).*m^3 ./s,
+          zeros(length(params.tbins)).*m^3 ./s,
+          zeros(length(params.tbins),3).*m^3 ./s,
           zeros(length(params.tbins)).*eV*s,
           zeros(length(params.tbins),3).*m*s,
+          zeros(length(params.tbins),3).*m^2*s,
           zeros(length(params.tbins),3).*m,
           zeros(length(params.tbins),3).*m^2,
+          zeros(length(params.tbins),3).*m^3,
+          zeros(length(params.tbins),3).*m^3,
+          zeros(length(params.tbins),3).*m^3,
           zeros(length(params.tbins)).*s,
           zeros(length(params.tbins)).*s
           )
