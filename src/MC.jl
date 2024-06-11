@@ -189,18 +189,25 @@ end
     meas_inner.measc.r²[particle.tbin,:] += @. particle.weight * dt*(
         a.^2*dt .^4/20 + 
         dt^2*(a .*particle.r + particle.v.^2)/3 + 
-        a*dt .^3 .*particle.v/4 + particle.r.^2 + particle.r .*particle.v*dt)
+        a*dt .^3 .*particle.v/4 + 
+        particle.r.^2 + 
+        particle.r .*particle.v*dt
+    )
+
     meas_inner.measc.v[particle.tbin,:] += particle.weight * (particle.v + 0.5*a*dt)*dt
     meas_inner.measc.rv[particle.tbin,:] += particle.weight * (particle.r.*particle.v + 0.5*(particle.r.* a+particle.v.^2)*dt + 0.5*particle.v.* a*(dt^2) + (1/8)*((a).^2)*(dt^3))*dt
     # NOTE: These have been optimised for electric field in z direction
-    meas_inner.measc.r²v[particle.tbin,:] += @. 1/24*dt*particle.weight * (
+    #
+    meas_inner.measc.r²v[particle.tbin,:] += @. 1/24 * dt * particle.weight * (
         a *dt + 2*particle.v) * (
         6*particle.r*dt * (a*dt + 2*particle.v) + dt^2*(a*dt + 2particle.v)^2 + 12particle.r.^2)
+
     meas_inner.measc.rx²vz[particle.tbin] += 1/12*dt^2*particle.weight * (
         4*dt*particle.v[1]*(2*a[3]*particle.r[1]+particle.v[3]*particle.v[1]) + 
         6*particle.r[1]*(a[3]*particle.r[1]+2*particle.v[1]*particle.v[3]) +
         3*a[3]*dt^2*particle.v[1]^2 + 
         12*particle.v[3]*particle.r[1]^2/dt)
+
     meas_inner.measc.rzrxvx[particle.tbin] += particle.weight * particle.v[1] * dt * (
         a[3]*particle.v[1]*dt^3/8 +
         dt^2*(a[3]*particle.r[1]+2*particle.v[1]*particle.v[3])/6 + 
