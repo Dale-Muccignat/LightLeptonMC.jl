@@ -570,6 +570,10 @@ end
     bDls::AUTO = [0.]
     fDl::AUTO = 0.
     fDls::AUTO = [0.]
+    fQl::AUTO = 0.
+    fQls::AUTO = [0.]
+    fQt::AUTO = 0.
+    fQts::AUTO = [0.]
 end
 
 @fastmath function findMinInd(x::AbstractArray,y)::Int64

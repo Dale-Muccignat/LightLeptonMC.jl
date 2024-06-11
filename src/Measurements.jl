@@ -100,6 +100,8 @@ function swarmMeasurements(meas,params,model)
     fWs = uconvert.(m/s,    fWs)
     fDts = uconvert.(m^2/s,    fDts)
     fDls = uconvert.(m^2/s,    fDls)
+    fQts = uconvert.(m^3/s,    fQts)
+    fQls = uconvert.(m^3/s,    fQls)
 
     if isempty(fWs)
         fWs = bWs
@@ -115,6 +117,8 @@ function swarmMeasurements(meas,params,model)
         measurement(mean(fDts[end÷2:end].*uconvert(m^-3,params.n0)),std(fDts[end÷2:end].*uconvert(m^-3,params.n0))),fDts.*uconvert(m^-3,params.n0),
         measurement(mean(bDls[end÷2:end].*uconvert(m^-3,params.n0)),std(bDls[end÷2:end].*uconvert(m^-3,params.n0))),bDls.*uconvert(m^-3,params.n0),
         measurement(mean(fDls[end÷2:end].*uconvert(m^-3,params.n0)),std(fDls[end÷2:end].*uconvert(m^-3,params.n0))),fDls.*uconvert(m^-3,params.n0)
+        measurement(mean(fQls[end÷2:end].*uconvert(m^-3,params.n0).^2),std(fQls[end÷2:end].*uconvert(m^-3,params.n0).^2)),fQls.*uconvert(m^-3,params.n0).^2
+        measurement(mean(fQts[end÷2:end].*uconvert(m^-3,params.n0).^2),std(fQts[end÷2:end].*uconvert(m^-3,params.n0).^2)),fQts.*uconvert(m^-3,params.n0).^2,
     )
     println("""
     Energy: $(swarm.ε)
@@ -127,6 +131,8 @@ function swarmMeasurements(meas,params,model)
     W: $(swarm.fW)
     n₀Dₗ: $(swarm.fDl)
     n₀Dₜ: $(swarm.fDt)
+    n₀²Qₗ: $(swarm.fQl)
+    n₀²Qₜ: $(swarm.fQt)
         """)
     return swarm
 end
