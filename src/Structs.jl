@@ -34,8 +34,8 @@ Spatial
 Parent type for each option for spatial config. See subtypes for a list of options
 ```julia
     ZeroSpatial()
-    InitSpatial()
-    GaussianLμJSpatial()
+    InitSpatial(val,axis)
+    GaussianLμJSpatial(val, Δy_source,gaussian_axis,axis)
 ```
 
 """
