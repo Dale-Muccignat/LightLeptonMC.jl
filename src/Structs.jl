@@ -47,10 +47,12 @@ Parent type for each option for spatial config. See subtypes for a list of optio
 @xport abstract type Ionisation end
 
 @xport struct ZeroSpatial <: Spatial end
+
 @xport @AutoParm struct InitSpatial <: Spatial
     val::AUTO
     axis::AUTO
 end
+
 @xport @AutoParm struct InitTemporal <: Temporal
     val::AUTO = 0. *s
 end
@@ -199,7 +201,7 @@ end
     vals[end] = 1. - sum(vals)
     vals = cumsum(vals)
 
-    function iso()
+    function iso() # TODO: Moves these outside of the function
         coschi = 1-2*rand()
         sinchi = sqrt(1-coschi^2)
         phi = rand()*2*pi
@@ -211,8 +213,8 @@ end
 
     spl = LinearInterpolation(Interpolations.deduplicate_knots!(vals),energies,extrapolation_bc=Flat())
 
-    # return FunctionalEnergy(delta,spl)
-    return FunctionalEnergy(iso,spl)
+    return FunctionalEnergy(delta,spl)
+    # return FunctionalEnergy(iso,spl)
 end
 
 """

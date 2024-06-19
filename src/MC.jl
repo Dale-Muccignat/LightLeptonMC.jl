@@ -857,9 +857,12 @@ end
 function getZDt(field::UniformField,particle,model,params)
     if params.zbins != nothing
         # if (particle.v[3] < 0m/s) && (( (particle.v[3]^2)/(params.a[3]*params.n0) + 2*params.zbins[particle.zbin]-2e-10m ) > 2*particle.r[3]) && (particle.zbin != 0)
-        if (particle.v[3] < 0m/s) && ((particle.v[3])^2 - 2*(params.a[3]*params.n0)*(particle.r[3]-params.zbins[particle.zbin]) > 0m^2/s^2) && (particle.zbin != 0)
+        if (particle.v[3] < 0m/s) && ((particle.v[3])^2 - 2*(params.a[3]*params.n0)*(particle.r[3]-params.zbins[particle.zbin]+1e-12m̃) > 0m^2/s^2) && (particle.zbin != 0)
             # return dt_EVENT((- particle.v[3] - sqrt( (particle.v[3])^2 - 2*(params.a[3]*params.n0)*(particle.r[3]-params.zbins[particle.zbin]+1e-12m) ))/(params.a[3]*params.n0), :dt_zbin,:Down)
-            return dt_EVENT((- particle.v[3] - sqrt( (particle.v[3])^2 - 2*(params.a[3]*params.n0)*(particle.r[3]-params.zbins[particle.zbin] ) ))/(params.a[3]*params.n0), :dt_zbin,:Down)
+            a = (- particle.v[3] - sqrt( (particle.v[3])^2 - 2*(params.a[3]*params.n0)*(particle.r[3]-params.zbins[particle.zbin]+1e-12m̃ ) ))/(params.a[3]*params.n0)
+            b = (- particle.v[3] + sqrt( (particle.v[3])^2 - 2*(params.a[3]*params.n0)*(particle.r[3]-params.zbins[particle.zbin]+1e-12m̃ ) ))/(params.a[3]*params.n0)
+            b > 0s && b < a && error("Zbin calculation error down: a=$(a), b=$(b)")
+            return dt_EVENT(a, :dt_zbin,:Down)
         elseif (particle.zbin < length(params.zbins)) 
             # @debug particle.r[3] particle.v[3] params.zbins[particle.zbin:(particle.zbin+1)]
             # return dt_EVENT((- particle.v[3] + sqrt( particle.v[3]^2 - 2*(params.a[3]*params.n0)*(particle.r[3]-params.zbins[particle.zbin+1]-1e-10m) ))/(params.a[3]*params.n0), :dt_zbin, :Up)
@@ -868,7 +871,10 @@ function getZDt(field::UniformField,particle,model,params)
                 @info params.zbins[particle.zbin]
                 @info params.zbins[particle.zbin+1]
             end
-            return dt_EVENT((- particle.v[3] + sqrt( particle.v[3]^2 - 2*(params.a[3]*params.n0)*(particle.r[3]-params.zbins[particle.zbin+1] ) ))/(params.a[3]*params.n0), :dt_zbin, :Up)
+            a = (- particle.v[3] + sqrt( particle.v[3]^2 - 2*(params.a[3]*params.n0)*(particle.r[3]-params.zbins[particle.zbin+1]-1e-12m̃ ) ))/(params.a[3]*params.n0)
+            b = (- particle.v[3] - sqrt( particle.v[3]^2 - 2*(params.a[3]*params.n0)*(particle.r[3]-params.zbins[particle.zbin+1]-1e-12m̃ ) ))/(params.a[3]*params.n0)
+            b > 0s && b < a && error("Zbin calculation error up: a=$(a), b=$(b)")
+            return dt_EVENT(a, :dt_zbin, :Up)
         end
     end
     return dt_EVENT(Inf*s,:dt_zbin,:Up)
