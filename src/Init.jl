@@ -217,7 +217,7 @@ end
     θs = LinRange(1e-6,π,100)
 
     #insert thresholds into energy array so they are handled accurately
-    if any(threshes .> 0eV .&& threshes .!== Inf*eV)
+    if any(threshes .> 0eV .&& threshes .!== Inf*eV .&& threshes .!== 0. *eV)
         [insert!(ens2,findfirst((x)->x>thresh,ens2),thresh) for thresh in threshes if thresh > 0eV && thresh ∉ ens2]
         [insert!(ens2,findfirst((x)->x>thresh,ens2),thresh) for thresh in prevfloat.(threshes) if thresh > 0eV && thresh ∉ ens2]
         [insert!(ens2,findfirst((x)->x>thresh,ens2),thresh) for thresh in nextfloat.(threshes) if thresh > 0eV && thresh ∉ ens2]
