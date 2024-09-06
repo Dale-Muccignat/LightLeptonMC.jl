@@ -39,7 +39,7 @@ function flight(particle_og,model,params,verbose)
         while particle_inner.alive
             #@debug "Particle before: " particle
             @debug debugParticle("before",particle_inner)
-            # checkBins(dt_EVENT(1s,:before,:before),particle_inner,params)
+            checkBins(dt_EVENT(1s,:before,:before),particle_inner,params)
             dt = getDt(particle_inner,model,params,verbose)
 
             :f in model.meas ? measureCumulative!(dt.time,particle_inner,model.En0,model.n0,model,params,meas_inner,verbose) : nothing
@@ -48,6 +48,7 @@ function flight(particle_og,model,params,verbose)
             event!(dt,particle_inner,model,params,meas_inner,verbose,new_particles)
 
             @debug debugParticle("after",particle_inner)
+            @debug sum(meas_inner.measg.coll_count) > 5 && break
 
             particle_inner.alive = particle_inner.alive && checkAlive(model.type,particle_inner,model,meas_inner,params,verbose)
             measureEvent!(model.type,dt,particle_inner,model,params,meas_inner,verbose)
@@ -403,6 +404,8 @@ end
         @inbounds CS += params.splat_gas.cs[cs_ind](en) * params.splat_gas.w[cs_ind] * v
         # @show CS
         # @show getTotalFreq(particle,model,params,verbose)
+
+        CS/getTotalFreq(particle,model,params) > 1+1e-8 && error("Collision freq error: CS=$(CS) CS_Total=$(getTotalFreq(particle,model,params))")
 
         if R < CS/getTotalFreq(particle,model,params)
             return cs_ind
@@ -953,30 +956,40 @@ end
 end
 
 @xport function getDt(particle,model,params,verbose)
-    dt_coll = getCDt(particle,model,params)
-    dt_energy = getEnDt(model.En0,model.n0,particle,model,params)
-    dt_tbin = getTDt(particle,model,params)
+    dts = (
+    	getCDt(particle,model,params),
+    	getEnDt(model.En0,model.n0,particle,model,params),
+    	getTDt(particle,model,params),
     #TODO: Restrict the following to 0 field
-    dt_rbin = getRDt(particle,model,model.type,params)
-    dt_zbin = getZDt(model.En0,particle,model,params)
-    dt_ybin = getYDt(particle,model,params)
-    dt_xbin = getXDt(particle,model,params)
-    dts = (dt_coll,dt_energy,dt_tbin,dt_rbin,dt_zbin,dt_ybin,dt_xbin)
+    	getRDt(particle,model,model.type,params),
+    	getZDt(model.En0,particle,model,params),
+    	getYDt(particle,model,params),
+    	getXDt(particle,model,params),
+    )
+    # dts = (dt_coll,dt_energy,dt_tbin,dt_rbin,dt_zbin,dt_ybin,dt_xbin)
     #@debug dts
-    dt_times = (dt_coll.time,dt_energy.time,dt_tbin.time,dt_rbin.time,dt_zbin.time,dt_ybin.time,dt_xbin.time)
-    @debug """
+    # dt_times = (
+    #     dt_coll.time,
+    #     dt_energy.time,
+    #     dt_tbin.time,
+    #     dt_rbin.time,
+    #     dt_zbin.time,
+    #     dt_ybin.time,
+    #     dt_xbin.time
+    # )
+    # @debug """
 
-    Curr: $(particle.t)
-    
-    Coll: $(dt_times[1])
-    Ener: #$(particle.cbin) $(dt_times[2])
-    tbin: #$(particle.tbin) $(dt_times[3])
-    rbin: #$(particle.rbin) $(dt_times[4])
-    zbin: #$(particle.zbin) $(dt_times[5])
-    ybin: #$(particle.ybin) $(dt_times[6])
-    xbin: #$(particle.xbin) $(dt_times[7])
-    """
-    return dts[findMinTime(dt_times,verbose=verbose)]
+    # Curr: $(particle.t)
+    # 
+    # Coll: $(dt_times[1])
+    # Ener: #$(particle.cbin) $(dt_times[2])
+    # tbin: #$(particle.tbin) $(dt_times[3])
+    # rbin: #$(particle.rbin) $(dt_times[4])
+    # zbin: #$(particle.zbin) $(dt_times[5])
+    # ybin: #$(particle.ybin) $(dt_times[6])
+    # xbin: #$(particle.xbin) $(dt_times[7])
+    # """
+    return dts[findMinTime([dt.time for dt in dts],verbose=verbose)]
 end
 
 function findMinTime(times;verbose)
