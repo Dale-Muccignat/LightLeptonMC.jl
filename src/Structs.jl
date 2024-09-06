@@ -62,7 +62,7 @@ end
     Δt_source::AUTO = 10. *ns
 end
 
-@xport @AutoParm struct GaussianLμJSpatial <: Spatial
+@xport @AutoParm struct GaussianLμJSpatial <: Spatial # TODO: Rename to remove LuJ
     val::AUTO = -7.6e-6m
     Δy_source::AUTO = 7.5e-6m
     gaussian_axis::AUTO = [0,1,0]
@@ -75,6 +75,40 @@ end
     return GaussianLμJSpatial(val,Δy_source,gaussian_axis,axis)
 end
 
+@xport @AutoParm struct FunctionalSpatial <: Spatial
+    getAxis::AUTO
+    getPosition::AUTO
+end
+
+"""
+FunctionalSpatial(spatialDist;axis)
+
+spatialDist - Two element tuple. First element is the dependent variable of the density vector (second element)
+axis - function that returns the axis for the distribution, can be a random vector to simulate symmetry
+"""
+@xport function FunctionalSpatial(spatialDist::Tuple{Any,Any},axis=()->[0,0,1])
+    # Takes a two element vector spatial histogram/density distribution, creates a cumulative distribution function
+    # assumes isotropic scattering
+    dependent = spatialDist[1]
+    independent = spatialDist[2]
+    independent_func = LinearInterpolation(dependent,independent)
+    vals = zero(dependent)
+
+    norm = quadgk(independent_func,dependent[1],dependent[end],order=100)[1]
+
+    # vals[1] = quadgk(independent,dependent[1],dependent[1],order=100)[1]
+    vals[1] = zero(independent[1]*dependent[1])
+    for i in 2:(length(dependent)-1)
+        vals[i] = quadgk(independent_func,dependent[i-1],dependent[i],order=100)[1]
+    end
+    vals = vals ./ norm
+    vals[end] = 1. - sum(vals)
+    vals = cumsum(vals)
+
+    spl(x) = LinearInterpolation(Interpolations.deduplicate_knots!(vals),dependent,extrapolation_bc=Flat())(x)
+
+    return FunctionalSpatial(axis,spl)
+end
 
 @xport @AutoParm struct UniformDensity <: Density
     val::AUTO = 1e23m^-3
@@ -186,20 +220,29 @@ end
 @xport function FunctionalEnergy(velocityDist)
     # takes velocityDist and creates a cumulative distribution function to sample from
     # assumes isotropic scattering
-    energies = 10. .^(-6:0.01:4) .*eV
-    vals = zeros(length(energies)) .*eV
+    energies = 10. .^(-4:0.001:2) .*sqrt(eV)
+    # energies = velocityDist.itp.knots[1]
+    # P = velocityDist.itp.coefs
+    # energies = sqrt.(0eV:1e-5eV:100eV)
+    vals = zeros(length(energies)) 
 
-    norm = quadgk(velocityDist,0eV,energies[end],order=100)[1]
+    norm = quadgk(velocityDist,sqrt(0eV),energies[end],order=100)[1]
+    # norm = energies .* P |> sum
+    # @show norm
+    # vals = energies .* P
+    # vals ./= sum(vals)
 
-    vals[1] = quadgk(velocityDist,0eV,energies[1],order=100)[1]
+    vals[1] = quadgk(velocityDist,sqrt(0eV),energies[1],order=100)[1]
     for i in 2:(length(energies)-1)
         vals[i] = quadgk(velocityDist,energies[i-1],energies[i],order=100)[1]
+        vals[i] < 0 && (vals[i] = 0)
     end
+    # return vals
     @show sum(vals)
     vals = vals ./ norm
     @show sum(vals)
-    vals[end] = 1. - sum(vals)
     vals = cumsum(vals)
+    vals[end] = 1. 
 
     function iso() # TODO: Moves these outside of the function
         coschi = 1-2*rand()
@@ -210,11 +253,12 @@ end
     function delta()
         return [0,0,1]
     end
+    @show energies[1], vals[1]
 
-    spl = LinearInterpolation(Interpolations.deduplicate_knots!(vals),energies,extrapolation_bc=Flat())
+    spl = LinearInterpolation(Interpolations.deduplicate_knots!(vals),energies.^2,extrapolation_bc=0eV)
 
-    return FunctionalEnergy(delta,spl)
-    # return FunctionalEnergy(iso,spl)
+    # return FunctionalEnergy(delta,spl)
+    return FunctionalEnergy(iso,spl)
 end
 
 """
@@ -430,10 +474,11 @@ end
     xy::AUTO = nothing
     xybins::AUTO = nothing
     tz::AUTO = nothing
+    v_tz::AUTO = nothing
 end
 
 function MEASCELL(model::MCMODEL,params::MCPARAMS)
-    εz_w, ε, εz, x, y, z, xy, xybins, tz = nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing
+    εz_w, ε, εz, x, y, z, xy, xybins, tz, v_tz = nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing
     if :ε ∈ model.meas
         ε = zeros(length(params.ebins))
     end
@@ -456,8 +501,10 @@ function MEASCELL(model::MCMODEL,params::MCPARAMS)
     end
     if :tz ∈ model.meas
         tz = zeros(length(params.tbins),length(params.zbins))
+        v_tz = zeros(length(params.tbins),length(params.zbins))*m/s
     end
-    return MEASCELL(ε,εz,εz_w,x,y,z,xy,xybins,tz)
+
+    return MEASCELL(ε,εz,εz_w,x,y,z,xy,xybins,tz,v_tz)
 end
 
 @AutoParm mutable struct MEASG
