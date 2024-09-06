@@ -458,18 +458,22 @@ end
 function initPartr(r_0::InitSpatial,params)
     r = r_0.axis .* r_0.val
 end
+function initPartr(r_0::FunctionalSpatial,params)
+    r_0.getAxis() .* r_0.getPosition(rand())
+end
 function initPartr(r_0::GaussianLμJSpatial,params)
-    SD = r_0.Δy_source/(2*sqrt(2*log(2)))
+    # SD = r_0.Δy_source/(2*sqrt(2*log(2)))
 
-    val = Inf*m .* r_0.gaussian_axis .+ r_0.val .* r_0.axis
-    while -7.5μm > val[2] || val[2] > 7.5μm 
-        R=randn()
-        # while val < -SD*R
-            # R=randn()
-        # end
-        val= SD*R .* r_0.gaussian_axis .+ r_0.val .* r_0.axis
-    end
-    val
+    return r_0.Δy_source/(2*sqrt(2*log(2)))*randn() .* r_0.gaussian_axis .+ r_0.val .* r_0.axis
+    # val = Inf*m .* r_0.gaussian_axis .+ r_0.val .* r_0.axis
+    # while -7.5μm > val[2] || val[2] > 7.5μm 
+    #     R=randn()
+    #     # while val < -SD*R
+    #         # R=randn()
+    #     # end
+    #     val= SD*R .* r_0.gaussian_axis .+ r_0.val .* r_0.axis
+    # end
+    # val
 end
 
 function initPartt(t_0::InitTemporal,params)
