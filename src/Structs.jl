@@ -2,7 +2,7 @@ module Structs
 
 using AutoParameters, Gases, StaticArrays, AndExport, Interpolations, QuadGK, MCSimUnits
 
-export MCMODEL, MCINIT, MCPARAMS, PART, MEAS, MEAST, MEASS, MEASC, findMinInd
+export MCMODEL, MCPARAMS, PART, MEAS, MEAST, MEASS, MEASC, findMinInd
 
 """
 NonConservativeMethod

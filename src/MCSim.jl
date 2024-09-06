@@ -21,11 +21,11 @@ export mc, MCINIT, MCPARAMS, saveBatch, saveDist
 @reexport using MCSimUnits
 
 
-include("Utils.jl")
-@reexport using .Utils
-
 include("Structs.jl")
 @reexport using .Structs
+
+include("Utils.jl")
+@reexport using .Utils
 
 include("Init.jl")
 @reexport using .Init
@@ -63,12 +63,12 @@ end
 
 
 
-function mc(gas::Gas;S=1e-5,E=1.,T=0.,N=1000,t=Inf,meas=[:t],ion_type=RatioIonisation(),verbose=false)
+function mc(gas::Gas;S=1e-5,E=1.,T=0.,N=1000,t=Inf,meas=[:t],ion_type=RatioIonisation(),n0=1e23,verbose=false)
     if t == Inf
         t = findSimTime(gas,S,E,T,meas,verbose)
     end
 
-    model = MCMODEL(meas=meas,type=SWARM(t*s),n=N,En0=UniformField(E*Td),T=UniformTemp(T*K),ion_type=ion_type,v_0=InitVelocity(S*eV,[0,0,1]))
+    model = MCMODEL(meas=meas,type=SWARM(t*s),n=N,En0=UniformField(E*Td),T=UniformTemp(T*K),ion_type=ion_type,v_0=InitVelocity(S*eV,[0,0,1]),n0=UniformDensity(n0/m^3))
     mc(model,initParams(gas,model),verbose=verbose)
 end
 
