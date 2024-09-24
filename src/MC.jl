@@ -969,40 +969,34 @@ end
 end
 
 @xport function getDt(particle,model,params,verbose)
-    dts = (
-    	getCDt(particle,model,params),
-    	getEnDt(model.En0,model.n0,particle,model,params),
-    	getTDt(particle,model,params),
-    #TODO: Restrict the following to 0 field
-    	getRDt(particle,model,model.type,params),
-    	getZDt(model.En0,particle,model,params),
-    	getYDt(particle,model,params),
-    	getXDt(particle,model,params),
-    )
-    # dts = (dt_coll,dt_energy,dt_tbin,dt_rbin,dt_zbin,dt_ybin,dt_xbin)
-    #@debug dts
-    # dt_times = (
-    #     dt_coll.time,
-    #     dt_energy.time,
-    #     dt_tbin.time,
-    #     dt_rbin.time,
-    #     dt_zbin.time,
-    #     dt_ybin.time,
-    #     dt_xbin.time
-    # )
-    # @debug """
+    # Preallocate arrays
+    dts = Array{dt_EVENT, 1}(undef, 7)
+    dt_times = Array{Quantity, 1}(undef, 7)
 
-    # Curr: $(particle.t)
-    # 
-    # Coll: $(dt_times[1])
-    # Ener: #$(particle.cbin) $(dt_times[2])
-    # tbin: #$(particle.tbin) $(dt_times[3])
-    # rbin: #$(particle.rbin) $(dt_times[4])
-    # zbin: #$(particle.zbin) $(dt_times[5])
-    # ybin: #$(particle.ybin) $(dt_times[6])
-    # xbin: #$(particle.xbin) $(dt_times[7])
-    # """
-    return dts[findMinTime([dt.time for dt in dts],verbose=verbose)]
+    # Calculate dt values
+    dts[1] = getCDt(particle, model, params)
+    dts[2] = getEnDt(model.En0, model.n0, particle, model, params)
+    dts[3] = getTDt(particle, model, params)
+    dts[4] = getRDt(particle, model, model.type, params)
+    dts[5] = getZDt(model.En0, particle, model, params)
+    dts[6] = getYDt(particle, model, params)
+    dts[7] = getXDt(particle, model, params)
+
+    # Calculate corresponding times
+    dt_times[1] = dts[1].time
+    dt_times[2] = dts[2].time
+    dt_times[3] = dts[3].time
+    dt_times[4] = dts[4].time
+    dt_times[5] = dts[5].time
+    dt_times[6] = dts[6].time
+    dt_times[7] = dts[7].time
+
+    # Find minimum time
+    min_time = minimum(dt_times)
+    min_index = findfirst(x -> x == min_time, dt_times)
+
+    # Return result
+    return dts[min_index]
 end
 
 function findMinTime(times;verbose)
@@ -1015,7 +1009,6 @@ function findMinTime(times;verbose)
     end
 
     return 1
-
 end
 
 

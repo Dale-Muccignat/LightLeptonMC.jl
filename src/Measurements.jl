@@ -22,18 +22,18 @@ end
 end
 
 @xport function process(type::CELL,meas,params,model)
-    :ε in model.meas ? meas.measCell.ε ./= model.n : nothing
-    :x in model.meas ? meas.measCell.x ./= model.n : nothing
-    :y in model.meas ? meas.measCell.y ./= model.n : nothing
-    :z in model.meas ? meas.measCell.z ./= model.n : nothing
-    :tz in model.meas ? meas.measCell.tz ./= model.n : nothing
-    :xy in model.meas ? meas.measCell.xy ./= model.n : nothing
-    :xy in model.meas ? meas.measCell.xybins ./= model.n : nothing
-    :SP in model.meas ? meas.measg.SP_ε /= model.n : nothing
-    :SP_z in model.meas ? meas.measg.SP_εs /= model.n : nothing
-    :SP in model.meas ? meas.measg.SP_r /= model.n : nothing
-    meas.measg.coschi /= model.n
-    weights!(meas,model)
+    # :ε in model.meas ? meas.measCell.ε ./= model.n : nothing
+    # :x in model.meas ? meas.measCell.x ./= model.n : nothing
+    # :y in model.meas ? meas.measCell.y ./= model.n : nothing
+    # :z in model.meas ? meas.measCell.z ./= model.n : nothing
+    # :tz in model.meas ? meas.measCell.tz ./= model.n : nothing
+    # :xy in model.meas ? meas.measCell.xy ./= model.n : nothing
+    # :xy in model.meas ? meas.measCell.xybins ./= model.n : nothing
+    # :SP in model.meas ? meas.measg.SP_ε /= model.n : nothing
+    # :SP_z in model.meas ? meas.measg.SP_εs /= model.n : nothing
+    # :SP in model.meas ? meas.measg.SP_r /= model.n : nothing
+    # meas.measg.coschi /= model.n
+    # weights!(meas,model)
     swarmMeas = swarmMeasurements(meas,params,model)
     meas, swarmMeas
 end
@@ -63,35 +63,44 @@ end
 
 function swarmMeasurements(meas,params,model)
 
-    εs::Vector{Quantity} = []
-    Rs::Vector{Quantity} = []
-    bWs::Vector{Quantity} = []
-    bDts::Vector{Quantity} = []
-    bDls::Vector{Quantity} = []
-    fQts::Vector{Quantity} = []
-    fQls::Vector{Quantity} = []
-    fεs::Vector{Quantity} = []
-    fWs::Vector{Quantity} = []
-    fDts::Vector{Quantity} = []
-    fDls::Vector{Quantity} = []
+    εs = Array{Quantity, 1}(undef, length(meas.meast.w)-1)
+    Rs = Array{Quantity, 1}(undef, length(meas.meast.w)-1)
+    bWs = Array{Quantity, 1}(undef, length(meas.meast.w)-1)
+    bDts = Array{Quantity, 1}(undef, length(meas.meast.w)-1)
+    bDls = Array{Quantity, 1}(undef, length(meas.meast.w)-1)
+    fQts = Array{Quantity, 1}(undef, length(meas.meast.w)-1)
+    fQls = Array{Quantity, 1}(undef, length(meas.meast.w)-1)
+    fεs = Array{Quantity, 1}(undef, length(meas.meast.w)-1)
+    fWs = Array{Quantity, 1}(undef, length(meas.meast.w)-1)
+    fDts = Array{Quantity, 1}(undef, length(meas.meast.w)-1)
+    fDls = Array{Quantity, 1}(undef, length(meas.meast.w)-1)
     #bins = length(meas.meast.w[1:end])
     for i in 2:length(meas.meast.w)
-        push!(εs,meas.meast.εᵢ[i])
-        push!(Rs,(log(meas.meast.w[i])-log(meas.meast.w[i-1]))/(params.tbins[2]-params.tbins[1]))
+        εs[i-1] = meas.meast.εᵢ[i] 
+        Rs[i-1] = (log(meas.meast.w[i])-log(meas.meast.w[i-1]))/(params.tbins[2]-params.tbins[1]) 
 
-        push!(bWs,(meas.meast.r[i,3]-meas.meast.r[i-1,3])/(params.tbins[2]-params.tbins[1]))
+        bWs[i-1] = (meas.meast.r[i,3]-meas.meast.r[i-1,3])/(params.tbins[2]-params.tbins[1]) 
 
-        push!(bDls, (1/2 * ( (meas.meast.r²[i,3] - meas.meast.r[i,3]^2) - (meas.meast.r²[i-1,3] - meas.meast.r[i-1,3]^2) )) / (params.tbins[2]-params.tbins[1]))
+        bDls[i-1] =  (1/2 * ( (meas.meast.r²[i,3] - meas.meast.r[i,3]^2) - (meas.meast.r²[i-1,3] - meas.meast.r[i-1,3]^2) )) / (params.tbins[2]-params.tbins[1]) 
 
-        push!(bDts, (1/4 * ( (meas.meast.r²[i,2] + meas.meast.r²[i,1]) - (meas.meast.r²[i-1,2] + meas.meast.r²[i-1,1]) )) / (params.tbins[2]-params.tbins[1]))
+        bDts[i-1] =  (1/4 * ( (meas.meast.r²[i,2] + meas.meast.r²[i,1]) - (meas.meast.r²[i-1,2] + meas.meast.r²[i-1,1]) )) / (params.tbins[2]-params.tbins[1]) 
 
         if :f in model.meas
-            push!(fWs,sqrt(dot(meas.measc.v_final[i,:],meas.measc.v_final[i,:])))
-            push!(fDls, meas.measc.rv_final[i,3] - meas.measc.v_final[i,3]*meas.measc.r_final[i,3])
-            push!(fDts, 0.5 * (meas.measc.rv_final[i,2]+meas.measc.rv_final[i,1]))
-            push!(fQls, meas.measc.r²v_final[i,3]/2-meas.measc.v_final[i,3]*meas.measc.r²_final[i,3]/2-meas.measc.r_final[i,3]*meas.measc.rv_final[i,3]+meas.measc.r_final[i,3]*meas.measc.r_final[i,3]*meas.measc.v_final[i,3])
-            push!(fQts, meas.measc.rx²vz_final[i]/6-meas.measc.rzrxvx_final[i]/3-meas.measc.v_final[i,3]*meas.measc.r²_final[i,1]/6+meas.measc.r_final[i,3]*meas.measc.rv_final[i,1]/3)
+            fWs[i-1] = sqrt(dot(meas.measc.v_final[i,:],meas.measc.v_final[i,:])) 
+            fDls[i-1] =  meas.measc.rv_final[i,3] - meas.measc.v_final[i,3]*meas.measc.r_final[i,3] 
+            fDts[i-1] =  0.5 * (meas.measc.rv_final[i,2]+meas.measc.rv_final[i,1]) 
+            fQls[i-1] =  meas.measc.r²v_final[i,3]/2-meas.measc.v_final[i,3]*meas.measc.r²_final[i,3]/2-meas.measc.r_final[i,3]*meas.measc.rv_final[i,3]+meas.measc.r_final[i,3]*meas.measc.r_final[i,3]*meas.measc.v_final[i,3] 
+            fQts[i-1] =  meas.measc.rx²vz_final[i]/6-meas.measc.rzrxvx_final[i]/3-meas.measc.v_final[i,3]*meas.measc.r²_final[i,1]/6+meas.measc.r_final[i,3]*meas.measc.rv_final[i,1]/3 
         end
+    end
+
+
+    if !isassigned(fWs,1)
+        fWs = bWs
+        fDls = bDls
+        fDts = bDts
+        fQls = [1m^3/s,1m^3/s]
+        fQts = [1m^3/s,1m^3/s]
     end
 
     εs = uconvert.(eV,    εs)
@@ -99,20 +108,12 @@ function swarmMeasurements(meas,params,model)
     bWs = uconvert.(m/s,    bWs)
     bDts = uconvert.(m^2/s,    bDts)
     bDls = uconvert.(m^2/s,    bDls)
-    fεs = uconvert.(eV,    fεs)
+    # fεs = uconvert.(eV,    fεs)
     fWs = uconvert.(m/s,    fWs)
     fDts = uconvert.(m^2/s,    fDts)
     fDls = uconvert.(m^2/s,    fDls)
     fQts = uconvert.(m^3/s,    fQts)
     fQls = uconvert.(m^3/s,    fQls)
-
-    if isempty(fWs)
-        fWs = bWs
-        fDls = bDls
-        fDts = bDts
-        fQls = [1m^3/s,1m^3/s]
-        fQts = [1m^3/s,1m^3/s]
-    end
 
     swarm=SWARMMEAS(measurement(mean(εs[end÷2:end]),std(εs[end÷2:end])),εs,
         measurement(mean(Rs[end÷2:end]./uconvert(m^-3,params.n0)),std(Rs[end÷2:end]./uconvert(m^-3,params.n0))),Rs./uconvert(m^-3,params.n0),
