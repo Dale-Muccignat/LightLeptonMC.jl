@@ -1,8 +1,34 @@
 module Utils
 
-using MCSimUnits, LinearAlgebra, Roots
+using ..Structs
+using MCSimUnits, LinearAlgebra, Roots, AndExport
 export debugParticle, getEnergy, getVelocity, structprint, adaptiveMesh, adaptiveMeshlog
 
+@xport function getTotalFreq(particle,model,params)
+    params.total_freq[particle.cbin]
+end
+
+@xport function getDensity(particle,n0::UniformDensity,params)
+    params.n0
+end
+@xport function getDensity(particle,n0::LμJDensity,params)
+    params.n0[particle.rbin]
+end
+@xport function getDensity(particle,n0::LμJDensityGradient,params)
+    params.n0[particle.rbin]
+end
+@xport function getDensity(particle,n0::CellDensity,params)
+    params.n0[particle.zbin]
+end
+
+function findTotalCF(en,model,params)
+    CS = 0. *u"Å^2*m/s"
+    for cs_ind in eachindex(params.splat_gas.cs)
+        @inbounds CS += params.splat_gas.cs[cs_ind](en) * params.splat_gas.w[cs_ind] * sqrt(en/electron_v2eV)
+    end
+
+    return CS
+end
 function debugParticle(header,particle)
     """
     Particle $header: 
