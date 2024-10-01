@@ -226,10 +226,10 @@ end
 function getZDt(field::UniformField,particle,model,params)
     if params.zbins != nothing
         # if (particle.v[3] < 0m/s) && (( (particle.v[3]^2)/(params.a[3]*params.n0) + 2*params.zbins[particle.zbin]-2e-10m ) > 2*particle.r[3]) && (particle.zbin != 0)
-        if (particle.v[3] < 0m/s) && ((particle.v[3])^2 - 2*(params.a[3]*params.n0)*(particle.r[3]-params.zbins[particle.zbin]+1e-14m̃) > 0m^2/s^2) && (particle.zbin != 0)
-            # return dt_EVENT((- particle.v[3] - sqrt( (particle.v[3])^2 - 2*(params.a[3]*params.n0)*(particle.r[3]-params.zbins[particle.zbin]+1e-12m) ))/(params.a[3]*params.n0), :dt_zbin,:Down)
-            a = (- particle.v[3] - sqrt( (particle.v[3])^2 - 2*(params.a[3]*params.n0)*(particle.r[3]-params.zbins[particle.zbin]+1e-14m̃ ) ))/(params.a[3]*params.n0)
-            b = (- particle.v[3] + sqrt( (particle.v[3])^2 - 2*(params.a[3]*params.n0)*(particle.r[3]-params.zbins[particle.zbin]+1e-14m̃ ) ))/(params.a[3]*params.n0)
+        if (particle.v[3] < 0m/s) && ((particle.v[3])^2 - 2*(params.a[3]*params.n0)*(particle.r[3]-params.zbins[particle.zbin]+1e-11m̃) > 0m^2/s^2) && (particle.zbin != 0)
+            # return dt_EVENT((- particle.v[3] - sqrt( (particle.v[3])^2 - 2*(params.a[3]*params.n0)*(particle.r[3]-params.zbins[particle.zbin]+1e-11m) ))/(params.a[3]*params.n0), :dt_zbin,:Down)
+            a = (- particle.v[3] - sqrt( (particle.v[3])^2 - 2*(params.a[3]*params.n0)*(particle.r[3]-params.zbins[particle.zbin]+1e-11m̃ ) ))/(params.a[3]*params.n0)
+            b = (- particle.v[3] + sqrt( (particle.v[3])^2 - 2*(params.a[3]*params.n0)*(particle.r[3]-params.zbins[particle.zbin]+1e-11m̃ ) ))/(params.a[3]*params.n0)
             b > 0s && b < a && error("Zbin calculation error down: a=$(a), b=$(b)")
             # if particle.v[3]^2 - 2*(params.a[3]*params.n0)*(particle.r[3]-params.zbins[particle.zbin+1]-1e-14m̃ ) > 0m̃^2/s̃^2
             #     c = (- particle.v[3] + sqrt( particle.v[3]^2 - 2*(params.a[3]*params.n0)*(particle.r[3]-params.zbins[particle.zbin+1]-1e-14m̃ ) ))/(params.a[3]*params.n0)
@@ -245,12 +245,12 @@ function getZDt(field::UniformField,particle,model,params)
                 @info params.zbins[particle.zbin]
                 @info params.zbins[particle.zbin+1]
             end
-            a = (- particle.v[3] + sqrt( particle.v[3]^2 - 2*(params.a[3]*params.n0)*(particle.r[3]-params.zbins[particle.zbin+1]-1e-13m̃ ) ))/(params.a[3]*params.n0)
-            b = (- particle.v[3] - sqrt( particle.v[3]^2 - 2*(params.a[3]*params.n0)*(particle.r[3]-params.zbins[particle.zbin+1]-1e-13m̃ ) ))/(params.a[3]*params.n0)
+            a = (- particle.v[3] + sqrt( particle.v[3]^2 - 2*(params.a[3]*params.n0)*(particle.r[3]-params.zbins[particle.zbin+1]-1e-11m̃ ) ))/(params.a[3]*params.n0)
+            b = (- particle.v[3] - sqrt( particle.v[3]^2 - 2*(params.a[3]*params.n0)*(particle.r[3]-params.zbins[particle.zbin+1]-1e-11m̃ ) ))/(params.a[3]*params.n0)
             b > 0s && b < a && error("Zbin calculation error up: a=$(a), b=$(b)")
-            if (particle.v[3])^2 - 2*(params.a[3]*params.n0)*(particle.r[3]-params.zbins[particle.zbin]+1e-14m̃ ) > 0m̃^2/s̃^2
-                c = (- particle.v[3] - sqrt( (particle.v[3])^2 - 2*(params.a[3]*params.n0)*(particle.r[3]-params.zbins[particle.zbin]+1e-13m̃ ) ))/(params.a[3]*params.n0)
-                d = (- particle.v[3] + sqrt( (particle.v[3])^2 - 2*(params.a[3]*params.n0)*(particle.r[3]-params.zbins[particle.zbin]+1e-13m̃ ) ))/(params.a[3]*params.n0)
+            if (particle.v[3])^2 - 2*(params.a[3]*params.n0)*(particle.r[3]-params.zbins[particle.zbin]+1e-11m̃ ) > 0m̃^2/s̃^2
+                c = (- particle.v[3] - sqrt( (particle.v[3])^2 - 2*(params.a[3]*params.n0)*(particle.r[3]-params.zbins[particle.zbin]+1e-11m̃ ) ))/(params.a[3]*params.n0)
+                d = (- particle.v[3] + sqrt( (particle.v[3])^2 - 2*(params.a[3]*params.n0)*(particle.r[3]-params.zbins[particle.zbin]+1e-11m̃ ) ))/(params.a[3]*params.n0)
                 (c > 0s && c < a) || (d > 0s && d < a) && error(""" Zbin calculation error up: a=$(a), b=$(b), c=$(c), d=$(d)
                                                                 $(debugParticle("Zbin error",particle))
                                                                 $(params.zbins[particle.zbin])
