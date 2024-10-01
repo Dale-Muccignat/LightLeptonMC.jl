@@ -22,20 +22,21 @@ end
 end
 
 @xport function process(type::CELL,meas,params,model)
-    # :ε in model.meas ? meas.measCell.ε ./= model.n : nothing
-    # :x in model.meas ? meas.measCell.x ./= model.n : nothing
-    # :y in model.meas ? meas.measCell.y ./= model.n : nothing
-    # :z in model.meas ? meas.measCell.z ./= model.n : nothing
-    # :tz in model.meas ? meas.measCell.tz ./= model.n : nothing
-    # :xy in model.meas ? meas.measCell.xy ./= model.n : nothing
-    # :xy in model.meas ? meas.measCell.xybins ./= model.n : nothing
-    # :SP in model.meas ? meas.measg.SP_ε /= model.n : nothing
-    # :SP_z in model.meas ? meas.measg.SP_εs /= model.n : nothing
-    # :SP in model.meas ? meas.measg.SP_r /= model.n : nothing
-    # meas.measg.coschi /= model.n
+    :ε in model.meas ? meas.measCell.ε ./= model.n : nothing
+    :x in model.meas ? meas.measCell.x ./= model.n : nothing
+    :y in model.meas ? meas.measCell.y ./= model.n : nothing
+    :z in model.meas ? meas.measCell.z ./= model.n : nothing
+    :tz in model.meas ? meas.measCell.tz ./= model.n : nothing
+    :xy in model.meas ? meas.measCell.xy ./= model.n : nothing
+    :xy in model.meas ? meas.measCell.xybins ./= model.n : nothing
+    :SP in model.meas ? meas.measg.SP_ε /= model.n : nothing
+    :SP_z in model.meas ? meas.measg.SP_εs /= model.n : nothing
+    :SP in model.meas ? meas.measg.SP_r /= model.n : nothing
+    meas.measg.coschi /= model.n
     # weights!(meas,model)
-    swarmMeas = swarmMeasurements(meas,params,model)
-    meas, swarmMeas
+    # swarmMeas = swarmMeasurements(meas,params,model)
+    # meas, swarmMeas
+    meas, SWARMMEAS()
 end
 
 function weights!(meas,model)

@@ -330,7 +330,7 @@ end
 
 function buildTBins(type::CELL,model)
     # return LinRange(0s,type.t_f,10000)
-    return 0s:1e-10s:type.t_f
+    return 0s:1e-9s:type.t_f
 end
 
 function buildχBins(type::CELL,model)

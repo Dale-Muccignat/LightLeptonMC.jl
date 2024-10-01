@@ -161,8 +161,13 @@ function mc(model::MCMODEL,params::MCPARAMS;verbose=false)
             @info "Progress: "*string(100*n/model.n)*"%"
         end
 
-        meas_inner = flight(PART(model,params),model,params,verbose)
-        [meas_inner]
+        # TODO: Account for no of ionisation events
+        # meas_inner = flight(PART(model,params),model,params,verbose)
+        # if model.ion_type.method == :EXPLICIT
+
+        # end
+        # [meas_inner]
+        [flight(PART(model,params),model,params,verbose)]
     end
     @debug "Finished Sim"
     # @show params.rbins

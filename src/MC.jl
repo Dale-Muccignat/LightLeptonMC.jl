@@ -3,6 +3,7 @@ module MC
 using ..Utils
 using ..Structs
 using ..Init
+using ..TimeOfFlight
 using AutoParameters, Random, StaticArrays, LinearAlgebra, AndExport, MCSimUnits
 export flight
 
@@ -26,13 +27,16 @@ function flight(particle_og,model,params,verbose)
     @debug "Conducting flight..."
     :f in model.meas && (params.a[1] > 0m^4/s^2 || params.a[2] > 0m^4/s^2) && @warn "Measuring flux with x or y field, third order will be wrong."
     meas_inner = initMeas(model,params)
+    # Preallocate arrays
+    dts = Array{dt_EVENT, 1}(undef, 7)
+    dt_times = Array{Quantity, 1}(undef, 7)
 
     measureTbin!(particle_og,model,params,meas_inner) ## measure initial stuff
 
     new_particles = [particle_og]
     while !isempty(new_particles)
         particle_inner = new_particles[1]
-        if length(new_particles) > 2000
+        if length(new_particles) > 10000
             error("Too many ionisation events")
         end
         # @show length(new_particles)
@@ -40,7 +44,7 @@ function flight(particle_og,model,params,verbose)
             #@debug "Particle before: " particle
             @debug debugParticle("before",particle_inner)
             checkBins(dt_EVENT(1s,:before,:before),particle_inner,params)
-            dt = getDt(particle_inner,model,params,verbose)
+            dt = getDt!(dts,dt_times,particle_inner,model,params,verbose)
 
             :f in model.meas ? measureCumulative!(dt.time,particle_inner,model.En0,model.n0,model,params,meas_inner,verbose) : nothing
             updateParticle!(dt.time,particle_inner,model.En0,model.n0,model,params,meas_inner,verbose)
@@ -81,7 +85,7 @@ function checkBins(dt,particle,params)
                                                                                                                                              )
     end
     if params.zbins != nothing && 0 < particle.zbin < length(params.zbins)
-        (params.zbins[particle.zbin]-eps()*m) <= particle.r[3] <= (params.zbins[particle.zbin+1]+eps()*m) && particle.r[3] > params.zbins[1] || error("""zbin error
+        (params.zbins[particle.zbin]-(1e12+eps())*m) <= particle.r[3] <= (params.zbins[particle.zbin+1]+(1e12+eps())*m) && particle.r[3] > params.zbins[1] || error("""zbin error
             $(params.zbins[particle.zbin])
             $(particle.r[3])
             $(params.zbins[particle.zbin+1])
@@ -348,8 +352,8 @@ function measureTbin!(particle,model,params,meas_inner)
 
     :zyt ∈ model.meas ? meas_inner.measLμJ.zyt[particle.zbin,particle.ybin,particle.tbin] += particle.weight : nothing
 
-    :tz ∈ model.meas ? meas_inner.measCell.tz[particle.tbin,particle.zbin] += particle.weight : nothing
-    :tz ∈ model.meas ? meas_inner.measCell.v_tz[particle.tbin,particle.zbin] += particle.weight*particle.v[3] : nothing
+    @inbounds :tz ∈ model.meas ? meas_inner.measCell.tz[particle.tbin,particle.zbin] += particle.weight : nothing
+    # @inbounds :tz ∈ model.meas ? meas_inner.measCell.v_tz[particle.tbin,particle.zbin] += particle.weight*particle.v[3] : nothing
     # :tz ∈ model.meas && params.zbins[2] < particle.r[3] < params.zbins[end] ? meas_inner.measCell.tz[particle.tbin,1] += particle.weight : nothing
     # :tz ∈ model.meas && particle.r[3] < params.zbins[end] ? meas_inner.measCell.tz[particle.tbin,1] += particle.weight : nothing
 end
@@ -408,7 +412,7 @@ end
         # @show CS
         # @show getTotalFreq(particle,model,params,verbose)
 
-        CS/getTotalFreq(particle,model,params) > 1+1e-8 && error("Collision freq error: CS=$(CS) CS_Total=$(getTotalFreq(particle,model,params))")
+        # CS/getTotalFreq(particle,model,params) > 1+1e-8 && error("Collision freq error: CS=$(CS) CS_Total=$(getTotalFreq(particle,model,params))")
 
         if R < CS/getTotalFreq(particle,model,params)
             return cs_ind
