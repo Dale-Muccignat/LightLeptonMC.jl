@@ -217,7 +217,18 @@ end
     getVelocity::AUTO
 end
 
-@xport function FunctionalEnergy(velocityDist)
+@xport function iso() # TODO: Moves these outside of the function
+    coschi = 1-2*rand()
+    sinchi = sqrt(1-coschi^2)
+    phi = rand()*2*pi
+    return [cos(phi)*sinchi,sin(phi)*sinchi,coschi]
+end
+
+@xport function delta()
+    return [0,0,1]
+end
+
+@xport function FunctionalEnergy(velocityDist; direction=delta())
     # takes velocityDist and creates a cumulative distribution function to sample from
     # assumes isotropic scattering
     energies = 10. .^(-4:0.001:2) .*sqrt(eV)
@@ -238,27 +249,15 @@ end
         vals[i] < 0 && (vals[i] = 0)
     end
     # return vals
-    @show sum(vals)
     vals = vals ./ norm
-    @show sum(vals)
     vals = cumsum(vals)
     vals[end] = 1. 
 
-    function iso() # TODO: Moves these outside of the function
-        coschi = 1-2*rand()
-        sinchi = sqrt(1-coschi^2)
-        phi = rand()*2*pi
-        return [cos(phi)*sinchi,sin(phi)*sinchi,coschi]
-    end
-    function delta()
-        return [0,0,1]
-    end
     @show energies[1], vals[1]
 
     spl = LinearInterpolation(Interpolations.deduplicate_knots!(vals),energies.^2,extrapolation_bc=0eV)
 
-    # return FunctionalEnergy(delta,spl)
-    return FunctionalEnergy(iso,spl)
+    return FunctionalEnergy(direction,spl)
 end
 
 """
