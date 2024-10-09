@@ -228,7 +228,7 @@ end
     return [0,0,1]
 end
 
-@xport function FunctionalEnergy(velocityDist; direction=delta())
+@xport function FunctionalEnergy(velocityDist; direction=delta)
     # takes velocityDist and creates a cumulative distribution function to sample from
     # assumes isotropic scattering
     energies = 10. .^(-4:0.001:2) .*sqrt(eV)
