@@ -1,35 +1,24 @@
-module Utils
-
-using ..Structs
-using MCSimUnits, LinearAlgebra, Roots, AndExport
-export debugParticle, getEnergy, getVelocity, structprint, adaptiveMesh, adaptiveMeshlog
-
-@xport function getTotalFreq(particle,model,params)
+function getTotalFreq(particle, model, params)
     params.total_freq[particle.cbin]
 end
 
-@xport function getDensity(particle,n0::UniformDensity,params)
+function getDensity(particle, n0::UniformDensity, params)
     params.n0
 end
-@xport function getDensity(particle,n0::LμJDensity,params)
+
+function getDensity(particle, n0::LμJDensity, params)
     params.n0[particle.rbin]
 end
-@xport function getDensity(particle,n0::LμJDensityGradient,params)
+
+function getDensity(particle, n0::LμJDensityGradient, params)
     params.n0[particle.rbin]
 end
-@xport function getDensity(particle,n0::CellDensity,params)
+
+function getDensity(particle, n0::CellDensity, params)
     params.n0[particle.zbin]
 end
 
-function findTotalCF(en,model,params)
-    CS = 0. *u"Å^2*m/s"
-    for cs_ind in eachindex(params.splat_gas.cs)
-        @inbounds CS += params.splat_gas.cs[cs_ind](en) * params.splat_gas.w[cs_ind] * sqrt(en/electron_v2eV)
-    end
-
-    return CS
-end
-function debugParticle(header,particle)
+function debugParticle(header, particle)
     """
     Particle $header: 
       ε: $(uconvert(eV,getEnergy(particle.v)))
@@ -41,22 +30,22 @@ function debugParticle(header,particle)
 end
 
 function getEnergy(v)
-    0.5*me*dot(v,v)
+    0.5 * me * dot(v, v)
 end
 
 function getVelocity(ε)
-    sqrt(ε*2/me)
+    sqrt(ε * 2 / me)
 end
 
 
-function adaptiveMeshlog(func,lower,upper,δ)
+function adaptiveMeshlog(func, lower, upper, δ)
     # Create an adaptive mesh that has a data point for each "δ" change
     # Start with the lower value
     # Find the func of that value
     # Find the value that has a func value δ different to that of the previous step, this value
     # should be larger
     # stored_xunit = unit(lower)*0+(1*unit(lower))
-    stored_yunit = unit(func(lower))*0+(1*unit(func(lower)))
+    stored_yunit = unit(func(lower)) * 0 + (1 * unit(func(lower)))
     # @debug """
     # $(stored_yunit)
     # """
@@ -70,16 +59,16 @@ function adaptiveMeshlog(func,lower,upper,δ)
     while xs[end] < upper
         n += 1
         n > 100 && break
-        sol = find_zeros((z) -> func(z)-10^(y*(1+δ))*stored_yunit,xs[end],upper)
+        sol = find_zeros((z) -> func(z) - 10^(y * (1 + δ)) * stored_yunit, xs[end], upper)
         if isempty(sol)
-            sol = find_zeros((z) -> func(z)-10^(y*(1-δ))*stored_yunit,xs[end],upper)
+            sol = find_zeros((z) -> func(z) - 10^(y * (1 - δ)) * stored_yunit, xs[end], upper)
             # @debug """
             # Adaptive Mesh Down
             # $(xs[end])
             # $(y)
             # $(sol)
             # """
-            y *= 1-δ
+            y *= 1 - δ
         else
             # @debug """
             # Adaptive Mesh Up
@@ -87,17 +76,17 @@ function adaptiveMeshlog(func,lower,upper,δ)
             # $(y)
             # $(sol)
             # """
-            y *= 1+δ
+            y *= 1 + δ
         end
         isempty(sol) && break
-        push!(xs,minimum(sol))
+        push!(xs, minimum(sol))
     end
-    push!(xs,upper)
-     
+    push!(xs, upper)
+
     return xs
 end
 
-function adaptiveMesh(func,lower,upper,δ)
+function adaptiveMesh(func, lower, upper, δ)
     # Create an adaptive mesh that has a data point for each "δ" change
     # Start with the lower value
     # Find the func of that value
@@ -109,16 +98,16 @@ function adaptiveMesh(func,lower,upper,δ)
     while xs[end] < upper
         n += 1
         n > 100 && break
-        sol = find_zeros((z) -> func(z)-y*(1+δ),xs[end],upper)
+        sol = find_zeros((z) -> func(z) - y * (1 + δ), xs[end], upper)
         if isempty(sol)
-            sol = find_zeros((z) -> func(z)-y*(1-δ),xs[end],upper)
+            sol = find_zeros((z) -> func(z) - y * (1 - δ), xs[end], upper)
             @debug """
             Adaptive Mesh Down
             $(xs[end])
             $(y)
             $(sol)
             """
-            y *= 1-δ
+            y *= 1 - δ
         else
             @debug """
             Adaptive Mesh Up
@@ -126,13 +115,13 @@ function adaptiveMesh(func,lower,upper,δ)
             $(y)
             $(sol)
             """
-            y *= 1+δ
+            y *= 1 + δ
         end
         isempty(sol) && break
-        push!(xs,minimum(sol))
+        push!(xs, minimum(sol))
     end
-    push!(xs,upper)
-     
+    push!(xs, upper)
+
     return xs
 end
 
@@ -147,5 +136,4 @@ end
     push!(expr.args, :(obj = T(contents...)))
 
     expr
-end
 end

@@ -1,271 +1,54 @@
-module Init
+function initParams(input_gas=MaxwellModel(), model::MCMODEL=MCMODEL())
 
-using ..Utils
-using ..Structs
-using LinearAlgebra, StaticArrays, AndExport, Gases, LXCatParser, AutoParameters, Interpolations, QuadGK, MCSimUnits
-
-export initParams, initMeas, PART, getEnergy, test
-
-@AutoParm struct MCGAS
-    cs::AUTO
-    dcs::AUTO
-    type::AUTO
-    thresh::AUTO
-    m::AUTO
-    w::AUTO
-end
-
-
-function initParams(input_gas=MaxwellModel(),model::MCMODEL=MCMODEL())
-
-    cbins = [0.,(10. .^(-8:0.1:-1))...,(10. .^(-0.98:0.02:2.98))...,(10. .^(3:0.1:10))...].*eV
+    cbins = [0.0, (10.0 .^ (-8:0.1:-1))..., (10.0 .^ (-0.98:0.02:2.98))..., (10.0 .^ (3:0.1:10))...] .* eV #TODO: move to input struct
 
     tbins, ebins, rbins, χbins, zbins, ybins, xbins = generateBins(model)
-    n0=buildDensity(model.n0,rbins,zbins)
-    a=buildField(model.En0)
+    n0 = buildDensity(model.n0, rbins, zbins)
+    a = buildField(model.En0)
 
-    length_scale = 1e23*1e-20
-    time_scale = 1e23*1e-20*sqrt(2*q/me)
-    energy_scale = (length_scale/time_scale)^2
-
-    splat_gas=splatCS(input_gas,model.T.val,energy_scale,collect(ustrip.(cbins))) #NOTE: This grid needs to be finer than cbins for the null collision method to work
-    total_freq=upreferred.(buildFreq(model,splat_gas,cbins,energy_scale))
+    #' splat_gas = splatCS(input_gas, model.T.val, energy_scale, collect(ustrip.(cbins))) #NOTE: This grid needs to be finer than cbins for the null collision method to work
+    total_freq = upreferred.(buildFreq(input_gas, cbins))
 
     params = MCPARAMS(
-        ebins=uconvert.(J̃,ebins),
+        ebins=uconvert.(J̃, ebins),
         tbins=upreferred.(tbins),
         zbins=upreferred.(zbins),
         ybins=upreferred.(ybins),
         xbins=upreferred.(xbins),
-        cbins=uconvert.(J̃,cbins),
+        cbins=uconvert.(J̃, cbins),
         rbins=upreferred.(rbins),
         χbins=upreferred.(χbins),
         gas=input_gas,
-        splat_gas=splat_gas,
         n0=upreferred.(n0),
         a=upreferred.(a),
         total_freq=total_freq,
-        length_scale = length_scale,
-        time_scale = time_scale,
-        energy_scale = energy_scale
-        )
+    )
 
     return params
 end
 
-# * Scale functions
-@xport function scale!(model,type::LμJ,params)
-    ls = params.length_scale
-    ts = params.time_scale
-    es = params.energy_scale
-
-    model.type.jet_center .*= ls
-end
-
-@xport function scale!(model,type::CELL,params)
-    ls = params.length_scale
-    ts = params.time_scale
-    es = params.energy_scale
-end
-
-@xport function scale!(model,type::SWARM,params)
-    ls = params.length_scale
-    ts = params.time_scale
-    es = params.energy_scale
-end
-@xport function scale!(params)
-    ls = params.length_scale
-    ts = params.time_scale
-    es = params.energy_scale
-
-    params.cbins *= es
-    params.ebins *= es
-    params.total_freq /= ts#/ls^3
-    params.a *= ls^4/ts^2
-    params.n0 /= ls^3
-    params.rbins *= ls^2
-    params.xbins *= ls
-    params.ybins *= ls
-    params.zbins *= ls
-    params.tbins *= ts
-
-    return params
-end
-
-@xport function unscale!(params)
-    ls = 1/params.length_scale
-    ts = 1/params.time_scale
-    es = 1/params.energy_scale
-
-    params.cbins *= es
-    params.ebins *= es
-    params.total_freq /= ts#/ls^3
-    params.a *= ls^4/ts^2
-    params.n0 /= ls^3
-    params.rbins *= ls^2
-    params.xbins *= ls
-    params.ybins *= ls
-    params.zbins *= ls
-    params.tbins *= ts
-
-    return params
-end
-
-@xport function unscale!(type::SWARM,model,params,meas::MEAS)
-    ls = 1/params.length_scale
-    ts = 1/params.time_scale
-    es = 1/params.energy_scale
-    meas.meast.εᵢ .*= es
-    meas.meast.v² .*= es
-    meas.meast.r² .*= ls^2
-    meas.meast.r .*= ls
-    meas.meast.v .*= ls/ts
-    meas.meast.rv .*= ls^2/ts
-    meas.measc.r .*= ls
-    meas.measc.v .*= ls/ts
-    meas.measc.rv .*= ls^2/ts
-end
-
-@xport function unscale!(type::LμJ,model,params,meas::MEAS)
-    ls = 1/params.length_scale
-    ts = 1/params.time_scale
-    es = 1/params.energy_scale
-    model.type.jet_center .*= ls
-end
-
-@xport function unscale!(type::CELL,model,params,meas::MEAS)
-    ls = 1/params.length_scale
-    ts = 1/params.time_scale
-    es = 1/params.energy_scale
-    meas.measg.SP_ε *= es
-    :SP_z in model.meas ? meas.measg.SP_εs .*= es : nothing
-    meas.measg.SP_r *= ls
-end
-
-function initMeas(model,params::MCPARAMS = MCPARAMS())
-    MEAS(model.type,model,params)
+function initMeas(model, params::MCPARAMS=MCPARAMS())
+    MEAS(model.type, model, params)
 end
 
 #### Frequency ####
 
-function buildFreq(model,gas,cbins,energy_scale)
-    total_freq = zeros(length(cbins)) .*m^3 ./s
-    en_spacing = cbins[end]-cbins[end-1]
+function getTotalFreq(gas::LLCS, ε)
+    #' sum([gas.cs[j](en) * sqrt(2 * en / me) * gas.w[j] for j in eachindex(gas.cs)])
+    νₘ(gas, ε) + νₑₓ(gas, ε) + νₐₜ(gas, ε) + νᵢₒ(gas, ε)
+end
+
+function buildFreq(gas::LLCS, cbins)
+    total_freq = zeros(length(cbins)) .* sqrt(eV) .* Å^2
+    en_spacing = cbins[end] - cbins[end-1]
+    inv_total(ε) = -getTotalFreq(gas, ε)
+
     for i in 1:length(total_freq)-1
-        total_freq[i] = maximum([sum([gas.cs[j](en)*sqrt(2*en/me)*gas.w[j] for j in eachindex(gas.cs)]) for en in LinRange(cbins[i],cbins[i+1],1000)])
-        #NOTE: This is no longer a frequency
+        total_freq[i] = -Optim.minimum(optimize(inv_total, ustrip(sqrt(eV), sqrt(cbins[i])), ustrip(sqrt(eV), sqrt(cbins[i+1])))) * sqrt(eV) * Å^2
     end
-    total_freq[end] = maximum([sum([gas.cs[j](en)*sqrt(2*en/me)*gas.w[j] for j in eachindex(gas.cs)]) for en in LinRange(cbins[end],cbins[end]+en_spacing,1000)])
+    total_freq[end] = -Optim.minimum(optimize(inv_total, ustrip(sqrt(eV), sqrt(cbins[end])), ustrip(sqrt(eV), sqrt(cbins[end] + en_spacing)))) * sqrt(eV) * Å^2
+
     return total_freq
-end
-
-@xport function addSuperElastics(gas,T)
-    excitations_super::Vector{Function} = []
-    excitations::Vector{Function} = []
-
-    # Z_total = Z_T(gas.exlosses,ustrip(T))
-
-    inds = []
-    if !isempty(gas.ex_nos)
-        no_gases = maximum(gas.ex_nos)
-        for j in 1:no_gases
-            Z_total = 1.
-            for (i,cs) in enumerate(gas.excitation) if gas.excitation[i].type === :ROTATION && gas.ex_nos[i] == j
-                Z_total += Z(gas.exlosses[i],ustrip(T))
-            end end
-            for (i,cs) in enumerate(gas.excitation) if gas.excitation[i].type === :ROTATION && gas.ex_nos[i] == j
-                @debug cs.type cs.energy_loss Z(gas.exlosses[i],ustrip(T))./(Z_total)
-                    push!(excitations_super, (ε)->(ε + gas.exlosses[i])*cs(ε+gas.exlosses[i])*Z(gas.exlosses[i],ustrip(T))./(Z_total * ε))
-                    push!(excitations, (ε)->cs(ε)./(Z_total))
-                    push!(inds,i)
-            end end
-
-            for t in (:VIBRATION, :EXCITATION, :DISSOCIATION)
-                for (i,cs) in enumerate(gas.excitation) if gas.excitation[i].type === t && gas.ex_nos[i] == j
-                    @debug cs.type cs.energy_loss Z(gas.exlosses[i],ustrip(T))./((1+Z(gas.exlosses[i],ustrip(T))))
-                    push!(excitations_super, (ε)->(ε + gas.exlosses[i])*cs(ε+gas.exlosses[i])*Z(gas.exlosses[i],ustrip(T))./((1+Z(gas.exlosses[i],ustrip(T))) * ε))
-                    push!(excitations, (ε)->cs(ε)./(1+Z(gas.exlosses[i],ustrip(T))))
-                    push!(inds,i)
-                end end
-            end
-        end
-    end
-
-
-    threshes = [[0. for thresh in gas.elastic]...,[thresh for thresh in gas.exlosses[inds]]...,[-thresh for thresh in gas.exlosses[inds]]...,[thresh for thresh in gas.iolosses]...,[0. for thresh in gas.attachment]...].*eV
-
-    masses = [[m for m in gas.Mₑₗ]...,[m for m in gas.Mₑₓ[inds]]...,[m for m in gas.Mₑₓ[inds]]...,[m for m in gas.Mₐₜ]...,[m for m in gas.Mᵢₒ]...] .* amu
-
-    ws = [[w for w in gas.wₑₗ]...,[w for w in gas.wₑₓ[inds]]...,[w for w in gas.wₑₓ[inds]]...,[w for w in gas.wₐₜ]...,[w for w in gas.wᵢₒ]...]
-
-    gases = [gas.elastic...,excitations...,excitations_super...,gas.ionisation...,gas.attachment...]
-
-    gases_dcss = [gas.elastic_DCS...,gas.excitation_DCS[inds]...,gas.excitation_DCS[inds]...,gas.ionisation_DCS...,gas.attachment_DCS...]
-    return gases, gases_dcss, threshes, masses, ws
-end
-
-
-@xport function splatCS(gas,T,energy_scale,cbins)
-    gases, gases_dcss, threshes, masses, ws = addSuperElastics(gas,T)
-    # gases = [gas.elastic...,gas.excitation...,gas.ionisation...,gas.attachment...]
-    # gases_dcss = [gas.elastic_DCS...,gas.excitation_DCS...,gas.ionisation_DCS...,gas.attachment_DCS...]
-    en_spacing = cbins[end]-cbins[end-1]
-    # ens = LinRange(1e-6,cbins[end]+en_spacing+1.,100)
-    ens = [0.,(10. .^(-8:0.1:-3.1))...,(10. .^(-3:0.1:1.9))...,(10. .^(2:0.1:10))...]
-    ens2 = [0.,(10. .^(-8:0.01:-3))...,(10. .^(-2.99:0.01:2.99))...,(10. .^(3:0.001:10))...].*eV
-    # ens2 = cbins[2:end]
-    θs = LinRange(1e-6,π,100)
-
-    #insert thresholds into energy array so they are handled accurately
-    if any(threshes .> 0eV .&& threshes .!== Inf*eV .&& threshes .!== 0. *eV)
-        [insert!(ens2,findfirst((x)->x>thresh,ens2),thresh) for thresh in threshes if thresh > 0eV && thresh ∉ ens2]
-        [insert!(ens2,findfirst((x)->x>thresh,ens2),thresh) for thresh in prevfloat.(threshes) if thresh > 0eV && thresh ∉ ens2]
-        [insert!(ens2,findfirst((x)->x>thresh,ens2),thresh) for thresh in nextfloat.(threshes) if thresh > 0eV && thresh ∉ ens2]
-    end
-
-    gases_itp = [LinearInterpolation(ens2,gas.(ustrip.(ens2)).*u"Å^2",extrapolation_bc=Flat()) for gas in gases]
-
-    dcss::Vector{Vector{Interpolations.Extrapolation{Float64, 1, Interpolations.GriddedInterpolation{Float64, 1, Vector{Float64}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Tuple{Vector{Float64}}}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Interpolations.Flat{Nothing}}}} = []
-    # replace_nan(v) = map(x -> isnan(x) ? zero(x)+1e-10 : x, v)
-    # replace_0(v) = map(x -> x == 0 ? zero(x)+1e-10 : x, v)
-    for σ in gases_dcss
-        DCS_matrix::Matrix{Float64} = zeros(length(ens),length(θs))
-        for i in eachindex(ens)
-            # func(chi)::Float64 = σ(ens[i],chi) < 1e-10 ? 1e-10 : σ(ens[i],chi)
-            func(chi)::Float64 = σ(ens[i],chi)*sin(chi) < 1e-10 ? 1e-10 : σ(ens[i],chi)*sin(chi)
-            norm = quadgk(func,0,pi)[1]::Float64
-            for j in eachindex(θs)
-                if j == 1
-                    DCS_matrix[i,j] = quadgk(func,0,θs[j])[1]::Float64/norm
-                elseif j == length(θs)
-                    DCS_matrix[i,j] = 1. - sum(DCS_matrix[i,:])
-                else
-                    DCS_matrix[i,j] = quadgk(func,θs[j-1],θs[j])[1]::Float64/norm
-                end
-            end
-        end
-        # DCS_matrix = replace_0(replace_nan(DCS_matrix))
-        DCS_matrix = cumsum(DCS_matrix,dims=2)
-        # @show DCS_matrix
-        spl2 = LinearInterpolation((ens,θs),DCS_matrix,extrapolation_bc=Flat())	#2D spline of the matrix
-        # func3(e,R) = LinearInterpolation(spl2(e,θs),cos.(θs))(R)::Float64	#Interpolates the above vector and evaluates a value of chi for a given R
-        # @show typeof(LinearInterpolation(spl2(1.,θs),cos.(θs)))	#Interpolates the above vector and evaluates a value of chi for a given R
-        #TODO: Try this with energy dependency aswell
-        push!(dcss,[LinearInterpolation(Interpolations.deduplicate_knots!(spl2(c,θs),move_knots=true),cos.(θs),extrapolation_bc=Flat()) for c in cbins])
-    end
-
-
-    types = [[:ELASTIC for i in 1:length(gas.elastic)]...,[:EXCITATION for i in 1:length(gas.excitation)]...,[:EXCITATION for i in 1:length(gas.excitation)]...,[:IONIZATION for i in 1:length(gas.ionisation)]...,[:ATTACHMENT for i in 1:length(gas.attachment)]...]
-
-    # threshes = [[0. for thresh in gas.elastic]...,[thresh for thresh in gas.exlosses]...,[-thresh for thresh in gas.exlosses]...,[thresh for thresh in gas.iolosses]...,[0. for thresh in gas.attachment]...].*eV
-
-    # masses = [[m for m in gas.Mₑₗ]...,[m for m in gas.Mₑₓ]...,[m for m in gas.Mₑₓ]...,[m for m in gas.Mₐₜ]...,[m for m in gas.Mᵢₒ]...] .* amu
-
-    # ws = [[w for w in gas.wₑₗ]...,[w for w in gas.wₑₓ]...,[w for w in gas.wₑₓ]...,[w for w in gas.wₐₜ]...,[w for w in gas.wᵢₒ]...]
-
-
-    MCGAS(gases_itp,dcss,types,threshes,masses,ws)
-    # return gases_itp,dcss,types,threshes,masses,ws
 end
 
 #### * Bins
@@ -275,13 +58,13 @@ function generateBins(model)
 
     m = string.(model.meas)
 
-    tbins = 1 ∈ occursin.("t",m) ? buildTBins(model.type,model) : nothing
-    ebins = 1 ∈ occursin.("ε",m) ? buildEnBins(model.type,model) : nothing
-    zbins = 1 ∈ occursin.("z",m) ? buildZBins(model.type,model) : nothing
-    ybins = 1 ∈ occursin.("y",m) ? buildYBins(model.type,model) : nothing
-    xbins = 1 ∈ occursin.("x",m) ? buildXBins(model.type,model) : nothing
-    rbins = 1 ∈ occursin.("r",m) ? buildRBins(model.type,model,model.n0) : nothing
-    χbins = 1 ∈ occursin.("χ",m) ? buildχBins(model.type,model) : nothing
+    tbins = 1 ∈ occursin.("t", m) ? buildTBins(model.type, model) : nothing
+    ebins = 1 ∈ occursin.("ε", m) ? buildEnBins(model.type, model) : nothing
+    zbins = 1 ∈ occursin.("z", m) ? buildZBins(model.type, model) : nothing
+    ybins = 1 ∈ occursin.("y", m) ? buildYBins(model.type, model) : nothing
+    xbins = 1 ∈ occursin.("x", m) ? buildXBins(model.type, model) : nothing
+    rbins = 1 ∈ occursin.("r", m) ? buildRBins(model.type, model, model.n0) : nothing
+    χbins = 1 ∈ occursin.("χ", m) ? buildχBins(model.type, model) : nothing
 
     return tbins, ebins, rbins, χbins, zbins, ybins, xbins
 
@@ -289,159 +72,159 @@ end
 
 # TODO: Combine these into one function per model
 
-function buildRBins(type::SWARM,model,n0::UniformDensity)
-    return LinRange(0m,1e-6m,10)
+function buildRBins(type::SWARM, model, n0::UniformDensity)
+    return LinRange(0m, 1e-6m, 10)
 end
 
-function buildEnBins(type::SWARM,model)
-    return 10 .^LinRange(-3,2,1000) .*eV
+function buildEnBins(type::SWARM, model)
+    return 10 .^ LinRange(-3, 2, 1000) .* eV
 end
 
-function buildTBins(type::SWARM,model)
-    return LinRange(0s,type.t_f,100)
+function buildTBins(type::SWARM, model)
+    return LinRange(0s, type.t_f, 100)
 end
 
-function buildχBins(type::SWARM,model)
-    return LinRange(0,π,90) .* u"rad"
+function buildχBins(type::SWARM, model)
+    return LinRange(0, π, 90) .* u"rad"
 end
 
-function buildZBins(type::SWARM,model)
-    return LinRange(-10mm,10mm,200)
+function buildZBins(type::SWARM, model)
+    return LinRange(-10mm, 10mm, 200)
 end
 
-function buildYBins(type::SWARM,model)
-    return LinRange(-7e-7,7e-7,200) .*m
+function buildYBins(type::SWARM, model)
+    return LinRange(-7e-7, 7e-7, 200) .* m
 end
 
-function buildXBins(type::SWARM,model)
-    return LinRange(-7e-7,7e-7,200) .*m
+function buildXBins(type::SWARM, model)
+    return LinRange(-7e-7, 7e-7, 200) .* m
 end
 
-function buildRBins(type::CELL,model,n0)
-    return LinRange(0,type.r,type.bin_no) .*m^2
+function buildRBins(type::CELL, model, n0)
+    return LinRange(0, type.r, type.bin_no) .* m^2
 end
 
-function buildEnBins(type::CELL,model)
+function buildEnBins(type::CELL, model)
     #TODO: Make specific to each velocity type
     #return collect(model.type.thresh:model.type.Δε_detector:(model.v_0.ε+2*model.v_0.Δε_source))
     # return 10 .^LinRange(-3,3,600) .*eV
-    return collect(10. .^(-3:0.1:6)).*eV
+    return collect(10.0 .^ (-3:0.1:6)) .* eV
 end
 
-function buildTBins(type::CELL,model)
+function buildTBins(type::CELL, model)
     # return LinRange(0s,type.t_f,10000)
     return 0s:1e-9s:type.t_f
 end
 
-function buildχBins(type::CELL,model)
-    return LinRange(0,π,100) .*u"rad"
+function buildχBins(type::CELL, model)
+    return LinRange(0, π, 100) .* u"rad"
 end
 
-function buildZBins(type::CELL,model)
+function buildZBins(type::CELL, model)
     # return [-10m, LinRange(0. *m,type.z,type.z_n)...]
-    return LinRange(0. *m,type.z,type.z_n) |> collect
+    return LinRange(0.0 * m, type.z, type.z_n) |> collect
 end
 
-function buildYBins(type::CELL,model)
-    return LinRange(-type.y,type.y,200)
+function buildYBins(type::CELL, model)
+    return LinRange(-type.y, type.y, 200)
 end
 
-function buildXBins(type::CELL,model)
-    return LinRange(-type.x,type.x,200)
+function buildXBins(type::CELL, model)
+    return LinRange(-type.x, type.x, 200)
 end
 
-function buildRBins(type::LμJ,model,n0::LμJDensity)
-    return [0. *m^2,(type.jet_width/2)^2,0.02^2 *m^2]
+function buildRBins(type::LμJ, model, n0::LμJDensity)
+    return [0.0 * m^2, (type.jet_width / 2)^2, 0.02^2 * m^2]
 end
 
-function buildRBins(type::LμJ,model,n0::LμJDensityGradient)
-    return adaptiveMeshlog(n0.func,0. *m,0.02 *m,n0.δtol).^2
+function buildRBins(type::LμJ, model, n0::LμJDensityGradient)
+    return adaptiveMeshlog(n0.func, 0.0 * m, 0.02 * m, n0.δtol) .^ 2
 end
 
-function buildEnBins(type::LμJ,model)
+function buildEnBins(type::LμJ, model)
     return collect(model.type.thresh:0.3eV:(model.v_0.ε+4*model.v_0.Δε_source))
 end
 
-function buildTBins(type::LμJ,model)
-    return LinRange(3e-13,320e-13,10) .*s
+function buildTBins(type::LμJ, model)
+    return LinRange(3e-13, 320e-13, 10) .* s
 end
 
-function buildχBins(type::LμJ,model)
-    return LinRange(0,π,100) .*u"rad"
+function buildχBins(type::LμJ, model)
+    return LinRange(0, π, 100) .* u"rad"
 end
 
-function buildZBins(type::LμJ,model)
-    return LinRange(-7.5e-6,-6.5e-6,200) .*m
+function buildZBins(type::LμJ, model)
+    return LinRange(-7.5e-6, -6.5e-6, 200) .* m
 end
 
-function buildYBins(type::LμJ,model)
-    return LinRange(-7e-7,7e-7,200) .*m
+function buildYBins(type::LμJ, model)
+    return LinRange(-7e-7, 7e-7, 200) .* m
 end
 
-function buildXBins(type::LμJ,model)
-    return LinRange(-7e-7,7e-7,200) .*m
+function buildXBins(type::LμJ, model)
+    return LinRange(-7e-7, 7e-7, 200) .* m
 end
 
 #### Density ####
 
-function buildDensity(n0::UniformDensity,rbins,zbins)
+function buildDensity(n0::UniformDensity, rbins, zbins)
     n0.val
 end
 
-function buildDensity(n0::LμJDensityGradient,rbins,zbins)
+function buildDensity(n0::LμJDensityGradient, rbins, zbins)
     n0.func.(sqrt.(rbins))
 end
 
-function buildDensity(n0::LμJDensity,rbins,zbins)
-    [n0.val,n0.background,0. *m^-3]
+function buildDensity(n0::LμJDensity, rbins, zbins)
+    [n0.val, n0.background, 0.0 * m^-3]
 end
 
-function buildDensity(n0::CellDensity,rbins,zbins)
+function buildDensity(n0::CellDensity, rbins, zbins)
     n0.val .* ones(length(zbins))
 end
 
 #### Electric Field ####
 
 function buildField(En0::UniformField)
-    SVector(0. *m^4*s^-2,0. *m^4*s^-2,upreferred((q*En0.val/me)))
+    SVector(0.0 * m^4 * s^-2, 0.0 * m^4 * s^-2, upreferred((q * En0.val / me)))
 end
 
 function buildField(En0::ZeroField)
-    SVector(0. *m^4/s^-2,0. *m^4/s^-2,0. *m^4/s^-2)
+    SVector(0.0 * m^4 / s^-2, 0.0 * m^4 / s^-2, 0.0 * m^4 / s^-2)
 end
 
 
 #### * PARTICLE
 
-function Structs.PART(model,params)
+function PART(model, params)
 
     particle = PART()
     particle.type = model.particle_type
-    particle.r = upreferred.(initPartr(model.r_0,params))#.*params.length_scale
-    particle.v = upreferred.(initPartv(model.v_0,params))#.*params.length_scale ./params.time_scale
-    particle.t = upreferred.(initPartt(model.t_0,params))
-    particle.cbin = findMinInd(params.cbins,getEnergy(particle.v))
+    particle.r = upreferred.(initPartr(model.r_0, params))#.*params.length_scale
+    particle.v = upreferred.(initPartv(model.v_0, params))#.*params.length_scale ./params.time_scale
+    particle.t = upreferred.(initPartt(model.t_0, params))
+    particle.cbin = findMinInd(params.cbins, getEnergy(particle.v))
     if params.ebins != nothing
-        particle.ebin = findMinInd(params.ebins,getEnergy(particle.v))
+        particle.ebin = findMinInd(params.ebins, getEnergy(particle.v))
     end
     if params.tbins != nothing
-        particle.tbin = findMinInd(params.tbins,particle.t)
+        particle.tbin = findMinInd(params.tbins, particle.t)
     end
 
     if params.rbins != nothing
-        particle.rbin = findMinInd(params.rbins,dot(particle.r,particle.r))
+        particle.rbin = findMinInd(params.rbins, dot(particle.r, particle.r))
     end
 
     if params.zbins != nothing
-        particle.zbin = findMinInd(params.zbins,particle.r[3])
+        particle.zbin = findMinInd(params.zbins, particle.r[3])
     end
 
     if params.xbins != nothing
-        particle.xbin = findMinInd(params.xbins,particle.r[1])
+        particle.xbin = findMinInd(params.xbins, particle.r[1])
     end
 
     if params.ybins != nothing
-        particle.ybin = findMinInd(params.ybins,particle.r[2])
+        particle.ybin = findMinInd(params.ybins, particle.r[2])
     end
 
 
@@ -451,20 +234,20 @@ end
 
 
 
-function initPartr(r_0::ZeroSpatial,params)
-    r = SArray{Tuple{3},Float64,1,3}(0.,0.,0.)
-    return r*m
+function initPartr(r_0::ZeroSpatial, params)
+    r = SArray{Tuple{3},Float64,1,3}(0.0, 0.0, 0.0)
+    return r * m
 end
-function initPartr(r_0::InitSpatial,params)
+function initPartr(r_0::InitSpatial, params)
     r = r_0.axis .* r_0.val
 end
-function initPartr(r_0::FunctionalSpatial,params)
+function initPartr(r_0::FunctionalSpatial, params)
     r_0.getAxis() .* r_0.getPosition(rand())
 end
-function initPartr(r_0::GaussianLμJSpatial,params)
+function initPartr(r_0::GaussianLμJSpatial, params)
     # SD = r_0.Δy_source/(2*sqrt(2*log(2)))
 
-    return r_0.Δy_source/(2*sqrt(2*log(2)))*randn() .* r_0.gaussian_axis .+ r_0.val .* r_0.axis
+    return r_0.Δy_source / (2 * sqrt(2 * log(2))) * randn() .* r_0.gaussian_axis .+ r_0.val .* r_0.axis
     # val = Inf*m .* r_0.gaussian_axis .+ r_0.val .* r_0.axis
     # while -7.5μm > val[2] || val[2] > 7.5μm 
     #     R=randn()
@@ -476,59 +259,57 @@ function initPartr(r_0::GaussianLμJSpatial,params)
     # val
 end
 
-function initPartt(t_0::InitTemporal,params)
+function initPartt(t_0::InitTemporal, params)
     t_0.val
 end
 
-function initPartt(t_0::GaussianTemporal,params)
+function initPartt(t_0::GaussianTemporal, params)
     # electron_v2eV = 0.5 * me
     # coschi = 1-2*rand()
     # sinchi = sqrt(1-coschi^2)
     # phi = rand()*2*pi
     #
-    return t_0.Δt_source/(2*sqrt(2*log(2)))*randn() .+ t_0.val 
+    return t_0.Δt_source / (2 * sqrt(2 * log(2))) * randn() .+ t_0.val
 end
 
-function initPartv(v_0::ZeroVelocity,params)
-    r = SArray{Tuple{3},Float64,1,3}(0.,0.,0.)
-    return r*m/s
+function initPartv(v_0::ZeroVelocity, params)
+    r = SArray{Tuple{3},Float64,1,3}(0.0, 0.0, 0.0)
+    return r * m / s
 end
 
-function initPartv(v_0::FunctionalEnergy,params)
+function initPartv(v_0::FunctionalEnergy, params)
     #TODO: Make all these static arrays
     return v_0.getAxis() .* getVelocity(v_0.getVelocity(rand()))
 end
 
-function initPartv(v_0::InitVelocity,params)
+function initPartv(v_0::InitVelocity, params)
     #TODO: Make all these static arrays
-    v= v_0.axis .* getVelocity(v_0.ε)
+    v = v_0.axis .* getVelocity(v_0.ε)
     return v
 end
 
-function initPartv(v_0::GaussianDirectionVelocity,params)
+function initPartv(v_0::GaussianDirectionVelocity, params)
     electron_v2eV = 0.5 * me
-    coschi = 1-2*rand()
-    sinchi = sqrt(1-coschi^2)
-    phi = rand()*2*pi
+    coschi = 1 - 2 * rand()
+    sinchi = sqrt(1 - coschi^2)
+    phi = rand() * 2 * pi
 
-    sqrt(v_0.ε/electron_v2eV) * SArray{Tuple{3},Float64,1,3}(cos(phi)*sinchi,sin(phi)*sinchi,coschi)
+    sqrt(v_0.ε / electron_v2eV) * SArray{Tuple{3},Float64,1,3}(cos(phi) * sinchi, sin(phi) * sinchi, coschi)
 end
 
 
-function initPartv(v_0::GaussianEnergyVelocity,params)
-    SD = v_0.Δε_source/(2*sqrt(2*log(2)))
+function initPartv(v_0::GaussianEnergyVelocity, params)
+    SD = v_0.Δε_source / (2 * sqrt(2 * log(2)))
     electron_v2eV = 0.5 * me
 
     ea = v_0.ε
 
-    R=randn()
-    while ea < -SD*R
-        R=randn()
+    R = randn()
+    while ea < -SD * R
+        R = randn()
     end
-    new_ea=ea+SD*R
+    new_ea = ea + SD * R
 
-    sqrt.(new_ea/electron_v2eV)*v_0.axis
+    sqrt.(new_ea / electron_v2eV) * v_0.axis
 end
 
-
-end
