@@ -15,7 +15,9 @@ module LightLeptonMC
 #TODO: Add Density Gradient (this is probably best solved through Danny's code though)
 
 using LightLeptonTools
-using Distributed, Statistics, Unitful, Optim, AutoParameters, StaticArrays
+using Distributed, Statistics, Unitful, Optim, AutoParameters, StaticArrays, LinearAlgebra, Random, Measurements
+
+const electron_v2eV = 0.5 * me
 
 include("Structs.jl")
 

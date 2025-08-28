@@ -193,7 +193,7 @@ end
 end
 
 function getCDt(particle, model, params)
-    dt_EVENT(randexp() / (getTotalFreq(particle, model, params) * getDensity(particle, model.n0, params)), :dt_collision, :Up)
+    dt_EVENT(randexp() / (getTotalFreq(particle, model, params) / sqrt(electron_v2eV) * getDensity(particle, model.n0, params)), :dt_collision, :Up)
 end
 
 function getZDt(field::ZeroField, particle, model, params)

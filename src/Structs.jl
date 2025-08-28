@@ -529,14 +529,14 @@ end
 
 function MEAST(params)
 
-    MEAST(zeros(length(params.tbins) - 1) .* eV,
-        zeros(length(params.tbins) - 1, 3) .* m,
-        zeros(length(params.tbins) - 1, 3) .* m / s,
-        zeros(length(params.tbins) - 1, 3) .* m^2,
-        zeros(length(params.tbins) - 1, 3) .* m^2 / s^2,
-        zeros(length(params.tbins) - 1, 3) .* m^2 / s,
-        zeros(length(params.tbins) - 1),
-        zeros(length(params.tbins) - 1)
+    MEAST(zeros(length(params.tbins)) .* eV,
+        zeros(length(params.tbins), 3) .* m,
+        zeros(length(params.tbins), 3) .* m / s,
+        zeros(length(params.tbins), 3) .* m^2,
+        zeros(length(params.tbins), 3) .* m^2 / s^2,
+        zeros(length(params.tbins), 3) .* m^2 / s,
+        zeros(length(params.tbins)),
+        zeros(length(params.tbins))
     )
 
 end

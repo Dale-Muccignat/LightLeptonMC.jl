@@ -33,7 +33,7 @@ end
 
 #### Frequency ####
 
-function getTotalFreq(gas::LLCS, ε)
+function evalTotalFreq(gas::LLCS, ε)
     #' sum([gas.cs[j](en) * sqrt(2 * en / me) * gas.w[j] for j in eachindex(gas.cs)])
     νₘ(gas, ε) + νₑₓ(gas, ε) + νₐₜ(gas, ε) + νᵢₒ(gas, ε)
 end
@@ -41,7 +41,7 @@ end
 function buildFreq(gas::LLCS, cbins)
     total_freq = zeros(length(cbins)) .* sqrt(eV) .* Å^2
     en_spacing = cbins[end] - cbins[end-1]
-    inv_total(ε) = -getTotalFreq(gas, ε)
+    inv_total(ε) = -evalTotalFreq(gas, ε)
 
     for i in 1:length(total_freq)-1
         total_freq[i] = -Optim.minimum(optimize(inv_total, ustrip(sqrt(eV), sqrt(cbins[i])), ustrip(sqrt(eV), sqrt(cbins[i+1])))) * sqrt(eV) * Å^2

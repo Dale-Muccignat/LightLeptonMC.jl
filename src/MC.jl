@@ -319,19 +319,19 @@ end
 
 function measureTbin!(particle, model, params, meas_inner)
     if :t ∈ model.meas
-        @inbounds @. meas_inner.meast.v²[particle.tbin, :] += particle.v^2 * particle.weight
-        @inbounds @. meas_inner.meast.r²[particle.tbin, :] += particle.r^2 * particle.weight
-        @inbounds @. meas_inner.meast.r[particle.tbin, :] += particle.r * particle.weight
-        @inbounds @. meas_inner.meast.v[particle.tbin, :] += particle.v * particle.weight
-        @inbounds @. meas_inner.meast.rv[particle.tbin, :] += particle.v * particle.r * particle.weight
-        @inbounds meas_inner.meast.w[particle.tbin] += particle.weight
-        @inbounds meas_inner.meast.εᵢ[particle.tbin] += 0.5 * me * dot(particle.v, particle.v) * particle.weight
+        @. meas_inner.meast.v²[particle.tbin, :] += particle.v^2 * particle.weight
+        @. meas_inner.meast.r²[particle.tbin, :] += particle.r^2 * particle.weight
+        @. meas_inner.meast.r[particle.tbin, :] += particle.r * particle.weight
+        @. meas_inner.meast.v[particle.tbin, :] += particle.v * particle.weight
+        @. meas_inner.meast.rv[particle.tbin, :] += particle.v * particle.r * particle.weight
+        meas_inner.meast.w[particle.tbin] += particle.weight
+        meas_inner.meast.εᵢ[particle.tbin] += 0.5 * me * dot(particle.v, particle.v) * particle.weight
     end
 
     :zyt ∈ model.meas ? meas_inner.measLμJ.zyt[particle.zbin, particle.ybin, particle.tbin] += particle.weight : nothing
 
-    @inbounds :tz ∈ model.meas ? meas_inner.measCell.tz[particle.tbin, particle.zbin] += particle.weight : nothing
-    # @inbounds :tz ∈ model.meas ? meas_inner.measCell.v_tz[particle.tbin,particle.zbin] += particle.weight*particle.v[3] : nothing
+    :tz ∈ model.meas ? meas_inner.measCell.tz[particle.tbin, particle.zbin] += particle.weight : nothing
+    # :tz ∈ model.meas ? meas_inner.measCell.v_tz[particle.tbin,particle.zbin] += particle.weight*particle.v[3] : nothing
     # :tz ∈ model.meas && params.zbins[2] < particle.r[3] < params.zbins[end] ? meas_inner.measCell.tz[particle.tbin,1] += particle.weight : nothing
     # :tz ∈ model.meas && particle.r[3] < params.zbins[end] ? meas_inner.measCell.tz[particle.tbin,1] += particle.weight : nothing
 end
@@ -346,19 +346,22 @@ function eventCollision!(dt::dt_EVENT, particle, model, params, meas_inner, verb
     :SP in model.meas && sum(meas_inner.measg.coll_count) == 0 ? energy_loss = getEnergy(particle.v) : nothing
     @debug """
     Collision: 
-    $(cs_ind == 0 ? "NULL" : params.splat_gas.type[cs_ind]) $(dt.time)
+    $(cs_ind == 0 ? "NULL" : params.gas[cs_ind][1].type) $(dt.time)
     """
     if cs_ind != 0
-        if params.splat_gas.type[cs_ind] == :ELASTIC
-            elasticColl!(cs_ind, getRelVel(cs_ind, particle, model, params), particle, model, params, meas_inner, verbose)
-        elseif params.splat_gas.type[cs_ind] == :EXCITATION
-            excitationColl!(cs_ind, getRelVel(cs_ind, particle, model, params), particle, model, params, meas_inner, verbose)
-            # energy_loss = params.splat_gas.thresh[cs_no]
-        elseif params.splat_gas.type[cs_ind] == :IONIZATION
-            ionisationColl!(cs_ind, model.ion_type, getRelVel(cs_ind, particle, model, params), particle, model, params, meas_inner, verbose, new_particles)
-            # energy_loss = params.splat_gas.thresh[cs_no]
-        elseif params.splat_gas.type[cs_ind] == :ATTACHMENT
-            attachmentColl!(cs_ind, getRelVel(cs_ind, particle, model, params), particle, model, params, meas_inner, verbose)
+        cs, weight, mass = params.gas[cs_ind]
+        g = getRelVel(cs_ind, cs, mass, particle, model, params)
+
+        if cs.type == :ELASTIC
+            elasticColl!(cs_ind, cs, mass, g, particle, model, params, meas_inner, verbose)
+        elseif cs.type == :EXCITATION
+            excitationColl!(cs_ind, cs, mass, g, particle, model, params, meas_inner, verbose)
+            # energy_loss = cs.energy_loss
+        elseif cs.type == :IONIZATION
+            ionisationColl!(cs_ind, cs, mass, model.ion_type, g, particle, model, params, meas_inner, verbose, new_particles)
+            # energy_loss = cs.energy_loss
+        elseif cs.type == :ATTACHMENT
+            attachmentColl!(cs_ind, cs, mass, g, particle, model, params, meas_inner, verbose)
         end
     end
 
@@ -369,27 +372,27 @@ function eventCollision!(dt::dt_EVENT, particle, model, params, meas_inner, verb
     return new_particle
 end
 
-function getRelVel(cs_no, particle, model, params)
+function getRelVel(cs_no, cs, mass, particle, model, params)
     if model.T.val == 0.0 * K
         g = copy(particle.v)
     else
-        g = findu(cs_no, particle, model, params)
+        g = findu(cs_no, cs, mass, particle, model, params)
     end
     @debug g
     return g
 end
 
 function getCollType(particle, model, params, verbose)
-    @inbounds begin
+    begin
         R = rand()
-        CS = 0.0uÅ2 * sqrt(eV)
-        en = getEnergy(particle.v)#/params.energy_scale
+        CS = 0.0Å^2 * sqrt(eV)
+        en = uconvert(eV, getEnergy(particle.v))#/params.energy_scale
         #' v = sqrt(dot(particle.v, particle.v))#/params.length_scale
 
         for (cs_ind, (cs, weight, mass)) in enumerate(params.gas)
-            @inbounds CS += CollisionFrequency(cs)(sqrt(en)) * weight
+            CS += CollisionFrequency(cs)(sqrt(en)) * weight
 
-            if R < CS / getTotalFreq(params.gas, en)
+            if R < CS / getTotalFreq(particle, model, params)
                 return cs_ind
             end
         end
@@ -397,26 +400,26 @@ function getCollType(particle, model, params, verbose)
     end
 end
 
-function elasticColl!(cs_no, g, particle, model, params, meas_inner, verbose)
+function elasticColl!(cs_no, cs, mass, g, particle, model, params, meas_inner, verbose)
     #me2 = 4amu
-    # @debug uconvert(amu,me), uconvert(amu,params.splat_gas.m[cs_no])
-    coschi, sinchi, phi = scatteringAngle(cs_no, g, particle, model, params, verbose)
+    # @debug uconvert(amu,me), uconvert(amu,mass)
+    coschi, sinchi, phi = scatteringAngle(cs_no, cs, mass, g, particle, model, params, verbose)
     v2 = norm(g) * SArray{Tuple{3},Float64,1,3}(cos(phi) * sinchi, sin(phi) * sinchi, coschi)
     v2 = shift(v2, g)
-    v2 = (me * particle.v + params.splat_gas.m[cs_no] * (g - particle.v + v2)) / (me + params.splat_gas.m[cs_no])
+    v2 = (me * particle.v + mass * (g - particle.v + v2)) / (me + mass)
     meas_inner.measg.coschi += dot(particle.v, v2) / (norm(v2) * norm(particle.v))
     meas_inner.measg.coll_count[cs_no] += 1
     # meas_inner.no_elas += 1
     particle.v = v2
 end
 
-function excitationColl!(cs_no, g, particle, model, params, meas_inner, verbose)
+function excitationColl!(cs_no, cs, mass, g, particle, model, params, meas_inner, verbose)
 
-    if dot(g, g) - 2 * params.splat_gas.thresh[cs_no] / me > 0m^2 / s^2
-        coschi, sinchi, phi = scatteringAngle(cs_no, g, particle, model, params, verbose)
-        v2 = sqrt(dot(g, g) - 2 * params.splat_gas.thresh[cs_no] / me) * SArray{Tuple{3},Float64,1,3}(cos(phi) * sinchi, sin(phi) * sinchi, coschi)
+    if dot(g, g) - 2 * cs.energy_loss / me > 0m^2 / s^2
+        coschi, sinchi, phi = scatteringAngle(cs_no, cs, mass, g, particle, model, params, verbose)
+        v2 = sqrt(dot(g, g) - 2 * cs.energy_loss / me) * SArray{Tuple{3},Float64,1,3}(cos(phi) * sinchi, sin(phi) * sinchi, coschi)
         v2 = shift(v2, g)
-        v2 = (me * particle.v + params.splat_gas.m[cs_no] * (g - particle.v + v2)) / (me + params.splat_gas.m[cs_no])
+        v2 = (me * particle.v + mass * (g - particle.v + v2)) / (me + mass)
         meas_inner.measg.coschi += dot(particle.v, v2) / (norm(v2) * norm(particle.v))
         meas_inner.measg.coll_count[cs_no] += 1
         particle.v = v2
@@ -424,16 +427,16 @@ function excitationColl!(cs_no, g, particle, model, params, meas_inner, verbose)
 
 end
 
-function ionisationColl!(cs_no, ion_type, g, particle, model, params, meas_inner, verbose, new_particles)
+function ionisationColl!(cs_no, cs, mass, ion_type, g, particle, model, params, meas_inner, verbose, new_particles)
 
-    if dot(g, g) - 2 * params.splat_gas.thresh[cs_no] / me > 0m^2 / s^2
-        part_energy, other_part_energy = getIonisationEnergy(params.splat_gas.thresh[cs_no], ion_type, g, particle, model, params)
+    if dot(g, g) - 2 * cs.energy_loss / me > 0m^2 / s^2
+        part_energy, other_part_energy = getIonisationEnergy(cs.energy_loss, ion_type, g, particle, model, params)
 
-        coschi, sinchi, phi = scatteringAngle(cs_no, g, particle, model, params, verbose)
+        coschi, sinchi, phi = scatteringAngle(cs_no, cs, mass, g, particle, model, params, verbose)
 
         v2 = sqrt(2 * part_energy / me) * SArray{Tuple{3},Float64,1,3}(cos(phi) * sinchi, sin(phi) * sinchi, coschi)
         v2 = shift(v2, g)
-        v2 = (me * particle.v + params.splat_gas.m[cs_no] * (g - particle.v + v2)) / (me + params.splat_gas.m[cs_no])
+        v2 = (me * particle.v + mass * (g - particle.v + v2)) / (me + mass)
 
         meas_inner.measg.coschi += dot(particle.v, v2) / (norm(v2) * norm(particle.v))
         meas_inner.measg.coll_count[cs_no] += 1
@@ -443,7 +446,7 @@ function ionisationColl!(cs_no, ion_type, g, particle, model, params, meas_inner
         if ion_type.method == :WEIGHTING
             particle.type == :electron ? particle.weight *= 2.0 : nothing
         elseif ion_type.method == :EXPLICIT
-            coschi2, sinchi2, phi2 = scatteringAngle(cs_no, g, particle, model, params, verbose)
+            coschi2, sinchi2, phi2 = scatteringAngle(cs_no, cs, mass, g, particle, model, params, verbose)
             v2 = sqrt(2 * other_part_energy / me) * SArray{Tuple{3},Float64,1,3}(cos(phi2) * sinchi2, sin(phi2) * sinchi2, coschi2)
             new_particle = deepcopy(particle)
             meas_inner.measg.coschi += dot(new_particle.v, v2) / (norm(v2) * norm(new_particle.v))
@@ -460,7 +463,7 @@ function ionisationColl!(cs_no, ion_type, g, particle, model, params, meas_inner
             """
             Ion threshold greater than energy"
             Cross section #: $(cs_no)
-            Threshold: $(params.splat_gas.thresh[cs_no])
+            Threshold: $(cs.energy_loss)
             $(debugParticle("Ionisation collision",particle))
 
             """
@@ -533,7 +536,7 @@ function getIonisationEnergy(thresh, ion_type::DiscreteFunctionalIonisation, g, 
     return part_energy, other_part_energy
 end
 
-function attachmentColl!(cs_no, g, particle, model, params, meas_inner, verbose)
+function attachmentColl!(cs_no, cs, mass, g, particle, model, params, meas_inner, verbose)
     if model.ion_type.method == :WEIGHTING
         particle.type == :positron ? particle.alive = false : particle.weight /= 2.0
     elseif model.ion_type.method == :EXPLICIT
@@ -543,9 +546,9 @@ function attachmentColl!(cs_no, g, particle, model, params, meas_inner, verbose)
     end
 end
 
-function scatteringAngle(cs_no, g, particle, model, params, verbose)
+function scatteringAngle(cs_no, cs, mass, g, particle, model, params, verbose)
     coschi = 1 - 2 * rand()
-    #' coschi = params.splat_gas.dcs[cs_no][particle.cbin](rand())::Float64
+    #' coschi = params.splat_gas.dcs[cs_no][particle.cbin](rand())::Float64 #TODO: DCS
     #coschi = -1
     sinchi = sqrt(1 - coschi^2)
     phi = rand() * 2 * pi
@@ -676,8 +679,8 @@ end
 
     #TODO: get actual CF from CS
 
-    @inbounds hcf = getTotalFreq(params.gas, he)
-    @inbounds lcf = getTotalFreq(params.gas, params)
+    hcf = getTotalFreq(params.gas, he)
+    lcf = getTotalFreq(params.gas, params)
 
     g = copy(v)
     mcf = max(hcf, lcf)
@@ -690,7 +693,7 @@ end
         # @show g
         eg = electron_v2eV * dot(g, g)
         # @show eg
-        @inbounds ccf = getTotalFreq(params.gas, eg)
+        ccf = getTotalFreq(params.gas, eg)
         # @show lcf
         # @show hcf
         # @show ccf
