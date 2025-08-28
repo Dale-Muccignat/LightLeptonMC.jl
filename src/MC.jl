@@ -349,17 +349,17 @@ function eventCollision!(dt::dt_EVENT, particle, model, params, meas_inner, verb
     $(cs_ind == 0 ? "NULL" : params.splat_gas.type[cs_ind]) $(dt.time)
     """
     if cs_ind != 0
-    if params.splat_gas.type[cs_ind] == :ELASTIC
-        elasticColl!(cs_ind, getRelVel(cs_ind, particle, model, params), particle, model, params, meas_inner, verbose)
-    elseif params.splat_gas.type[cs_ind] == :EXCITATION
-        excitationColl!(cs_ind, getRelVel(cs_ind, particle, model, params), particle, model, params, meas_inner, verbose)
-        # energy_loss = params.splat_gas.thresh[cs_no]
-    elseif params.splat_gas.type[cs_ind] == :IONIZATION
-        ionisationColl!(cs_ind, model.ion_type, getRelVel(cs_ind, particle, model, params), particle, model, params, meas_inner, verbose, new_particles)
-        # energy_loss = params.splat_gas.thresh[cs_no]
-    elseif params.splat_gas.type[cs_ind] == :ATTACHMENT
-        attachmentColl!(cs_ind, getRelVel(cs_ind, particle, model, params), particle, model, params, meas_inner, verbose)
-    end
+        if params.splat_gas.type[cs_ind] == :ELASTIC
+            elasticColl!(cs_ind, getRelVel(cs_ind, particle, model, params), particle, model, params, meas_inner, verbose)
+        elseif params.splat_gas.type[cs_ind] == :EXCITATION
+            excitationColl!(cs_ind, getRelVel(cs_ind, particle, model, params), particle, model, params, meas_inner, verbose)
+            # energy_loss = params.splat_gas.thresh[cs_no]
+        elseif params.splat_gas.type[cs_ind] == :IONIZATION
+            ionisationColl!(cs_ind, model.ion_type, getRelVel(cs_ind, particle, model, params), particle, model, params, meas_inner, verbose, new_particles)
+            # energy_loss = params.splat_gas.thresh[cs_no]
+        elseif params.splat_gas.type[cs_ind] == :ATTACHMENT
+            attachmentColl!(cs_ind, getRelVel(cs_ind, particle, model, params), particle, model, params, meas_inner, verbose)
+        end
     end
 
     :SP in model.meas && sum(meas_inner.measg.coll_count) == 1 ? energy_loss -= getEnergy(particle.v) : nothing
