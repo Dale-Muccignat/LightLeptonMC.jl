@@ -20,7 +20,7 @@ Parent type for each option for velocity. See subtypes for a list of options
 ```
 
 """
-abstract type Velocity end
+abstract type ConfigVelocity end
 
 """
 Spatial
@@ -33,30 +33,30 @@ Parent type for each option for spatial config. See subtypes for a list of optio
 ```
 
 """
-abstract type Spatial end
-abstract type Temporal end
-abstract type Density end
-abstract type Field end
-abstract type Temp end
+abstract type ConfigSpatial end
+abstract type ConfigTemporal end
+abstract type ConfigDensity end
+abstract type ConfigField end
+abstract type ConfigTemp end
 abstract type Ionisation end
 
-struct ZeroSpatial <: Spatial end
+struct ZeroSpatial <: ConfigSpatial end
 
-@AutoParm struct InitSpatial <: Spatial
+@AutoParm struct InitSpatial <: ConfigSpatial
     val::AUTO
     axis::AUTO
 end
 
-@AutoParm struct InitTemporal <: Temporal
+@AutoParm struct InitTemporal <: ConfigTemporal
     val::AUTO = 0.0 * s
 end
 
-@AutoParm struct GaussianTemporal <: Spatial
+@AutoParm struct GaussianTemporal <: ConfigSpatial
     val::AUTO = 20.0 * ns
     Δt_source::AUTO = 10.0 * ns
 end
 
-@AutoParm struct GaussianLμJSpatial <: Spatial # TODO: Rename to remove LuJ
+@AutoParm struct GaussianLμJSpatial <: ConfigSpatial # TODO: Rename to remove LuJ
     val::AUTO = -7.6e-6m
     Δy_source::AUTO = 7.5e-6m
     gaussian_axis::AUTO = [0, 1, 0]
@@ -69,7 +69,7 @@ function GaussianLμJSpatial(; val=-7.5μm, Δy_source=7.5μm, gaussian_axis=[0,
     return GaussianLμJSpatial(val, Δy_source, gaussian_axis, axis)
 end
 
-@AutoParm struct FunctionalSpatial <: Spatial
+@AutoParm struct FunctionalSpatial <: ConfigSpatial
     getAxis::AUTO
     getPosition::AUTO
 end
@@ -104,10 +104,10 @@ function FunctionalSpatial(spatialDist::Tuple{Any,Any}, axis=() -> [0, 0, 1])
     return FunctionalSpatial(axis, spl)
 end
 
-@AutoParm struct UniformDensity <: Density
+@AutoParm struct UniformDensity <: ConfigDensity
     val::AUTO = 1e23m^-3
 end
-@AutoParm struct LμJDensityGradient <: Density
+@AutoParm struct LμJDensityGradient <: ConfigDensity
     val::AUTO = 1e28m^-3
     background::AUTO = 2e18m^-3
     func::AUTO = (x) -> 0.5 * (1e28m^-3 + 1e23m^-3) - 0.5 * (1e28m^-3 - 1e23m^-3) * tanh(2 * ustrip(x) / 1e-9)
@@ -118,20 +118,20 @@ function LμJDensityGradient(; val=1e28m^-3, background=2e18m^-3, jet_width=15μ
     func = (x) -> 0.5 * (val + background) - 0.5 * (val - background) * tanh(2 * (x - jet_width) / 2 / δphase)
     return LμJDensityGradient(val, background, func, δtol, δphase)
 end
-@AutoParm struct LμJDensity <: Density
+@AutoParm struct LμJDensity <: ConfigDensity
     val::AUTO = 1e28m^-3
     background::AUTO = 2e18m^-3
 end
-@AutoParm struct CellDensity <: Density
+@AutoParm struct CellDensity <: ConfigDensity
     val::AUTO = 1e28m^-3
 end
-@AutoParm struct ZeroField <: Field
+@AutoParm struct ZeroField <: ConfigField
     val::AUTO = 0.0 * Td
 end
-@AutoParm struct UniformField <: Field
+@AutoParm struct UniformField <: ConfigField
     val::AUTO = 1.0 * Td
 end
-@AutoParm struct UniformTemp <: Temp
+@AutoParm struct UniformTemp <: ConfigTemp
     val::AUTO = 0.0 * K
 end
 
@@ -189,24 +189,24 @@ end
     loss::AUTO = (e) -> 5.0 * eV
 end
 
-struct ZeroVelocity <: Velocity end
+struct ZeroVelocity <: ConfigVelocity end
 
-@AutoParm struct InitVelocity <: Velocity
+@AutoParm struct InitVelocity <: ConfigVelocity
     ε::AUTO = 100.0 * eV
     axis::AUTO = [0, 0, 1]
 end
 
-@AutoParm struct GaussianEnergyVelocity <: Velocity
+@AutoParm struct GaussianEnergyVelocity <: ConfigVelocity
     ε::AUTO = 10.0 * eV
     Δε_source::AUTO = 0.5eV
     axis::AUTO = [0, 0, 1]
 end
 
-@AutoParm struct GaussianDirectionVelocity <: Velocity
+@AutoParm struct GaussianDirectionVelocity <: ConfigVelocity
     ε::AUTO = 10.0 * eV
 end
 
-@AutoParm struct FunctionalEnergy <: Velocity
+@AutoParm struct FunctionalEnergy <: ConfigVelocity
     getAxis::AUTO
     getVelocity::AUTO
 end
@@ -504,15 +504,15 @@ end
 end
 
 function MEASG(model::MCMODEL, params::MCPARAMS)
-    coschi, coll_count, SP_ε, SP_r, SP_εs, SP_zs = 0.0, zeros(length(params.gas)), nothing, nothing, nothing, nothing
+    coschi, coll_count, SP_ε, SP_r, SP_εs = 0.0, zeros(length(params.gas)), nothing, nothing, nothing
     @debug coll_count
-    if :SP ∈ model.meas
-        SP_ε = 0.0
-        SP_r = 0.0
-    end
-    if :SP_z ∈ model.meas
-        SP_εs = zeros(length(params.zbins))
-    end
+    #' if :SP ∈ model.meas
+    #'     SP_ε = 0.0
+    #'     SP_r = 0.0
+    #' end
+    #' if :SP_z ∈ model.meas
+    #'     SP_εs = zeros(length(params.zbins))
+    #' end
     return MEASG(coschi, coll_count, SP_ε, SP_r, SP_εs)
 end
 

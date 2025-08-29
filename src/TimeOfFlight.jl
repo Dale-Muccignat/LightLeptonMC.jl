@@ -6,13 +6,13 @@ abstract type Event end
 struct Down <: Direction end
 struct Up <: Direction end
 
-struct dt_EVENT{T<:Unitful.Time}
-    time::T
+struct dt_EVENT
+    time::uT
     type::Symbol
     direction::Symbol
 end
 
-@xport function getDt!(dts, dt_times, particle, model, params)
+function getDt!(dts, dt_times, particle, model, params)
     # Calculate dt values
     dts[1] = getCDt(particle, model, params)
     dts[2] = getEnDt(model.En0, model.n0, particle, model, params)
@@ -36,6 +36,7 @@ end
     # Find minimum time
     min_time = minimum(dt_times)
     min_index = findfirst(x -> x == min_time, dt_times)
+    min_index |> isnothing && error("Min time not found")
 
     # Return result
     return dts[min_index]
@@ -306,6 +307,6 @@ function getTDt(particle, model, params)
         end
     end
 
-    return dt_EVENT(Inf * s, :dt_tbin, :Up)
+    return dt_EVENT(Inf * s̃, :dt_tbin, :Up)
 
 end

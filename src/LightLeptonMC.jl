@@ -17,6 +17,12 @@ module LightLeptonMC
 using LightLeptonTools
 using Distributed, Statistics, Unitful, Optim, AutoParameters, StaticArrays, LinearAlgebra, Random, Measurements
 
+Unitful.register(@__MODULE__)
+function __init__()
+    Unitful.register(@__MODULE__)
+    Unitful.preferunits(m̃, s̃)
+end
+
 const electron_v2eV = 0.5 * me
 
 include("Structs.jl")
@@ -29,7 +35,7 @@ include("TimeOfFlight.jl")
 
 include("MC.jl")
 
-include("Measurements.jl")
+include("Processing.jl")
 
 export mc, MCPARAMS, saveBatch, saveDist
 
@@ -57,48 +63,75 @@ macro jld2save(filename, vars...)
     end
 end
 
-function mc(gas::LLCS; S=1e-5, E=1.0, T=0.0, N=1000, t=Inf, meas=[:t], ion_type=RatioIonisation(), n0=1e23, verbose=false)
-    if t == Inf
-        t = findSimTime(gas, S, E, T, meas, verbose)
+function mc(gas::LLCS; S::Energy=0eV, E::ReducedVoltage=1.0Td, T::Temperature=0.0K, N=1000, t::Time=Inf * s, meas=[:t], ion_type=UniformIonisation(:EXPLICIT), n0::NumberDensity=1e23 / m^3)
+    if t == Inf * s
+        t = findSimTime(gas, S, E, T, n0)[1] / n0
     end
-
-    model = MCMODEL(meas=meas, type=SWARM(t * s), n=N, En0=UniformField(E * Td), T=UniformTemp(T * K), ion_type=ion_type, v_0=InitVelocity(S * eV, [0, 0, 1]), n0=UniformDensity(n0 / m^3))
-    mc(model, initParams(gas, model), verbose=verbose)
+    model = MCMODEL(meas=meas, type=SWARM(t), n=N, En0=UniformField(E), T=UniformTemp(T), ion_type=ion_type, v_0=InitVelocity(S, [0, 0, 1]), n0=UniformDensity(n0), optimise_spatial=false)
+    mc(model, initParams(gas, model))
 end
 
-function findSimTime(gas, S, E, T, meas, verbose)
-    curr_time = 1e-7
+function findSimTime(gas, S, E, T, n0)
+    #= curr_time = 1e-9s * n0 =#
+    curr_time = 1e13s / m^3
     unconverged = true
-    N = 100
+    N::Int64 = 10000
+    N_og = N
     iterations = 0
+    measures_o = nothing
+    swarm_o = nothing
     while unconverged
+        if iterations > 100 #|| N > 1000000
+            @info "Not Converged"
+            throw("Convergence Failed. iters = $(iterations), N = $(N)")
+        end
         iterations += 1
-        verbose && @info "Current Time: " curr_time
-        model = MCMODEL(meas=meas, type=SWARM(curr_time * s), n=1000, En0=UniformField(E * Td), T=UniformTemp(T * K), ion_type=UniformIonisation(), v_0=InitVelocity(S * eV, [0, 0, 1]))
-        measures, swarm, params = mc(model, initParams(gas, model))
-        first, second = mean(measures.meast.εᵢ[1:end÷2]), mean(measures.meast.εᵢ[end÷2:end])
-        verbose && @info "Averages: " first second
-        verbose && @info "Diff: " abs(second - first) / second
+        @info "Current Time: " curr_time
+        model = MCMODEL(type=SWARM(curr_time / n0), n=N, n0=UniformDensity(n0), En0=UniformField(E), T=UniformTemp(T), ion_type=UniformIonisation(:EXPLICIT), v_0=InitVelocity(S, [0, 0, 1]))
+        @show typeof(model)
+        params = initParams(gas, model)
+        measures, swarm = mc(model, params)
+        particle_change = mean(measures.meast.w[3*end÷4:end])
+        first, second = mean(measures.meast.εᵢ[end÷3:2*end÷3]), mean(measures.meast.εᵢ[2*end÷3:end])
+        first_std, second_std = std(measures.meast.εᵢ[end÷3:2*end÷3]), std(measures.meast.εᵢ[2*end÷3:end])
+        if particle_change < N_og * 0.75
+            # if we've lost half our particles
+            N = round(Int, N * N_og / particle_change)
+            @info "Lost $(N_og - particle_change) particles, changing N to $(N)"
+            #= iterations += 1 =#
+            continue # retry
+        elseif N > 100 && particle_change > N_og * 2.0
+            N = round(Int, N * N_og / particle_change)
+            if N < 100
+                N = 100
+            end
+            @info "Gained $(particle_change-N_og) particles, changing N to $(N)"
+            #= iterations += 1 =#
+            continue # retry
+        end
+        #= @info "STDs: " first_std second_std third_std =#
+        @info "Averages: $(first) $(second)"
+        @info "Diff: $(abs(second - first) / second)"
+        @info "Particles: $(particle_change)"
         if abs(second - first) / second > 0.01
-            curr_time *= 2
+            curr_time *= 1.25
         else
-            curr_time *= 2 # For good measure
+            #= curr_time *= 2.0 # For good measure =#
             @info "Chose: " curr_time
             unconverged = false
-        end
-        if iterations > 10
-            @info "Not Converged"
-            throw("Convergence Failed.")
+            measures_o = measures
+            swarm_o = swarm
         end
     end
-    return curr_time
+    return curr_time, N_og / N, measures_o, swarm_o
 end
 
-function mc(model::MCMODEL, gas::LLCS; verbose=false)
-    mc(model, initParams(gas, model), verbose=verbose)
+
+function mc(model::MCMODEL, gas::LLCS)
+    mc(model, initParams(gas, model))
 end
 
-function mc(model::MCMODEL, gases, indicies; verbose=false, w=1.0, ref_gas=MaxwellModel(), save=false, dcs=false)
+function mc(model::MCMODEL, gases, indicies, w=1.0, ref_gas=MaxwellModel(), save=false, dcs=false)
     distribution_data::Dict{Int64,Tuple{Vector{Float64},Vector{Float64}}} = Dict()
     # @info "Batch: " indicies[1]
     for i in indicies
@@ -109,7 +142,7 @@ function mc(model::MCMODEL, gases, indicies; verbose=false, w=1.0, ref_gas=Maxwe
             params = initParams(gases[i] * w + ref_gas * (1 .- w), model)
         end
 
-        meas, swarm, params = mc(model, params, verbose=verbose)
+        meas, swarm, params = mc(model, params)
         if dcs
             distribution_data[i] = (params.χbins[4:end-1], sum(meas.measLμJ.εχ[:, :], dims=1)'[4:end-1])
         else
@@ -134,21 +167,69 @@ General models
 
 Swarm models
 ```julia
-    meas, swarm, params = mc(MaxwellModel();E=1.,T=0.,N=1000,S=0.,verbose=false)
+    meas, swarm, params = mc(MaxwellModel();E=1.,T=0.,N=1000,S=0.)
 ```
 
 """
-function mc(model::MCMODEL, params::MCPARAMS; verbose=false)
+function mc(model::MCMODEL, params::MCPARAMS)
     # @debug model.n=1
 
     #scale!(model,model.type,params)
-    meas = initMeas(model, params)
+    meas_outer = initMeas(model, params)
+    meass = [deepcopy(meas_outer) for _ in 1:Threads.nthreads()]
     @debug "Measurements initialised."
     #scale!(params)
 
     # @show params.rbins
     # meas = @distributed (+) for n in 1:model.n
-    meas = @distributed (+) for n in 1:model.n
+    N = model.n
+    if N / nprocs() < 1000
+        batches = [n for n in Iterators.partition(1:N, ceil(Int64, N / Threads.nthreads()))]
+    else
+        batches = [n for n in Iterators.partition(1:N, 100)]
+    end
+
+    Threads.@threads for n in eachindex(batches)
+        #' Threads.@threads for n in 1:N
+        id = Threads.threadid()
+        #' @show id
+        #' for n in eachindex(batches)
+        #' meas = @distributed (+) for n in 1:model.n
+        #=     @debug "Distributing..." =#
+        #==#
+        #=     if n % (model.n * 0.1) == 0.0 =#
+        #=         @info "Progress: " * string(100 * n / model.n) * "%" =#
+        #=     end =#
+
+        # TODO: Account for no of ionisation events
+        # meas_inner = flight(PART(model,params),model,params,verbose)
+        # if model.ion_type.method == :EXPLICIT
+
+        # end
+        # [meas_inner]
+        #= [flight(PART(model, params), model, params)] =#
+        #' flight!([PART(model, params)], model, params, meass[id])
+        flight!([PART(model, params) for _ in batches[n]], model, params, meass[id])
+    end
+    @debug "Finished Sim"
+    # @show params.rbins
+    #unscale!(params)
+    #unscale!(model.type,model,params,meas[1])
+    meas = sum(meass)
+    return process(model.type, meas, params, model)
+end
+
+function mcGetParticles(model::MCMODEL, params::MCPARAMS, coll_limit=Inf)
+    # @debug model.n=1
+
+    #scale!(model,model.type,params)
+    #= meas = initMeas(model, params) =#
+    @debug "Measurements initialised."
+    #scale!(params)
+
+    # @show params.rbins
+    # meas = @distributed (+) for n in 1:model.n
+    particles = @distributed (vcat) for n in 1:model.n
         @debug "Distributing..."
 
         if n % (model.n * 0.1) == 0.0
@@ -161,14 +242,98 @@ function mc(model::MCMODEL, params::MCPARAMS; verbose=false)
 
         # end
         # [meas_inner]
-        [flight(PART(model, params), model, params, verbose)]
+        flightGetParticles(PART(model, params), model, params, coll_limit=coll_limit)
+    end
+    @debug "Finished Sim"
+    # @show params.rbins
+    #unscale!(params)
+    return particles
+end
+
+function mcInitParticles(particles_og::Vector{<:PART}, model::MCMODEL, params::MCPARAMS; N=0, meas=initMeas(model, params))
+    N != 0 && (model.n += N)
+    N == 0 && (N = model.n)
+    if N / nprocs() < 1000
+        batches = [n for n in Iterators.partition(1:N, ceil(Int64, N / nprocs() / 4))]
+    else
+        batches = [n for n in Iterators.partition(1:N, 100)]
+    end
+    #= batches = [n for n in Iterators.partition(1:N, 1)] =#
+
+    meas_new = @distributed (+) for n in eachindex(batches)
+        @debug "Distributing..."
+
+        #= if n % (model.n * 0.1) == 0.0 =#
+        #=     @info "Progress: " * string(100 * n / model.n) * "%" =#
+        #= end =#
+
+        # TODO: Account for no of ionisation events
+        # meas_inner = flight(PART(model,params),model,params,verbose)
+        # if model.ion_type.method == :EXPLICIT
+
+        # end
+        # [meas_inner]
+        particles = [PART(model, params) for _ in batches[n]]
+        sample_particles = sample(particles_og, length(batches[n]))
+        #= particle.r = sample_particle.r =#
+        for i in eachindex(batches[n])
+            particles[i].v = sample_particles[i].v
+            particles[i].weight = sample_particles[i].weight
+            particles[i].cbin = findMinInd(params.cbins, getEnergy(particles[i].v))
+            if params.ebins != nothing
+                particles[i].ebin = findMinInd(params.ebins, getEnergy(particles[i].v))
+            end
+            if params.zbins != nothing
+                particles[i].zbin = findMinInd(params.zbins, particles[i].r[3])
+            end
+        end
+        [flight(particles, model, params)]
     end
     @debug "Finished Sim"
     # @show params.rbins
     #unscale!(params)
     #unscale!(model.type,model,params,meas[1])
-    return process(model.type, meas[1], params, model)..., params
+    meas = unweights(meas, model)
+    meas += meas_new[1]
+    return process(model.type, meas, params, model)
+end
 
+# The goal of the function is to provide a framework to progressibely build the electron swarm. There are two facets. I need to ensure that there are a sufficient number of particles and that they have to simulated for long enough.
+
+function mcAddParticles(model, params; N=0, meas=initMeas(model, params))
+    # this takes a vector of particles and simulates them until some end condition is met...
+    # Status: work in progress. The flaw is having to redefine params everytime anyway.
+    N != 0 && (model.n += N)
+    N == 0 && (N = model.n)
+    @debug N
+    if N / nprocs() < 1000
+        batches = [n for n in Iterators.partition(1:N, ceil(Int64, N / nprocs() / 4))]
+    else
+        batches = [n for n in Iterators.partition(1:N, 100)]
+    end
+    #= batches = [n for n in Iterators.partition(1:N,100)] =#
+    #= batches = [[n] for n in 1:N] =#
+
+    meas_new = @distributed (+) for n in eachindex(batches)
+        @debug "Distributing..."
+
+        if n % (N * 0.1) == 0.0
+            @info "Progress: " * string(100 * n / N) * "%"
+        end
+
+        # TODO: Account for no of ionisation events
+        # meas_inner = flight(PART(model,params),model,params,verbose)
+        # if model.ion_type.method == :EXPLICIT
+
+        # end
+        # [meas_inner]
+        [flight([PART(model, params) for _ in batches[n]], model, params)]
+    end
+    #= return meas_new =#
+    meas = unweights(meas, model)
+    meas += meas_new[1]
+    @debug "Finished Sim"
+    return process(model.type, meas, params, model)
 end
 
 function buildModel()

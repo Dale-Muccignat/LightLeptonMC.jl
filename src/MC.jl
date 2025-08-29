@@ -2,13 +2,15 @@
 #TODO: Only select electrons with position and velocity directed toward detector in LuJ
 #TODO: Tidy up measurement types...
 
-function flight(particle_og, model, params)
+function flight(particle_og::PART, model, params)
     @debug "Conducting flight..."
     :f in model.meas && (params.a[1] > 0m^4 / s^2 || params.a[2] > 0m^4 / s^2) && @warn "Measuring flux with x or y field, third order will be wrong."
     meas_inner = initMeas(model, params)
     # Preallocate arrays
-    dts = Array{dt_EVENT,1}(undef, 7)
-    dt_times = Array{Quantity,1}(undef, 7)
+    #= dts = Array{dt_EVENT,1}(undef, 7) =#
+    #= dt_times = Array{Quantity,1}(undef, 7) =#
+    dts = repeat([dt_EVENT(1.0 * s̃, :before, :before)], 7)
+    dt_times = repeat([1.0 * s̃], 7)
 
     measureTbin!(particle_og, model, params, meas_inner) ## measure initial stuff
 
@@ -16,7 +18,7 @@ function flight(particle_og, model, params)
     while !isempty(new_particles)
         #= @show "start" =#
         particle_inner = new_particles[1]
-        length(new_particles) % 1000 == 0 && @info length(new_particles)
+        length(new_particles) % 1000 == 0 && @info "Particles num: " length(new_particles)
         if length(new_particles) > 50000
             #= error("Too many ionisation events") =#
         end
@@ -55,14 +57,130 @@ function flight(particle_og, model, params)
     return meas_inner
 end
 
-function flightGetParticles(particle_og, model, params; coll_limit=Inf, t_limit=Inf * s)
+function flight!(particle_og::Vector{<:PART}, model, params, meas_inner)
+    @debug "Conducting flight..."
+    :f in model.meas && (params.a[1] > 0m^4 / s^2 || params.a[2] > 0m^4 / s^2) && @warn "Measuring flux with x or y field, third order will be wrong."
+    #' meas_inner = initMeas(model, params)
+    # Preallocate arrays
+    #= dts = Array{dt_EVENT,1}(undef, 7) =#
+    #= dt_times = Array{Quantity,1}(undef, 7) =#
+    dts = repeat([dt_EVENT(1.0 * s̃, :before, :before)], 7)
+    dt_times = repeat([1.0 * s̃], 7)
+    og_num = length(particle_og)
+
+    for p in particle_og
+        measureTbin!(p, model, params, meas_inner) ## measure initial stuff
+    end
+
+    new_particles = deepcopy(particle_og)
+    particle_no = 0
+    while !isempty(new_particles)
+        #= @show "start" =#
+        particle_no += 1
+        particle_inner = new_particles[1]
+        particle_no % 200000 == 0 && @info "Particles Done: $(particle_no)"
+        if length(new_particles) / og_num * model.n > 1000000000
+            @info "Alot of ionisation events, consider stopping..."
+            #= throw("Too many ionisation events") =#
+        end
+        #= event_number = 0 =#
+        #= particle_states = fill(deepcopy(particle_inner), 3) =#
+        #= dts_states = fill(fill(dt_EVENT(1.0 * s̃, :before, :before), 7), 3) =#
+        # @show length(new_particles)
+        while particle_inner.alive
+            #= event_number += 1 =#
+            #@debug "Particle before: " particle
+            @debug debugParticle("before", particle_inner)
+            #= checkBins(dt_EVENT(1.0 * s̃, :before, :before), particle_inner, params, particle_states, dts_states) =#
+            checkBins(dt_EVENT(1.0 * s̃, :before, :before), particle_inner, params)
+            dt = getDt!(dts, dt_times, particle_inner, model, params)
+
+            :f in model.meas ? measureCumulative!(dt.time, particle_inner, model.En0, model.n0, model, params, meas_inner) : nothing
+            updateParticle!(dt.time, particle_inner, model.En0, model.n0, model, params, meas_inner)
+            @debug debugParticle("after flight", particle_inner)
+
+            event!(dt, particle_inner, model, params, meas_inner, new_particles)
+            #= particle_states[event_number%3+1] = deepcopy(particle_inner) =#
+            #= dts_states[event_number%3+1] = dts =#
+
+            @debug debugParticle("after event", particle_inner)
+            #= @debug sum(meas_inner.measg.coll_count) > 5 && break =#
+
+            particle_inner.alive = particle_inner.alive && checkAlive(model.type, particle_inner, model, meas_inner, params)
+            measureEvent!(model.type, dt, particle_inner, model, params, meas_inner)
+            # if verbose && meas_inner.measg.coll_count.elastic > 5 alive = false end
+            #= checkBins(dt, particle_inner, params, particle_states, dts_states) =#
+            checkBins(dt, particle_inner, params)
+        end
+        measureDeath!(model.type, particle_inner, model, params, meas_inner)
+        popfirst!(new_particles)
+    end
+    return meas_inner::MEAS
+end
+
+function flightGetParticles(particle_og::Vector{PART}, model, params; coll_limit=Inf, t_limit=Inf * s)
     @debug "Conducting flight..."
     :f in model.meas && (params.a[1] > 0m^4 / s^2 || params.a[2] > 0m^4 / s^2) && @warn "Measuring flux with x or y field, third order will be wrong."
     meas_inner = initMeas(model, params)
     # Preallocate arrays
-    dts = Array{dt_EVENT,1}(undef, 7)
-    dt_times = Array{Quantity,1}(undef, 7)
+    #= dts = Array{dt_EVENT,1}(undef, 7) =#
+    #= dt_times = Array{Quantity,1}(undef, 7) =#
+    dts = repeat([dt_EVENT(1.0 * s̃, :before, :before)], 7)
+    dt_times = repeat([1.0 * s̃], 7)
 
+    measureTbin!(particle_og, model, params, meas_inner) ## measure initial stuff
+
+    new_particles = particle_og
+    i = 0
+    while i != length(new_particles)
+        i += 1
+        particle_inner = new_particles[i]
+        #= (length(new_particles)-i) % 1000 == 0 && @info length(new_particles) =#
+        if length(new_particles) - i > 50000
+            error("Too many ionisation events")
+        end
+        #= particle_states = fill(deepcopy(particle_inner), 3) =#
+        #= dts_states = fill(fill(dt_EVENT(1.0 * s̃, :before, :before), 7), 3) =#
+        # @show length(new_particles)
+        while particle_inner.alive && sum(meas_inner.measg.coll_count) < coll_limit
+            #@debug "Particle before: " particle
+            @debug debugParticle("before", particle_inner)
+            checkBins(dt_EVENT(1s, :before, :before), particle_inner, params)
+            #= checkBins(dt_EVENT(1s, :before, :before), particle_inner, params, particle_states, dts_states) =#
+            dt = getDt!(dts, dt_times, particle_inner, model, params)
+
+            particle_inner.t + dt.time > model.type.t_f && @error debugParticle("Time error", particle_inner) dt
+            :f in model.meas ? measureCumulative!(dt.time, particle_inner, model.En0, model.n0, model, params, meas_inner) : nothing
+            updateParticle!(dt.time, particle_inner, model.En0, model.n0, model, params, meas_inner)
+
+            event!(dt, particle_inner, model, params, meas_inner, new_particles)
+
+            @debug debugParticle("after", particle_inner)
+            @debug sum(meas_inner.measg.coll_count) > 5 && break
+
+            particle_inner.alive = particle_inner.alive && checkAlive(model.type, particle_inner, model, meas_inner, params)
+            measureEvent!(model.type, dt, particle_inner, model, params, meas_inner)
+            # if verbose && meas_inner.measg.coll_count.elastic > 5 alive = false end
+            checkBins(dt, particle_inner, params)
+            #= checkBins(dt, particle_inner, params, particle_states, dts_states) =#
+        end
+        measureDeath!(model.type, particle_inner, model, params, meas_inner)
+        #= popfirst!(new_particles) =#
+    end
+    return filter!((x) -> x.weight != 0.0, new_particles)
+end
+
+
+function flightGetParticles(particle_og::PART, model, params; coll_limit=Inf, t_limit=Inf * s)
+    @debug "Conducting flight..."
+    :f in model.meas && (params.a[1] > 0m^4 / s^2 || params.a[2] > 0m^4 / s^2) && @warn "Measuring flux with x or y field, third order will be wrong."
+    meas_inner = initMeas(model, params)
+    # Preallocate arrays
+    #= dts = Array{dt_EVENT,1}(undef, 7) =#
+    #= dt_times = Array{Quantity,1}(undef, 7) =#
+
+    dts = repeat([dt_EVENT(1.0 * s̃, :before, :before)], 7)
+    dt_times = repeat([1.0 * s̃], 7)
     measureTbin!(particle_og, model, params, meas_inner) ## measure initial stuff
 
     new_particles = [particle_og]
@@ -432,15 +550,15 @@ function eventCollision!(dt::dt_EVENT, particle, model, params, meas_inner, new_
         g = getRelVel(cs_ind, cs, mass, particle, model, params)
 
         if cs.type == :ELASTIC
-            elasticColl!(cs_ind, cs, mass, g, particle, model, params, meas_inner, verbose)
+            elasticColl!(cs_ind, cs, mass, g, particle, model, params, meas_inner)
         elseif cs.type == :EXCITATION
-            excitationColl!(cs_ind, cs, mass, g, particle, model, params, meas_inner, verbose)
+            excitationColl!(cs_ind, cs, mass, g, particle, model, params, meas_inner)
             # energy_loss = cs.energy_loss
         elseif cs.type == :IONIZATION
-            ionisationColl!(cs_ind, cs, mass, model.ion_type, g, particle, model, params, meas_inner, verbose, new_particles)
+            ionisationColl!(cs_ind, cs, mass, model.ion_type, g, particle, model, params, meas_inner, new_particles)
             # energy_loss = cs.energy_loss
         elseif cs.type == :ATTACHMENT
-            attachmentColl!(cs_ind, cs, mass, g, particle, model, params, meas_inner, verbose)
+            attachmentColl!(cs_ind, cs, mass, g, particle, model, params, meas_inner)
         end
     end
 
@@ -451,11 +569,11 @@ function eventCollision!(dt::dt_EVENT, particle, model, params, meas_inner, new_
     return new_particle
 end
 
-function getRelVel(cs_no, particle, model, params)
+function getRelVel(cs_no, cs, mass, particle, model, params)
     if model.T.val == 0.0 * K
         g = copy(particle.v)
     else
-        g = findu(cs_no, particle, model, params)
+        g = findu(cs_no, cs, mass, particle, model, params)
     end
     @debug g
     return g
@@ -511,7 +629,7 @@ function ionisationColl!(cs_no, cs, mass, ion_type, g, particle, model, params, 
     if dot(g, g) - 2 * cs.energy_loss / me > 0m^2 / s^2
         part_energy, other_part_energy = getIonisationEnergy(cs.energy_loss, ion_type, g, particle, model, params)
 
-        coschi, sinchi, phi = scatteringAngle(cs_no, cs, mass, g, particle, model, params, verbose)
+        coschi, sinchi, phi = scatteringAngle(cs_no, cs, mass, g, particle, model, params)
 
         v2 = sqrt(2 * part_energy / me) * SArray{Tuple{3},Float64,1,3}(cos(phi) * sinchi, sin(phi) * sinchi, coschi)
         v2 = shift(v2, g)
@@ -628,7 +746,7 @@ function attachmentColl!(cs_no, g, particle, model, params, meas_inner)
     end
 end
 
-function scatteringAngle(cs_no, g, particle, model, params)
+function scatteringAngle(cs_no, cs, mass, g, particle, model, params)
     coschi = 1 - 2 * rand()
     #' coschi = params.splat_gas.dcs[cs_no][particle.cbin](rand())::Float64
     #coschi = -1
@@ -752,17 +870,17 @@ end
 # * Fetch Functions
 
 #### * Temperature
-@fastmath function findu(cs_ind, particle, model, params)
+@fastmath function findu(cs_ind, cs, mass, particle, model, params)
     #TODO: make generic function based on inputs
-    w = sqrt(2 * k * model.T.val / params.splat_gas.m[cs_ind])
+    w = sqrt(2 * k * model.T.val / mass)
     v = particle.v#*params.time_scale/params.length_scale
     he = electron_v2eV * (norm(v) + 5.0 * w)^2
     le = max(1e-25u"kg*m^2/s^2", electron_v2eV * (norm(v) - 5.0 * w) .^ 2)
 
     #TODO: get actual CF from CS
 
-    hcf = getTotalFreq(params.gas, he)
-    lcf = getTotalFreq(params.gas, params)
+    hcf = evalTotalFreq(params.gas, he)
+    lcf = evalTotalFreq(params.gas, params)
 
     g = copy(v)
     mcf = max(hcf, lcf)
@@ -775,7 +893,7 @@ end
         # @show g
         eg = electron_v2eV * dot(g, g)
         # @show eg
-        ccf = getTotalFreq(params.gas, eg)
+        ccf = evalTotalFreq(params.gas, eg)
         # @show lcf
         # @show hcf
         # @show ccf
