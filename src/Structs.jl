@@ -418,7 +418,7 @@ function MEAS(type::LμJ, model, params::MCPARAMS=MCPARAMS())
 end
 
 function MEAS(type::CELL, model, params::MCPARAMS=MCPARAMS())
-    MEAS(MEASLμJ(), MEASCELL(model, params), MEASG(model, params), MEAST(), MEASS(), MEASC())
+    MEAS(MEASLμJ(), MEASCELL(model, params), MEASG(model, params), MEAST(params), MEASS(), MEASC(params))
 end
 
 @AutoParm mutable struct MEASLμJ
@@ -489,7 +489,7 @@ function MEASCELL(model::MCMODEL, params::MCPARAMS)
     end
     if :tz ∈ model.meas
         tz = zeros(length(params.tbins), length(params.zbins))
-        # v_tz = zeros(length(params.tbins),length(params.zbins))*m/s
+        v_tz = zeros(length(params.tbins), length(params.zbins)) * m / s
     end
 
     return MEASCELL(ε, εz, εz_w, x, y, z, xy, xybins, tz, v_tz)
@@ -521,8 +521,10 @@ end
     r::AUTO = nothing
     v::AUTO = nothing
     r²::AUTO = nothing
+    r³::AUTO = nothing
     v²::AUTO = nothing
     rv::AUTO = nothing
+    zx²::AUTO = nothing
     w::AUTO = nothing
     zeff::AUTO = nothing
 end
@@ -533,8 +535,10 @@ function MEAST(params)
         zeros(length(params.tbins), 3) .* m,
         zeros(length(params.tbins), 3) .* m / s,
         zeros(length(params.tbins), 3) .* m^2,
+        zeros(length(params.tbins), 3) .* m^3,
         zeros(length(params.tbins), 3) .* m^2 / s^2,
         zeros(length(params.tbins), 3) .* m^2 / s,
+        zeros(length(params.tbins)) .* m^3,
         zeros(length(params.tbins)),
         zeros(length(params.tbins))
     )
@@ -607,6 +611,10 @@ end
     bDls::AUTO = [0.0]
     fDl::AUTO = 0.0
     fDls::AUTO = [0.0]
+    bQl::AUTO = 0.0
+    bQls::AUTO = [0.0]
+    bQt::AUTO = 0.0
+    bQts::AUTO = [0.0]
     fQl::AUTO = 0.0
     fQls::AUTO = [0.0]
     fQt::AUTO = 0.0

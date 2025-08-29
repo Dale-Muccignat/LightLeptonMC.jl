@@ -26,6 +26,20 @@ function debugParticle(header, particle)
     pos: x=$(particle.r[1]) y=$(particle.r[2]) z=$(particle.r[3]) 
     vel: x=$(particle.v[1]) y=$(particle.v[2]) z=$(particle.v[3]) 
     rad: $(sqrt(particle.r[2]^2+particle.r[3]^2))
+    weight: $(particle.weight) alive: $(particle.alive)
+    bin: t=$(particle.tbin) | c=$(particle.cbin) | e=$(particle.ebin) | z=$(particle.zbin) 
+    """
+end
+
+function debugDts(dts)
+    """ time of flights
+        CS Bin: $(dts[1].time)
+        En Bin: $(dts[2].time)
+        T  Bin: $(dts[3].time)
+        R  Bin: $(dts[4].time)
+        Z  Bin: $(dts[5].time)
+        Y  Bin: $(dts[6].time)
+        X  Bin: $(dts[7].time)
     """
 end
 
@@ -125,7 +139,7 @@ function adaptiveMesh(func, lower, upper, δ)
     return xs
 end
 
-@generated function structprint(this::T)::T where T
+@generated function structprint(this::T)::T where {T}
     expr = Expr(:block)
     contents_expr = Expr(:tuple)
     for fname in fieldnames(this)

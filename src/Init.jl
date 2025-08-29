@@ -1,12 +1,11 @@
 function initParams(input_gas=MaxwellModel(), model::MCMODEL=MCMODEL())
 
-    cbins = [0.0, (10.0 .^ (-8:0.1:-1))..., (10.0 .^ (-0.98:0.02:2.98))..., (10.0 .^ (3:0.1:10))...] .* eV #TODO: move to input struct
+    cbins = [0.0, (10.0 .^ (-8:0.1:4))...] .* eV
 
     tbins, ebins, rbins, χbins, zbins, ybins, xbins = generateBins(model)
     n0 = buildDensity(model.n0, rbins, zbins)
     a = buildField(model.En0)
 
-    #' splat_gas = splatCS(input_gas, model.T.val, energy_scale, collect(ustrip.(cbins))) #NOTE: This grid needs to be finer than cbins for the null collision method to work
     total_freq = upreferred.(buildFreq(input_gas, cbins))
 
     params = MCPARAMS(
@@ -113,7 +112,7 @@ end
 
 function buildTBins(type::CELL, model)
     # return LinRange(0s,type.t_f,10000)
-    return 0s:1e-9s:type.t_f
+    return [-Inf * s, (0s:1e-9s:type.t_f)...]
 end
 
 function buildχBins(type::CELL, model)
