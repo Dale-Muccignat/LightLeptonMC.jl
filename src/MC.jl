@@ -72,7 +72,7 @@ function flight!(particle_og::Vector{<:PART}, model, params, meas_inner)
         measureTbin!(p, model, params, meas_inner) ## measure initial stuff
     end
 
-    new_particles = deepcopy(particle_og)
+    new_particles = particle_og
     particle_no = 0
     while !isempty(new_particles)
         #= @show "start" =#
