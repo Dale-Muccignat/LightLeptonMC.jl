@@ -26,6 +26,7 @@ end
 const electron_v2eV = 0.5 * me
 
 include("Structs.jl")
+export MCMODEL, initParams, CELL, LμJ, InitVelocity, InitSpatial, UniformDensity, UniformField, GaussianTemporal, UniformTemp
 
 include("Utils.jl")
 
