@@ -735,7 +735,7 @@ function getIonisationEnergy(thresh, ion_type::DiscreteFunctionalIonisation, g, 
     return part_energy, other_part_energy
 end
 
-function attachmentColl!(cs_no, g, particle, model, params, meas_inner)
+function attachmentColl!(cs_no, cs, mass, g, particle, model, params, meas_inner)
     if model.ion_type.method == :WEIGHTING
         particle.type == :positron ? particle.alive = false : particle.weight /= 2.0
     elseif model.ion_type.method == :EXPLICIT
