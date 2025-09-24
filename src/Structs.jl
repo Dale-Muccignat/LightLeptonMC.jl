@@ -488,9 +488,9 @@ function MEASCELL(model::MCMODEL, params::MCPARAMS)
         xybins = convert(Vector{Float64}, LinRange(0, model.type.r, model.type.bin_no))
     end
     if :tz ∈ model.meas
-        tz = zeros(length(params.tbins), length(params.zbins))
-        v_tz = zeros(length(params.tbins), length(params.zbins)) * m / s
+        tz = spzeros(length(params.tbins), length(params.zbins))
     end
+        v_tz = spzeros(length(params.tbins), length(params.zbins)) * m / s
 
     return MEASCELL(ε, εz, εz_w, x, y, z, xy, xybins, tz, v_tz)
 end
