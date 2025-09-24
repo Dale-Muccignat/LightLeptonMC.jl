@@ -621,31 +621,46 @@ end
     fQts::AUTO = [0.0]
 end
 
-@fastmath function findMinInd(x::AbstractArray, y)::Int64
-    left::Int64 = 1
-    right::Int64 = length(x)
-    x = collect(x)
-    d = Inf * x[1]
-    dlast = -Inf * x[1]
-    c::Int64 = 0
-    while d != dlast
-        # c = Int(round((left+right)/2))
-        c = div(left + right, 2)
-        dlast = d
-        @inbounds d = x[c]
-        if d < y
+#' @fastmath function findMinInd(x::AbstractArray, y)::Int64
+#'     left::Int64 = 1
+#'     right::Int64 = length(x)
+#'     d = Inf * x[1]
+#'     dlast = -Inf * x[1]
+#'     c::Int64 = 0
+#'     while d != dlast
+#'         # c = Int(round((left+right)/2))
+#'         c = div(left + right, 2)
+#'         dlast = d
+#'         @inbounds d = x[c]
+#'         if d < y
+#'             left = c
+#'         elseif d >= y
+#'             right = c
+#'         end
+#'
+#'     end
+#'     if x[right] <= y
+#'         return right
+#'     else
+#'         return left
+#'     end
+#' end
+function findMinInd(x::AbstractVector, y)::Int
+    left, right = 1, length(x)
+    #' @assert issorted(x) "x must be sorted ascending"
+
+    while left + 1 < right
+        c = (left + right) >>> 1  # bitshift for div
+        @inbounds if x[c] < y
             left = c
-        elseif d >= y
+        else
             right = c
         end
+    end
 
-    end
-    if x[right] <= y
-        return right
-    else
-        return left
-    end
+    return ifelse(x[right] <= y, right, left)
 end
+
 
 @fastmath function findMinInd(x::Array{Int64,1}, y::Int64)::Int64
     left::Int64 = 1
