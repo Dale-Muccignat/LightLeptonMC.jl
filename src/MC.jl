@@ -528,7 +528,7 @@ function measureTbin!(particle, model, params, meas_inner)
     :zyt ∈ model.meas ? meas_inner.measLμJ.zyt[particle.zbin, particle.ybin, particle.tbin] += particle.weight : nothing
 
     :tz ∈ model.meas ? meas_inner.measCell.tz[particle.tbin, particle.zbin] += particle.weight : nothing
-    :tz ∈ model.meas ? meas_inner.measCell.v_tz[particle.tbin, particle.zbin] += particle.weight * particle.v[3] : nothing
+    :tz_v ∈ model.meas ? meas_inner.measCell.v_tz[particle.tbin, particle.zbin] += particle.weight * particle.v[3] : nothing
     # :tz ∈ model.meas && params.zbins[2] < particle.r[3] < params.zbins[end] ? meas_inner.measCell.tz[particle.tbin,1] += particle.weight : nothing
     # :tz ∈ model.meas && particle.r[3] < params.zbins[end] ? meas_inner.measCell.tz[particle.tbin,1] += particle.weight : nothing
 end

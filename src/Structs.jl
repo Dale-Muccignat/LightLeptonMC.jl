@@ -418,7 +418,7 @@ function MEAS(type::LμJ, model, params::MCPARAMS=MCPARAMS())
 end
 
 function MEAS(type::CELL, model, params::MCPARAMS=MCPARAMS())
-    MEAS(MEASLμJ(), MEASCELL(model, params), MEASG(model, params), MEAST(params), MEASS(), MEASC(params))
+    MEAS(MEASLμJ(), MEASCELL(model, params), MEASG(model, params), MEAST(), MEASS(), MEASC())
 end
 
 @AutoParm mutable struct MEASLμJ
@@ -490,7 +490,9 @@ function MEASCELL(model::MCMODEL, params::MCPARAMS)
     if :tz ∈ model.meas
         tz = spzeros(length(params.tbins), length(params.zbins))
     end
+    if :tz_v ∈ model.meas
         v_tz = spzeros(length(params.tbins), length(params.zbins)) * m / s
+    end
 
     return MEASCELL(ε, εz, εz_w, x, y, z, xy, xybins, tz, v_tz)
 end
