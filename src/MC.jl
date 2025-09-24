@@ -57,10 +57,10 @@ function flight(particle_og::PART, model, params)
     return meas_inner
 end
 
-function flight!(particle_og::Vector{<:PART}, model, params, meas_inner)
     @debug "Conducting flight..."
+function flight(particle_og::Vector{<:PART}, model, params)
     :f in model.meas && (params.a[1] > 0m^4 / s^2 || params.a[2] > 0m^4 / s^2) && @warn "Measuring flux with x or y field, third order will be wrong."
-    #' meas_inner = initMeas(model, params)
+    meas_inner = initMeas(model, params)
     # Preallocate arrays
     #= dts = Array{dt_EVENT,1}(undef, 7) =#
     #= dt_times = Array{Quantity,1}(undef, 7) =#

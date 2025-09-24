@@ -176,8 +176,8 @@ function mc(model::MCMODEL, params::MCPARAMS)
     # @debug model.n=1
 
     #scale!(model,model.type,params)
-    meas_outer = initMeas(model, params)
-    meass = [deepcopy(meas_outer) for _ in 1:Threads.nthreads()]
+    #' meas_outer = initMeas(model, params)
+    #' meass = [deepcopy(meas_outer) for _ in 1:Threads.nthreads()]
     @debug "Measurements initialised."
     #scale!(params)
 
@@ -190,9 +190,9 @@ function mc(model::MCMODEL, params::MCPARAMS)
         batches = [n for n in Iterators.partition(1:N, 100)]
     end
 
-    Threads.@threads for n in eachindex(batches)
+    meas = @distributed (+) for n in eachindex(batches)
         #' Threads.@threads for n in 1:N
-        id = Threads.threadid()
+        #' id = Threads.threadid()
         #' @show id
         #' for n in eachindex(batches)
         #' meas = @distributed (+) for n in 1:model.n
@@ -210,13 +210,13 @@ function mc(model::MCMODEL, params::MCPARAMS)
         # [meas_inner]
         #= [flight(PART(model, params), model, params)] =#
         #' flight!([PART(model, params)], model, params, meass[id])
-        flight!([PART(model, params) for _ in batches[n]], model, params, meass[id])
+        flight([PART(model, params) for _ in batches[n]], model, params)
     end
     @debug "Finished Sim"
     # @show params.rbins
     #unscale!(params)
     #unscale!(model.type,model,params,meas[1])
-    meas = sum(meass)
+    #' meas = sum(meass)
     return process(model.type, meas, params, model)
 end
 
