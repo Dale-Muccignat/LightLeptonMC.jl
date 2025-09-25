@@ -13,33 +13,35 @@ struct dt_EVENT
 end
 
 function getDt!(dts, dt_times, particle, model, params)
-    # Calculate dt values
-    dts[1] = getCDt(particle, model, params)
-    dts[2] = getEnDt(model.En0, model.n0, particle, model, params)
-    dts[3] = getTDt(particle, model, params)
-    dts[4] = getRDt(particle, model, model.type, params)
-    dts[5] = getZDt(model.En0, particle, model, params)
-    dts[6] = getYDt(particle, model, params)
-    dts[7] = getXDt(particle, model, params)
+    @inbounds begin
+        # Calculate dt values
+        dts[1] = getCDt(particle, model, params)
+        dts[2] = getEnDt(model.En0, model.n0, particle, model, params)
+        dts[3] = getTDt(particle, model, params)
+        dts[4] = getRDt(particle, model, model.type, params)
+        dts[5] = getZDt(model.En0, particle, model, params)
+        dts[6] = getYDt(particle, model, params)
+        dts[7] = getXDt(particle, model, params)
 
-    # Calculate corresponding times
-    dt_times[1] = dts[1].time
-    dt_times[2] = dts[2].time
-    dt_times[3] = dts[3].time
-    dt_times[4] = dts[4].time
-    dt_times[5] = dts[5].time
-    dt_times[6] = dts[6].time
-    dt_times[7] = dts[7].time
+        # Calculate corresponding times
+        dt_times[1] = dts[1].time
+        dt_times[2] = dts[2].time
+        dt_times[3] = dts[3].time
+        dt_times[4] = dts[4].time
+        dt_times[5] = dts[5].time
+        dt_times[6] = dts[6].time
+        dt_times[7] = dts[7].time
 
-    @debug debugDts(dts)
-    # @show dt_times
-    # Find minimum time
-    min_time = minimum(dt_times)
-    min_index = findfirst(x -> x == min_time, dt_times)
-    min_index |> isnothing && error("Min time not found")
+        #' @debug debugDts(dts)
+        # @show dt_times
+        # Find minimum time
+        min_time = minimum(dt_times)
+        min_index = findfirst(x -> x == min_time, dt_times)
+        min_index |> isnothing && error("Min time not found")
 
-    # Return result
-    return dts[min_index]
+        # Return result
+        return dts[min_index]
+    end
 end
 
 function getEnDt(En0::UniformField, n0::UniformDensity, particle, model, params)

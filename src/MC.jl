@@ -3,7 +3,7 @@
 #TODO: Tidy up measurement types...
 
 function flight(particle_og::PART, model, params)
-    @debug "Conducting flight..."
+    #' @debug "Conducting flight..."
     :f in model.meas && (params.a[1] > 0m^4 / s^2 || params.a[2] > 0m^4 / s^2) && @warn "Measuring flux with x or y field, third order will be wrong."
     meas_inner = initMeas(model, params)
     # Preallocate arrays
@@ -29,20 +29,20 @@ function flight(particle_og::PART, model, params)
         while particle_inner.alive
             event_number += 1
             #@debug "Particle before: " particle
-            @debug debugParticle("before", particle_inner)
+            #' @debug debugParticle("before", particle_inner)
             #= checkBins(dt_EVENT(1.0 * s̃, :before, :before), particle_inner, params, particle_states, dts_states) =#
             checkBins(dt_EVENT(1.0 * s̃, :before, :before), particle_inner, params)
             dt = getDt!(dts, dt_times, particle_inner, model, params)
 
             :f in model.meas ? measureCumulative!(dt.time, particle_inner, model.En0, model.n0, model, params, meas_inner) : nothing
             updateParticle!(dt.time, particle_inner, model.En0, model.n0, model, params, meas_inner)
-            @debug debugParticle("after flight", particle_inner)
+            #' @debug debugParticle("after flight", particle_inner)
 
             event!(dt, particle_inner, model, params, meas_inner, new_particles)
             #= particle_states[event_number%3+1] = deepcopy(particle_inner) =#
             #= dts_states[event_number%3+1] = dts =#
 
-            @debug debugParticle("after event", particle_inner)
+            #' @debug debugParticle("after event", particle_inner)
             #= @debug sum(meas_inner.measg.coll_count) > 5 && break =#
 
             particle_inner.alive = particle_inner.alive && checkAlive(model.type, particle_inner, model, meas_inner, params)
@@ -57,8 +57,8 @@ function flight(particle_og::PART, model, params)
     return meas_inner
 end
 
-    @debug "Conducting flight..."
 function flight(particle_og::Vector{<:PART}, model, params)
+    #' @debug "Conducting flight..."
     :f in model.meas && (params.a[1] > 0m^4 / s^2 || params.a[2] > 0m^4 / s^2) && @warn "Measuring flux with x or y field, third order will be wrong."
     meas_inner = initMeas(model, params)
     # Preallocate arrays
@@ -90,20 +90,20 @@ function flight(particle_og::Vector{<:PART}, model, params)
         while particle_inner.alive
             #= event_number += 1 =#
             #@debug "Particle before: " particle
-            @debug debugParticle("before", particle_inner)
+            #' @debug debugParticle("before", particle_inner)
             #= checkBins(dt_EVENT(1.0 * s̃, :before, :before), particle_inner, params, particle_states, dts_states) =#
             checkBins(dt_EVENT(1.0 * s̃, :before, :before), particle_inner, params)
             dt = getDt!(dts, dt_times, particle_inner, model, params)
 
             :f in model.meas ? measureCumulative!(dt.time, particle_inner, model.En0, model.n0, model, params, meas_inner) : nothing
             updateParticle!(dt.time, particle_inner, model.En0, model.n0, model, params, meas_inner)
-            @debug debugParticle("after flight", particle_inner)
+            #' @debug debugParticle("after flight", particle_inner)
 
             event!(dt, particle_inner, model, params, meas_inner, new_particles)
             #= particle_states[event_number%3+1] = deepcopy(particle_inner) =#
             #= dts_states[event_number%3+1] = dts =#
 
-            @debug debugParticle("after event", particle_inner)
+            #' @debug debugParticle("after event", particle_inner)
             #= @debug sum(meas_inner.measg.coll_count) > 5 && break =#
 
             particle_inner.alive = particle_inner.alive && checkAlive(model.type, particle_inner, model, meas_inner, params)
@@ -119,7 +119,7 @@ function flight(particle_og::Vector{<:PART}, model, params)
 end
 
 function flightGetParticles(particle_og::Vector{PART}, model, params; coll_limit=Inf, t_limit=Inf * s)
-    @debug "Conducting flight..."
+    #' @debug "Conducting flight..."
     :f in model.meas && (params.a[1] > 0m^4 / s^2 || params.a[2] > 0m^4 / s^2) && @warn "Measuring flux with x or y field, third order will be wrong."
     meas_inner = initMeas(model, params)
     # Preallocate arrays
@@ -144,7 +144,7 @@ function flightGetParticles(particle_og::Vector{PART}, model, params; coll_limit
         # @show length(new_particles)
         while particle_inner.alive && sum(meas_inner.measg.coll_count) < coll_limit
             #@debug "Particle before: " particle
-            @debug debugParticle("before", particle_inner)
+            #' @debug debugParticle("before", particle_inner)
             checkBins(dt_EVENT(1s, :before, :before), particle_inner, params)
             #= checkBins(dt_EVENT(1s, :before, :before), particle_inner, params, particle_states, dts_states) =#
             dt = getDt!(dts, dt_times, particle_inner, model, params)
@@ -155,8 +155,8 @@ function flightGetParticles(particle_og::Vector{PART}, model, params; coll_limit
 
             event!(dt, particle_inner, model, params, meas_inner, new_particles)
 
-            @debug debugParticle("after", particle_inner)
-            @debug sum(meas_inner.measg.coll_count) > 5 && break
+            #' @debug debugParticle("after", particle_inner)
+            #' @debug sum(meas_inner.measg.coll_count) > 5 && break
 
             particle_inner.alive = particle_inner.alive && checkAlive(model.type, particle_inner, model, meas_inner, params)
             measureEvent!(model.type, dt, particle_inner, model, params, meas_inner)
@@ -172,7 +172,7 @@ end
 
 
 function flightGetParticles(particle_og::PART, model, params; coll_limit=Inf, t_limit=Inf * s)
-    @debug "Conducting flight..."
+    #' @debug "Conducting flight..."
     :f in model.meas && (params.a[1] > 0m^4 / s^2 || params.a[2] > 0m^4 / s^2) && @warn "Measuring flux with x or y field, third order will be wrong."
     meas_inner = initMeas(model, params)
     # Preallocate arrays
@@ -197,7 +197,7 @@ function flightGetParticles(particle_og::PART, model, params; coll_limit=Inf, t_
         # @show length(new_particles)
         while particle_inner.alive && sum(meas_inner.measg.coll_count) < coll_limit
             #@debug "Particle before: " particle
-            @debug debugParticle("before", particle_inner)
+            #' @debug debugParticle("before", particle_inner)
             checkBins(dt_EVENT(1s, :before, :before), particle_inner, params)
             #= checkBins(dt_EVENT(1s, :before, :before), particle_inner, params, particle_states, dts_states) =#
             dt = getDt!(dts, dt_times, particle_inner, model, params)
@@ -208,8 +208,8 @@ function flightGetParticles(particle_og::PART, model, params; coll_limit=Inf, t_
 
             event!(dt, particle_inner, model, params, meas_inner, new_particles)
 
-            @debug debugParticle("after", particle_inner)
-            @debug sum(meas_inner.measg.coll_count) > 5 && break
+            #' @debug debugParticle("after", particle_inner)
+            #' @debug sum(meas_inner.measg.coll_count) > 5 && break
 
             particle_inner.alive = particle_inner.alive && checkAlive(model.type, particle_inner, model, meas_inner, params)
             measureEvent!(model.type, dt, particle_inner, model, params, meas_inner)
@@ -507,7 +507,7 @@ end
 end
 #### * TBins Measurements
 function eventTbin!(dt, particle, model, params, meas_inner)
-    @debug "TBin Up: #$(particle.zbin) $(dt.time)"
+    #' @debug "TBin Up: #$(particle.zbin) $(dt.time)"
     particle.tbin += 1
     measureTbin!(particle, model, params, meas_inner)
 end
@@ -541,10 +541,10 @@ function eventCollision!(dt::dt_EVENT, particle, model, params, meas_inner, new_
     cs_ind = getCollType(particle, model, params)
     energy_loss = 0.0
     :SP in model.meas && sum(meas_inner.measg.coll_count) == 0 ? energy_loss = getEnergy(particle.v) : nothing
-    @debug """
-    Collision: 
-    $(cs_ind == 0 ? "NULL" : params.gas[cs_ind][1].type) $(dt.time)
-    """
+    #' @debug """
+    #' Collision: 
+    #' $(cs_ind == 0 ? "NULL" : params.gas[cs_ind][1].type) $(dt.time)
+    #' """
     if cs_ind != 0
         cs, weight, mass = params.gas[cs_ind]
         g = getRelVel(cs_ind, cs, mass, particle, model, params)
@@ -575,7 +575,7 @@ function getRelVel(cs_no, cs, mass, particle, model, params)
     else
         g = findu(cs_no, cs, mass, particle, model, params)
     end
-    @debug g
+    #' @debug g
     return g
 end
 
@@ -752,10 +752,10 @@ function scatteringAngle(cs_no, cs, mass, g, particle, model, params)
     #coschi = -1
     sinchi = sqrt(1 - coschi^2)
     phi = rand() * 2 * pi
-    @debug """
-    Scattering angle: 
-    $coschi $sinchi $phi"
-    """
+    #' @debug """
+    #' Scattering angle: 
+    #' $coschi $sinchi $phi"
+    #' """
     return coschi, sinchi, phi
 end
 
@@ -810,23 +810,23 @@ end
 
 function eventEnergy!(dt::dt_EVENT, particle, model, params, meas_inner)
     if dt.direction == :Up
-        @debug "Energy Bin Up: #$(particle.cbin) $(dt.time)"
+        #' @debug "Energy Bin Up: #$(particle.cbin) $(dt.time)"
         particle.cbin += 1
     elseif dt.direction == :Down
-        @debug "Energy Bin Down: #$(particle.cbin) $(dt.time)"
+        #' @debug "Energy Bin Down: #$(particle.cbin) $(dt.time)"
         particle.cbin -= 1
     end
 end
 
 function eventRBin!(dt::dt_EVENT, particle, model, params, meas_inner)
     if dt.direction == :Up
-        @debug "RBin Up: #$(particle.rbin) $(dt.time)"
+        #' @debug "RBin Up: #$(particle.rbin) $(dt.time)"
         if particle.r[2]^2 + particle.r[3]^2 < params.rbins[particle.rbin+1]
             # If particle is going up an Rbin, it can't be less than that bin value
         end
         particle.rbin += 1
     elseif dt.direction == :Down
-        @debug "RBin Down: #$(particle.rbin) $(dt.time)"
+        #' @debug "RBin Down: #$(particle.rbin) $(dt.time)"
         if particle.r[2]^2 + particle.r[3]^2 > params.rbins[particle.rbin]
             # If particle is going down an Rbin, it can't be more than the existing bin value
         end
@@ -836,20 +836,20 @@ end
 
 function eventYBin!(dt::dt_EVENT, particle, model, params, meas_inner)
     if dt.direction == :Up
-        @debug "YBin Down: #$(particle.ybin) $(dt.time)"
+        #' @debug "YBin Down: #$(particle.ybin) $(dt.time)"
         particle.ybin += 1
     elseif dt.direction == :Down
-        @debug "YBin Down: #$(particle.ybin) $(dt.time)"
+        #' @debug "YBin Down: #$(particle.ybin) $(dt.time)"
         particle.ybin -= 1
     end
 end
 
 function eventZBin!(dt::dt_EVENT, particle, model, params, meas_inner)
     if dt.direction == :Up
-        @debug "ZBin Up: #$(particle.zbin) $(dt.time)"
+        #' @debug "ZBin Up: #$(particle.zbin) $(dt.time)"
         particle.zbin += 1
     elseif dt.direction == :Down
-        @debug "ZBin Down: #$(particle.zbin) $(dt.time)"
+        #' @debug "ZBin Down: #$(particle.zbin) $(dt.time)"
         particle.zbin -= 1
     end
     if :SP_z in model.meas && particle.zbin != 0
@@ -859,10 +859,10 @@ end
 
 function eventXBin!(dt::dt_EVENT, particle, model, params, meas_inner)
     if dt.direction == :Up
-        @debug "XBin Down: #$(particle.xbin) $(dt.time)"
+        #' @debug "XBin Down: #$(particle.xbin) $(dt.time)"
         particle.xbin += 1
     elseif dt.direction == :Down
-        @debug "XBin Down: #$(particle.xbin) $(dt.time)"
+        #' @debug "XBin Down: #$(particle.xbin) $(dt.time)"
         particle.xbin -= 1
     end
 end
@@ -906,6 +906,6 @@ end
             break
         end
     end
-    @debug "Neutral velocity: x = $(g[1]), y = $(g[2]), z = $(g[3])"
+    #' @debug "Neutral velocity: x = $(g[1]), y = $(g[2]), z = $(g[3])"
     return g - +SArray{Tuple{3},Float64,1,3}(1e2, 0, 0)m / s#*params.length_scale/params.time_scale
 end
