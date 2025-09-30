@@ -182,22 +182,22 @@ function swarmMeasurements(meas, params, model)
         measurement(mean(fQts[end÷2:end-1] .* uconvert(m^-3, params.n0) .^ 2),
             std(fQts[end÷2:end-1] .* uconvert(m^-3, params.n0) .^ 2)), fQts .* uconvert(m^-3, params.n0) .^ 2,
     )
-    println("""
-    Energy: $(swarm.ε)
-    Rate: $(swarm.R)
-    Bulk:
-    W: $(swarm.bW)
-    n₀Dₗ: $(swarm.bDl)
-    n₀Dₜ: $(swarm.bDt)
-    n₀²Qₗ: $(swarm.bQl)
-    n₀²Qₜ: $(swarm.bQt)
-    Flux:
-    W: $(swarm.fW)
-    n₀Dₗ: $(swarm.fDl)
-    n₀Dₜ: $(swarm.fDt)
-    n₀²Qₗ: $(swarm.fQl)
-    n₀²Qₜ: $(swarm.fQt)
-        """)
+    #' println("""
+    #' Energy: $(swarm.ε)
+    #' Rate: $(swarm.R)
+    #' Bulk:
+    #' W: $(swarm.bW)
+    #' n₀Dₗ: $(swarm.bDl)
+    #' n₀Dₜ: $(swarm.bDt)
+    #' n₀²Qₗ: $(swarm.bQl)
+    #' n₀²Qₜ: $(swarm.bQt)
+    #' Flux:
+    #' W: $(swarm.fW)
+    #' n₀Dₗ: $(swarm.fDl)
+    #' n₀Dₜ: $(swarm.fDt)
+    #' n₀²Qₗ: $(swarm.fQl)
+    #' n₀²Qₜ: $(swarm.fQt)
+    #'     """)
     return swarm
 end
 

@@ -83,13 +83,11 @@ function findSimTime(gas, S, E, T, n0)
     swarm_o = nothing
     while unconverged
         if iterations > 100 #|| N > 1000000
-            @info "Not Converged"
             throw("Convergence Failed. iters = $(iterations), N = $(N)")
         end
         iterations += 1
-        @info "Current Time: " curr_time
+        @debug "Current Time: " curr_time
         model = MCMODEL(type=SWARM(curr_time / n0), n=N, n0=UniformDensity(n0), En0=UniformField(E), T=UniformTemp(T), ion_type=UniformIonisation(:EXPLICIT), v_0=InitVelocity(S, [0, 0, 1]))
-        @show typeof(model)
         params = initParams(gas, model)
         measures, swarm = mc(model, params)
         particle_change = mean(measures.meast.w[3*end÷4:end])
@@ -98,7 +96,7 @@ function findSimTime(gas, S, E, T, n0)
         if particle_change < N_og * 0.75
             # if we've lost half our particles
             N = round(Int, N * N_og / particle_change)
-            @info "Lost $(N_og - particle_change) particles, changing N to $(N)"
+            @debug "Lost $(N_og - particle_change) particles, changing N to $(N)"
             #= iterations += 1 =#
             continue # retry
         elseif N > 100 && particle_change > N_og * 2.0
@@ -106,19 +104,19 @@ function findSimTime(gas, S, E, T, n0)
             if N < 100
                 N = 100
             end
-            @info "Gained $(particle_change-N_og) particles, changing N to $(N)"
+            @debug "Gained $(particle_change-N_og) particles, changing N to $(N)"
             #= iterations += 1 =#
             continue # retry
         end
         #= @info "STDs: " first_std second_std third_std =#
-        @info "Averages: $(first) $(second)"
-        @info "Diff: $(abs(second - first) / second)"
-        @info "Particles: $(particle_change)"
+        @debug "Averages: $(first) $(second)"
+        @debug "Diff: $(abs(second - first) / second)"
+        @debug "Particles: $(particle_change)"
         if abs(second - first) / second > 0.01
             curr_time *= 1.25
         else
             #= curr_time *= 2.0 # For good measure =#
-            @info "Chose: " curr_time
+            @debug "Chose: " curr_time
             unconverged = false
             measures_o = measures
             swarm_o = swarm
