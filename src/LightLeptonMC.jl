@@ -185,7 +185,7 @@ function mc(model::MCMODEL, params::MCPARAMS)
     # meas = @distributed (+) for n in 1:model.n
     N = model.n
     if N / nprocs() < 1000
-        batches = [n for n in Iterators.partition(1:N, ceil(Int64, N / Threads.nthreads()))]
+        batches = [n for n in Iterators.partition(1:N, ceil(Int64, N / nprocs()))]
     else
         batches = [n for n in Iterators.partition(1:N, 100)]
     end
