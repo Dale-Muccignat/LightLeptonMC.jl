@@ -374,19 +374,31 @@ function buildModel()
     end
 end
 
-
-@generated function GenericAddition(this::T, other::T)::T where {T}
-    expr = Expr(:block)
-    contents_expr = Expr(:tuple)
-    for fname in fieldnames(this)
-        push!(contents_expr.args, :(this.$fname + other.$fname))
+function GenericAddition!(this::T, other::T) where {T}
+    for f in fieldnames(T)
+        a = getfield(this, f)
+        b = getfield(other, f)
+        if isa(a, AbstractArray) && isa(b, AbstractArray)
+            a .+= b
+        else
+            setfield!(this, f, a + b)
+        end
     end
-
-    push!(expr.args, :(contents = $(contents_expr)))
-    push!(expr.args, :(obj = T(contents...)))
-
-    expr
+    return this
 end
+
+#' @generated function GenericAddition(this::T, other::T)::T where {T}
+#'     expr = Expr(:block)
+#'     contents_expr = Expr(:tuple)
+#'     for fname in fieldnames(this)
+#'         push!(contents_expr.args, :(this.$fname + other.$fname))
+#'     end
+#'
+#'     push!(expr.args, :(contents = $(contents_expr)))
+#'     push!(expr.args, :(obj = T(contents...)))
+#'
+#'     expr
+#' end
 
 Base.:+(x::Nothing, y::Nothing) = nothing
 Base.:*(x::Nothing, y::Float64) = nothing
@@ -396,14 +408,14 @@ Base.:/(x::Nothing, y) = nothing
 Unitful.upreferred(x::Nothing) = nothing
 Unitful.uconvert(y, x::Nothing) = nothing
 
-Base.:+(x::SWARMMEAS, y::SWARMMEAS) = GenericAddition(x, y)::SWARMMEAS
-Base.:+(x::MEAST, y::MEAST) = GenericAddition(x, y)::MEAST
-Base.:+(x::MEASLμJ, y::MEASLμJ) = GenericAddition(x, y)::MEASLμJ
-Base.:+(x::MEASCELL, y::MEASCELL) = GenericAddition(x, y)::MEASCELL
-Base.:+(x::MEASC, y::MEASC) = GenericAddition(x, y)::MEASC
-Base.:+(x::MEASS, y::MEASS) = GenericAddition(x, y)::MEASS
+Base.:+(x::SWARMMEAS, y::SWARMMEAS) = GenericAddition!(x, y)::SWARMMEAS
+Base.:+(x::MEAST, y::MEAST) = GenericAddition!(x, y)::MEAST
+Base.:+(x::MEASLμJ, y::MEASLμJ) = GenericAddition!(x, y)::MEASLμJ
+Base.:+(x::MEASCELL, y::MEASCELL) = GenericAddition!(x, y)::MEASCELL
+Base.:+(x::MEASC, y::MEASC) = GenericAddition!(x, y)::MEASC
+Base.:+(x::MEASS, y::MEASS) = GenericAddition!(x, y)::MEASS
 function Base.:+(x::MEAS, y::MEAS)
-    return MEAS(GenericAddition(x.measLμJ, y.measLμJ), GenericAddition(x.measCell, y.measCell), GenericAddition(x.measg, y.measg), GenericAddition(x.meast, y.meast), GenericAddition(x.meass, y.meass), GenericAddition(x.measc, y.measc))
+    return MEAS(GenericAddition!(x.measLμJ, y.measLμJ), GenericAddition!(x.measCell, y.measCell), GenericAddition!(x.measg, y.measg), GenericAddition!(x.meast, y.meast), GenericAddition!(x.meass, y.meass), GenericAddition!(x.measc, y.measc))
 end
 
 function saveBatch(dists, model, indicies, w)
