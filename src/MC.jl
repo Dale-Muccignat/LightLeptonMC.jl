@@ -874,13 +874,13 @@ end
     #TODO: make generic function based on inputs
     w = sqrt(2 * k * model.T.val / mass)
     v = particle.v#*params.time_scale/params.length_scale
-    he = electron_v2eV * (norm(v) + 5.0 * w)^2
-    le = max(1e-25u"kg*m^2/s^2", electron_v2eV * (norm(v) - 5.0 * w) .^ 2)
+    he = uconvert(eV, electron_v2eV * (norm(v) + 5.0 * w)^2)
+    le = uconvert(eV, max(1e-25u"kg*m^2/s^2", electron_v2eV * (norm(v) - 5.0 * w) .^ 2))
 
     #TODO: get actual CF from CS
 
-    hcf = evalTotalFreq(params.gas, he)
-    lcf = evalTotalFreq(params.gas, params)
+    hcf = evalTotalFreq(params.gas, sqrt(he))
+    lcf = evalTotalFreq(params.gas, sqrt(le))
 
     g = copy(v)
     mcf = max(hcf, lcf)
@@ -891,9 +891,9 @@ end
         # @show v
         # @show u
         # @show g
-        eg = electron_v2eV * dot(g, g)
+        eg = uconvert(eV, electron_v2eV * dot(g, g))
         # @show eg
-        ccf = evalTotalFreq(params.gas, eg)
+        ccf = evalTotalFreq(params.gas, sqrt(eg))
         # @show lcf
         # @show hcf
         # @show ccf
