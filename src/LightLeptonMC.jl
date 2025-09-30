@@ -16,6 +16,7 @@ module LightLeptonMC
 
 using LightLeptonTools
 using Distributed, Statistics, Unitful, Optim, AutoParameters, StaticArrays, LinearAlgebra, Random, Measurements, SparseArrays
+using DataFramesMeta, DataFrames
 
 Unitful.register(@__MODULE__)
 function __init__()
@@ -64,7 +65,33 @@ macro jld2save(filename, vars...)
     end
 end
 
-function mc(gas::LLCS; S::Energy=0eV, E::ReducedVoltage=1.0Td, T::Temperature=0.0K, N=1000, t::Time=Inf * s, meas=[:t], ion_type=UniformIonisation(:EXPLICIT), n0::NumberDensity=1e23 / m^3)
+@doc "This function takes the output of prepareSwarmData and duplicates it for a given gas"
+function mc(gas::LLCS, prepared_swarm_data::DataFrame; N=100_000)
+    mirrored_swarm_data = @transform prepared_swarm_data @byrow begin
+        :ys = mirrorSwarmDataRow(gas, :x, :T, :P, :types)
+        :gas = gas
+    end
+    return mirrored_swarm_data
+end
+
+@doc "For a given  row, this function takes the output of prepareSwarmData and duplicates it for a given gas"
+function mirrorSwarmDataRow(gas::LLCS,
+    Es::Vector{<:ReducedVoltage},
+    T::Temperature,
+    P::Union{Missing,Pressure},
+    types::Vector{Symbol};
+    N=100_000,
+)
+    #TODO: Better Convergence handling...
+    sols = [
+        mc(gas; P, T, E, N)[2]
+        for E in Es
+    ]
+    [[t == :ε ? s.ε : t == :W ? s.bW : t == :WF ? -s.fW : t == :nDLF ? s.fDl : t == :nDTF ? s.fDt : t == :nDL ? s.bDl : t == :Keff ? s.R : t == :nDT ? s.bDt : error("$(t) not implemented") for s in sols] for t in types]
+    #TODO: rename these so that it's a 1:1 conversion to FVB
+end
+
+function mc(gas::LLCS; P::Pressure=0kPa, S::Energy=0eV, E::ReducedVoltage=1.0Td, T::Temperature=0.0K, N=1000, t::Time=Inf * s, meas=[:t], ion_type=UniformIonisation(:EXPLICIT), n0::NumberDensity=1e23 / m^3)
     if t == Inf * s
         t = findSimTime(gas, S, E, T, n0)[1] / n0
     end
