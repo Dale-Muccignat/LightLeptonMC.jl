@@ -261,7 +261,7 @@ MCMODEL is the main constructor for MCSim.
 
 ```julia
     type = SWARM()                   # Used to set up specific models: LμJ(), SWARM() or CELL().
-    particle_type = :electron        # Change particle type: :electron or :positron. This will modify ionisation behaviour.
+particle_type = Electron()        # Change particle type: Electron() or Positron(). This will modify ionisation behaviour.
     n = 100                          # Number of particles to simulate
     v_0 = ZeroVelocity()             # Initial velocity: ZeroVelocity()...
     r_0 = ZeroSpatial()              # Initial spatial: ZeroSpatial()...
@@ -275,7 +275,7 @@ MCMODEL is the main constructor for MCSim.
 """
 @AutoParm mutable struct MCMODEL
     type::AUTO = SWARM()
-    particle_type::AUTO = :electron
+    particle_type::AUTO = Electron()
     n::Int64 = 100
     v_0::AUTO = ZeroVelocity()
     r_0::AUTO = ZeroSpatial()
@@ -375,7 +375,7 @@ end
 
 
 @AutoParm mutable struct PART
-    type::Symbol = :electron
+    type::Lepton = Electron()
     alive::Bool = true
     v::AUTO = [0.0, 0.0, 0.0]
     r::AUTO = [0.0, 0.0, 0.0]
