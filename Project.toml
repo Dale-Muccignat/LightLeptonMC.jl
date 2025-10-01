@@ -1,7 +1,7 @@
 name = "LightLeptonMC"
 uuid = "991984a3-fa47-4c97-b7d3-89e3c6c3a7f8"
 authors = ["Dale-Muccignat <dale.muccignat@my.jcu.edu.au>"]
-version = "0.3.5"
+version = "0.3.6"
 
 [deps]
 AutoParameters = "2688778c-3549-4980-b6fe-7a9ff5c92ab2"
