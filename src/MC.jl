@@ -549,15 +549,15 @@ function eventCollision!(dt::dt_EVENT, particle, model, params, meas_inner, new_
         cs, weight, mass = params.gas[cs_ind]
         g = getRelVel(cs_ind, cs, mass, particle, model, params)
 
-        if cs.type == :ELASTIC
+        if cs.type == :ELASTIC || cs.type == :EFFECTIVE
             elasticColl!(cs_ind, cs, mass, g, particle, model, params, meas_inner)
-        elseif cs.type == :EXCITATION
+        elseif cs.type == :EXCITATION || cs.type == :ROTATION || cs.type == :VIBRATION || cs.type == :DISSOCIATION
             excitationColl!(cs_ind, cs, mass, g, particle, model, params, meas_inner)
             # energy_loss = cs.energy_loss
         elseif cs.type == :IONIZATION
             ionisationColl!(cs_ind, cs, mass, model.ion_type, g, particle, model, params, meas_inner, new_particles)
             # energy_loss = cs.energy_loss
-        elseif cs.type == :ATTACHMENT
+        elseif cs.type == :ATTACHMENT || cs.type == :THERMAL || cs.type == :FORMATION || cs.type == :ANNIHILATION
             attachmentColl!(cs_ind, cs, mass, g, particle, model, params, meas_inner)
         end
     end
@@ -744,6 +744,7 @@ function attachmentColl!(cs_no, cs, mass, g, particle, model, params, meas_inner
     else
         error("Unknown non-conservative method in ion_type")
     end
+    meas_inner.measg.coll_count[cs_no] += 1
 end
 
 function scatteringAngle(cs_no, cs, mass, g, particle, model, params)
