@@ -641,7 +641,7 @@ function ionisationColl!(cs_no, cs, mass, ion_type, g, particle, model, params, 
 
 
         if ion_type.method == :WEIGHTING
-            particle.type == :electron ? particle.weight *= 2.0 : nothing
+            particle.type isa Electron ? particle.weight *= 2.0 : nothing
         elseif ion_type.method == :EXPLICIT
             coschi2, sinchi2, phi2 = scatteringAngle(cs_no, cs, mass, g, particle, model, params)
             v2 = sqrt(2 * other_part_energy / me) * SArray{Tuple{3},Float64,1,3}(cos(phi2) * sinchi2, sin(phi2) * sinchi2, coschi2)
@@ -673,7 +673,7 @@ end
 
 function getIonisationEnergy(thresh, ion_type::DiscreteIonisation, g, particle, model, params)
     total_energy = getEnergy(g) - thresh
-    if rand() > 0.5 || :SP in model.meas || particle.type == :positron
+    if rand() > 0.5 || :SP in model.meas || particle.type isa Positron
         other_part_energy = ion_type.loss#*params.energy_scale*q
     else
         other_part_energy = total_energy - ion_type.loss#*params.energy_scale*q
@@ -691,7 +691,7 @@ end
 
 function getIonisationEnergy(thresh, ion_type::RatioIonisation, g, particle, model, params)
     total_energy = getEnergy(g) - thresh
-    if rand() > 0.5 || :SP in model.meas || particle.type == :positron
+    if rand() > 0.5 || :SP in model.meas || particle.type isa Positron
         other_part_energy = total_energy * ion_type.ratio(getEnergy(g))::Float64
         # other_part_energy = 0
     else
@@ -703,7 +703,7 @@ end
 
 function getIonisationEnergy(thresh, ion_type::FunctionalIonisation, g, particle, model, params)
     total_energy = getEnergy(g) - thresh
-    if rand() > 0.5 || :SP in model.meas || particle.type == :positron
+    if rand() > 0.5 || :SP in model.meas || particle.type isa Positron
         other_part_energy = ion_type.func[particle.cbin](rand())#*params.energy_scale*q
     else
         other_part_energy = total_energy - ion_type.func[particle.cbin](rand())#*params.energy_scale*q
@@ -720,7 +720,7 @@ end
 
 function getIonisationEnergy(thresh, ion_type::DiscreteFunctionalIonisation, g, particle, model, params)
     total_energy = getEnergy(g) - thresh
-    if rand() > 0.5 || :SP in model.meas || particle.type == :positron
+    if rand() > 0.5 || :SP in model.meas || particle.type isa Positron
         other_part_energy = ion_type.loss(getEnergy(g))#/params.energy_scale)*params.energy_scale*q
     else
         other_part_energy = total_energy - ion_type.loss(getEnergy(g))#/params.energy_scale)*params.energy_scale*q
@@ -737,7 +737,7 @@ end
 
 function attachmentColl!(cs_no, cs, mass, g, particle, model, params, meas_inner)
     if model.ion_type.method == :WEIGHTING
-        particle.type == :positron ? particle.alive = false : particle.weight /= 2.0
+        particle.type isa Positron ? particle.alive = false : particle.weight /= 2.0
     elseif model.ion_type.method == :EXPLICIT
         particle.alive = false
         particle.weight = 0.0
