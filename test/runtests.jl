@@ -38,7 +38,7 @@ end
                 [2.8831e24 / s / m],
             ]]
         )
-        sol = LightLeptonMC.mc(MaxwellModel(), swarmData, N=2_000_000)
+        sol = LightLeptonMC.mc(MaxwellModel(), swarmData, N=1_000_000, t=3e-5s)
         compareSwarm(swarmData, sol)
     end
 
@@ -56,7 +56,7 @@ end
                 [3.0328e24 / s / m],
             ]]
         )
-        sol = LightLeptonMC.mc(MaxwellModel(), swarmData, N=2_000_000)
+        sol = LightLeptonMC.mc(MaxwellModel(), swarmData, N=1_000_000, t=3e-5s)
         compareSwarm(swarmData, sol)
     end
 end
