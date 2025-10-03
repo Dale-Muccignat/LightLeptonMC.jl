@@ -61,6 +61,44 @@ end
     end
 end
 
+@testset "HardSphere Model" begin
+    # Reference: Boyle, 2016, PhD Thesis.
+    @testset "HardSphere Model - 0K" begin
+        swarmData = DataFrame(
+            x=[[1.0Td]],
+            T=0.0K,
+            P=0.0kPa,
+            types=[[:ε, :W, :nDT, :nDL]],
+            ys=[[
+                [0.72932eV],
+                [5759.5m / s],
+                [3.202e24 / s / m],
+                [1.573e24 / s / m],
+            ]]
+        )
+        sol = LightLeptonMC.mc(HardSphereModel(), swarmData, N=100_000, t=1e-5s)
+        compareSwarm(swarmData, sol)
+    end
+
+    @testset "HardSphere Model - 293K" begin
+        # Reference: Boyle, 2016, PhD Thesis.
+        swarmData = DataFrame(
+            x=[[1.0Td]],
+            T=293.0K,
+            P=0.0kPa,
+            types=[[:ε, :W, :nDT, :nDL]],
+            ys=[[
+                [0.75057eV],
+                [5639.6m / s],
+                [3.247e24 / s / m],
+                [1.640e24 / s / m],
+            ]]
+        )
+        sol = LightLeptonMC.mc(HardSphereModel(), swarmData, N=100_000, t=1e-5s)
+        compareSwarm(swarmData, sol)
+    end
+end
+
 #' N = 100000
 #' tol = 0.01
 #' function withinTol(y, ŷ, tol=0.05)
