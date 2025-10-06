@@ -558,8 +558,9 @@ function eventCollision!(dt::dt_EVENT, particle, model, params, meas_inner, new_
             ionisationColl!(cs_ind, cs, mass, model.ion_type, g, particle, model, params, meas_inner, new_particles)
             # energy_loss = cs.energy_loss
         elseif cs.type == :ATTACHMENT || cs.type == :THERMAL || cs.type == :FORMATION || cs.type == :ANNIHILATION
-            attachmentColl!(cs_ind, cs, mass, g, particle, model, params, meas_inner)
+            attachmentColl!(particle, model.ion_type.method)
         end
+        meas_inner.measg.coll_count[cs_ind] += 1
     end
 
     :SP in model.meas && sum(meas_inner.measg.coll_count) == 1 ? energy_loss -= getEnergy(particle.v) : nothing
@@ -605,7 +606,6 @@ function elasticColl!(cs_no, cs, mass, g, particle, model, params, meas_inner)
     v2 = shift(v2, g)
     v2 = (me * particle.v + mass * (g - particle.v + v2)) / (me + mass)
     meas_inner.measg.coschi += dot(particle.v, v2) / (norm(v2) * norm(particle.v))
-    meas_inner.measg.coll_count[cs_no] += 1
     # meas_inner.no_elas += 1
     particle.v = v2
 end
@@ -618,7 +618,6 @@ function excitationColl!(cs_no, cs, mass, g, particle, model, params, meas_inner
         v2 = shift(v2, g)
         v2 = (me * particle.v + mass * (g - particle.v + v2)) / (me + mass)
         meas_inner.measg.coschi += dot(particle.v, v2) / (norm(v2) * norm(particle.v))
-        meas_inner.measg.coll_count[cs_no] += 1
         particle.v = v2
     end
 
@@ -636,7 +635,6 @@ function ionisationColl!(cs_no, cs, mass, ion_type, g, particle, model, params, 
         v2 = (me * particle.v + mass * (g - particle.v + v2)) / (me + mass)
 
         meas_inner.measg.coschi += dot(particle.v, v2) / (norm(v2) * norm(particle.v))
-        meas_inner.measg.coll_count[cs_no] += 1
         particle.v = v2
 
 
@@ -647,7 +645,6 @@ function ionisationColl!(cs_no, cs, mass, ion_type, g, particle, model, params, 
             v2 = sqrt(2 * other_part_energy / me) * SArray{Tuple{3},Float64,1,3}(cos(phi2) * sinchi2, sin(phi2) * sinchi2, coschi2)
             new_particle = deepcopy(particle)
             meas_inner.measg.coschi += dot(new_particle.v, v2) / (norm(v2) * norm(new_particle.v))
-            meas_inner.measg.coll_count[cs_no] += 1
             new_particle.v = v2
             # @info debugParticle("other particle",new_particle)
             updateCbin!(new_particle, params)
@@ -735,16 +732,26 @@ function getIonisationEnergy(thresh, ion_type::DiscreteFunctionalIonisation, g, 
     return part_energy, other_part_energy
 end
 
-function attachmentColl!(cs_no, cs, mass, g, particle, model, params, meas_inner)
-    if model.ion_type.method == :WEIGHTING
-        particle.type isa Positron ? particle.alive = false : particle.weight /= 2.0
-    elseif model.ion_type.method == :EXPLICIT
+function apply_attachment_weighting!(::Positron, particle)
+    particle.alive = false
+    particle
+end
+
+function apply_attachment_weighting!(::Lepton, particle)
+    particle.weight /= 2
+    particle
+end
+
+function attachmentColl!(particle, method)
+    if method == :WEIGHTING
+        apply_attachment_weighting!(particle.type, particle)
+    elseif method == :EXPLICIT
         particle.alive = false
         particle.weight = 0.0
     else
         error("Unknown non-conservative method in ion_type")
     end
-    meas_inner.measg.coll_count[cs_no] += 1
+    particle
 end
 
 function scatteringAngle(cs_no, cs, mass, g, particle, model, params)
