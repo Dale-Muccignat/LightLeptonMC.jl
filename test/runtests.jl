@@ -99,6 +99,44 @@ end
     end
 end
 
+@testset "Lucas and Saelee Ionisation" begin
+    # Reference: Boyle, 2016, PhD Thesis.
+    # NOTE: There is a type in the thesis. The α values are off by a factor of 100
+    # F=1
+    swarmData = DataFrame(
+        x=[[10Td]],
+        T=0.0K,
+        P=0.0kPa,
+        types=[[:ε, :W, :nDT, :nDL, :Keff]],
+        ys=[[
+            [4.969 * eV],
+            [94740 * m / s],
+            [27.23e24 / s / m],
+            [29.33e24 / s / m],
+            [2.42e-17 * m^3 / s],
+        ]]
+    )
+    sol = LightLeptonMC.mc(LucasSaelee(F=1), swarmData, N=100_000, t=5e-7s)
+    compareSwarm(swarmData, sol)
+
+    # Reference: Boyle, 2016, PhD Thesis.
+    # F=0.5
+    swarmData = DataFrame(
+        x=[[10Td]],
+        T=0.0K,
+        P=0.0kPa,
+        types=[[:ε, :W, :nDT, :nDL, :Keff]],
+        ys=[[
+            [5.224 * eV],
+            [85930 * m / s],
+            [27.26e24 / s / m],
+            [28.65e24 / s / m],
+            [1.33e-17 * m^3 / s],
+        ]]
+    )
+    sol = LightLeptonMC.mc(LucasSaelee(F=0.5), swarmData, N=100_000, t=5e-7s)
+    compareSwarm(swarmData, sol)
+end
 #' N = 100000
 #' tol = 0.01
 #' function withinTol(y, ŷ, tol=0.05)
