@@ -871,7 +871,7 @@ end
 # * Fetch Functions
 
 #### * Temperature
-@fastmath function findu(cs_ind, cs, mass, particle, model, params)
+function findu(cs_ind, cs, mass, particle, model, params)
     #TODO: make generic function based on inputs
     w = sqrt(2 * k * model.T.val / mass)
     v = particle.v#*params.time_scale/params.length_scale
@@ -880,33 +880,31 @@ end
 
     #TODO: get actual CF from CS
 
-    hcf = evalTotalFreq(params.gas, sqrt(he))
-    lcf = evalTotalFreq(params.gas, sqrt(le))
+    hcf = νₜ(params.gas, sqrt(he))
+    lcf = νₜ(params.gas, sqrt(le))
 
-    g = copy(v)
     mcf = max(hcf, lcf)
     while true
         # usually it only goes through one while loop iteration
-        u = SArray{Tuple{3},Float64,1,3}(randn(3)) * w ./ sqrt(2.0) # could only run this
+        u = (@SVector randn(3)) * (w / sqrt(2))
         g = v .- u
         # @show v
         # @show u
         # @show g
-        eg = uconvert(eV, electron_v2eV * dot(g, g))
+        #' eg = uconvert(eV, electron_v2eV * dot(g, g))
         # @show eg
-        ccf = evalTotalFreq(params.gas, sqrt(eg))
+        ccf = νₜ(params.gas, sqrt(uconvert(eV, electron_v2eV * dot(g, g))))
         # @show lcf
         # @show hcf
         # @show ccf
         # @show mcf
 
         if ccf / mcf == 0.0
-            throw("Zero relative energy")
+            error("Zero relative energy")
         end
         if rand() < ccf / mcf
-            break
+            return g
         end
     end
     #' @debug "Neutral velocity: x = $(g[1]), y = $(g[2]), z = $(g[3])"
-    return g - +SArray{Tuple{3},Float64,1,3}(1e2, 0, 0)m / s#*params.length_scale/params.time_scale
 end
