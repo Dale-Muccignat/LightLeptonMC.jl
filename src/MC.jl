@@ -32,7 +32,7 @@ function flight(particle_og::PART, model, params)
             #' @debug debugParticle("before", particle_inner)
             #= checkBins(dt_EVENT(1.0 * s̃, :before, :before), particle_inner, params, particle_states, dts_states) =#
             checkBins(dt_EVENT(1.0 * s̃, :before, :before), particle_inner, params)
-            dt = getDt!(dts, dt_times, particle_inner, model, params)
+            dt = getDt(particle_inner, model, params)
 
             :f in model.meas ? measureCumulative!(dt.time, particle_inner, model.En0, model.n0, model, params, meas_inner) : nothing
             updateParticle!(dt.time, particle_inner, model.En0, model.n0, model, params, meas_inner)
@@ -93,7 +93,7 @@ function flight(particle_og::Vector{<:PART}, model, params)
             #' @debug debugParticle("before", particle_inner)
             #= checkBins(dt_EVENT(1.0 * s̃, :before, :before), particle_inner, params, particle_states, dts_states) =#
             checkBins(dt_EVENT(1.0 * s̃, :before, :before), particle_inner, params)
-            dt = getDt!(dts, dt_times, particle_inner, model, params)
+            dt = getDt(particle_inner, model, params)
 
             :f in model.meas ? measureCumulative!(dt.time, particle_inner, model.En0, model.n0, model, params, meas_inner) : nothing
             updateParticle!(dt.time, particle_inner, model.En0, model.n0, model, params, meas_inner)
@@ -147,7 +147,7 @@ function flightGetParticles(particle_og::Vector{PART}, model, params; coll_limit
             #' @debug debugParticle("before", particle_inner)
             checkBins(dt_EVENT(1s, :before, :before), particle_inner, params)
             #= checkBins(dt_EVENT(1s, :before, :before), particle_inner, params, particle_states, dts_states) =#
-            dt = getDt!(dts, dt_times, particle_inner, model, params)
+            dt = getDt(particle_inner, model, params)
 
             particle_inner.t + dt.time > model.type.t_f && @error debugParticle("Time error", particle_inner) dt
             :f in model.meas ? measureCumulative!(dt.time, particle_inner, model.En0, model.n0, model, params, meas_inner) : nothing
@@ -200,7 +200,7 @@ function flightGetParticles(particle_og::PART, model, params; coll_limit=Inf, t_
             #' @debug debugParticle("before", particle_inner)
             checkBins(dt_EVENT(1s, :before, :before), particle_inner, params)
             #= checkBins(dt_EVENT(1s, :before, :before), particle_inner, params, particle_states, dts_states) =#
-            dt = getDt!(dts, dt_times, particle_inner, model, params)
+            dt = getDt(particle_inner, model, params)
 
             particle_inner.t + dt.time > model.type.t_f && @error debugParticle("Time error", particle_inner) dt
             :f in model.meas ? measureCumulative!(dt.time, particle_inner, model.En0, model.n0, model, params, meas_inner) : nothing
