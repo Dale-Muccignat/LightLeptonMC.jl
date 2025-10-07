@@ -68,7 +68,7 @@ end
 @doc "This function takes the output of prepareSwarmData and duplicates it for a given gas"
 function mc(gas::LLCS, prepared_swarm_data::DataFrame; N=100_000, t=Inf * s)
     mirrored_swarm_data = @transform prepared_swarm_data @byrow begin
-        :ys = mirrorSwarmDataRow(gas, :x, :T, :P, :types, t=t)
+        :ys = mirrorSwarmDataRow(gas, :x, :T, :P, :types, N=N, t=t)
         :gas = gas
     end
     return mirrored_swarm_data

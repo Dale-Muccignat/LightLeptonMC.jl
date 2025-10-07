@@ -12,36 +12,28 @@ struct dt_EVENT
     direction::Symbol
 end
 
-function getDt!(dts, dt_times, particle, model, params)
+function getDt(particle, model, params)
+    min_dt = dt_EVENT(typemax(uT), :NONE, :NONE)
+
     @inbounds begin
-        # Calculate dt values
-        dts[1] = getCDt(particle, model, params)
-        dts[2] = getEnDt(model.En0, model.n0, particle, model, params)
-        dts[3] = getTDt(particle, model, params)
-        dts[4] = getRDt(particle, model, model.type, params)
-        dts[5] = getZDt(model.En0, particle, model, params)
-        dts[6] = getYDt(particle, model, params)
-        dts[7] = getXDt(particle, model, params)
+        candidates = (
+            getCDt(particle, model, params),
+            getEnDt(model.En0, model.n0, particle, model, params),
+            getTDt(particle, model, params),
+            getRDt(particle, model, model.type, params),
+            getZDt(model.En0, particle, model, params),
+            getYDt(particle, model, params),
+            getXDt(particle, model, params)
+        )
 
-        # Calculate corresponding times
-        dt_times[1] = dts[1].time
-        dt_times[2] = dts[2].time
-        dt_times[3] = dts[3].time
-        dt_times[4] = dts[4].time
-        dt_times[5] = dts[5].time
-        dt_times[6] = dts[6].time
-        dt_times[7] = dts[7].time
-
-        #' @debug debugDts(dts)
-        # @show dt_times
-        # Find minimum time
-        min_time = minimum(dt_times)
-        min_index = findfirst(x -> x == min_time, dt_times)
-        min_index |> isnothing && error("Min time not found")
-
-        # Return result
-        return dts[min_index]
+        for dt in candidates
+            if dt.time < min_dt.time
+                min_dt = dt
+            end
+        end
     end
+
+    return min_dt
 end
 
 function getEnDt(En0::UniformField, n0::UniformDensity, particle, model, params)

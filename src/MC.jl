@@ -32,7 +32,7 @@ function flight(particle_og::PART, model, params)
             #' @debug debugParticle("before", particle_inner)
             #= checkBins(dt_EVENT(1.0 * s̃, :before, :before), particle_inner, params, particle_states, dts_states) =#
             checkBins(dt_EVENT(1.0 * s̃, :before, :before), particle_inner, params)
-            dt = getDt!(dts, dt_times, particle_inner, model, params)
+            dt = getDt(particle_inner, model, params)
 
             :f in model.meas ? measureCumulative!(dt.time, particle_inner, model.En0, model.n0, model, params, meas_inner) : nothing
             updateParticle!(dt.time, particle_inner, model.En0, model.n0, model, params, meas_inner)
@@ -93,7 +93,7 @@ function flight(particle_og::Vector{<:PART}, model, params)
             #' @debug debugParticle("before", particle_inner)
             #= checkBins(dt_EVENT(1.0 * s̃, :before, :before), particle_inner, params, particle_states, dts_states) =#
             checkBins(dt_EVENT(1.0 * s̃, :before, :before), particle_inner, params)
-            dt = getDt!(dts, dt_times, particle_inner, model, params)
+            dt = getDt(particle_inner, model, params)
 
             :f in model.meas ? measureCumulative!(dt.time, particle_inner, model.En0, model.n0, model, params, meas_inner) : nothing
             updateParticle!(dt.time, particle_inner, model.En0, model.n0, model, params, meas_inner)
@@ -147,7 +147,7 @@ function flightGetParticles(particle_og::Vector{PART}, model, params; coll_limit
             #' @debug debugParticle("before", particle_inner)
             checkBins(dt_EVENT(1s, :before, :before), particle_inner, params)
             #= checkBins(dt_EVENT(1s, :before, :before), particle_inner, params, particle_states, dts_states) =#
-            dt = getDt!(dts, dt_times, particle_inner, model, params)
+            dt = getDt(particle_inner, model, params)
 
             particle_inner.t + dt.time > model.type.t_f && @error debugParticle("Time error", particle_inner) dt
             :f in model.meas ? measureCumulative!(dt.time, particle_inner, model.En0, model.n0, model, params, meas_inner) : nothing
@@ -200,7 +200,7 @@ function flightGetParticles(particle_og::PART, model, params; coll_limit=Inf, t_
             #' @debug debugParticle("before", particle_inner)
             checkBins(dt_EVENT(1s, :before, :before), particle_inner, params)
             #= checkBins(dt_EVENT(1s, :before, :before), particle_inner, params, particle_states, dts_states) =#
-            dt = getDt!(dts, dt_times, particle_inner, model, params)
+            dt = getDt(particle_inner, model, params)
 
             particle_inner.t + dt.time > model.type.t_f && @error debugParticle("Time error", particle_inner) dt
             :f in model.meas ? measureCumulative!(dt.time, particle_inner, model.En0, model.n0, model, params, meas_inner) : nothing
@@ -558,8 +558,9 @@ function eventCollision!(dt::dt_EVENT, particle, model, params, meas_inner, new_
             ionisationColl!(cs_ind, cs, mass, model.ion_type, g, particle, model, params, meas_inner, new_particles)
             # energy_loss = cs.energy_loss
         elseif cs.type == :ATTACHMENT || cs.type == :THERMAL || cs.type == :FORMATION || cs.type == :ANNIHILATION
-            attachmentColl!(cs_ind, cs, mass, g, particle, model, params, meas_inner)
+            attachmentColl!(particle, model.ion_type.method)
         end
+        meas_inner.measg.coll_count[cs_ind] += 1
     end
 
     :SP in model.meas && sum(meas_inner.measg.coll_count) == 1 ? energy_loss -= getEnergy(particle.v) : nothing
@@ -605,7 +606,6 @@ function elasticColl!(cs_no, cs, mass, g, particle, model, params, meas_inner)
     v2 = shift(v2, g)
     v2 = (me * particle.v + mass * (g - particle.v + v2)) / (me + mass)
     meas_inner.measg.coschi += dot(particle.v, v2) / (norm(v2) * norm(particle.v))
-    meas_inner.measg.coll_count[cs_no] += 1
     # meas_inner.no_elas += 1
     particle.v = v2
 end
@@ -618,7 +618,6 @@ function excitationColl!(cs_no, cs, mass, g, particle, model, params, meas_inner
         v2 = shift(v2, g)
         v2 = (me * particle.v + mass * (g - particle.v + v2)) / (me + mass)
         meas_inner.measg.coschi += dot(particle.v, v2) / (norm(v2) * norm(particle.v))
-        meas_inner.measg.coll_count[cs_no] += 1
         particle.v = v2
     end
 
@@ -636,7 +635,6 @@ function ionisationColl!(cs_no, cs, mass, ion_type, g, particle, model, params, 
         v2 = (me * particle.v + mass * (g - particle.v + v2)) / (me + mass)
 
         meas_inner.measg.coschi += dot(particle.v, v2) / (norm(v2) * norm(particle.v))
-        meas_inner.measg.coll_count[cs_no] += 1
         particle.v = v2
 
 
@@ -647,7 +645,6 @@ function ionisationColl!(cs_no, cs, mass, ion_type, g, particle, model, params, 
             v2 = sqrt(2 * other_part_energy / me) * SArray{Tuple{3},Float64,1,3}(cos(phi2) * sinchi2, sin(phi2) * sinchi2, coschi2)
             new_particle = deepcopy(particle)
             meas_inner.measg.coschi += dot(new_particle.v, v2) / (norm(v2) * norm(new_particle.v))
-            meas_inner.measg.coll_count[cs_no] += 1
             new_particle.v = v2
             # @info debugParticle("other particle",new_particle)
             updateCbin!(new_particle, params)
@@ -735,16 +732,26 @@ function getIonisationEnergy(thresh, ion_type::DiscreteFunctionalIonisation, g, 
     return part_energy, other_part_energy
 end
 
-function attachmentColl!(cs_no, cs, mass, g, particle, model, params, meas_inner)
-    if model.ion_type.method == :WEIGHTING
-        particle.type isa Positron ? particle.alive = false : particle.weight /= 2.0
-    elseif model.ion_type.method == :EXPLICIT
+function apply_attachment_weighting!(::Positron, particle)
+    particle.alive = false
+    particle
+end
+
+function apply_attachment_weighting!(::Lepton, particle)
+    particle.weight /= 2
+    particle
+end
+
+function attachmentColl!(particle, method)
+    if method == :WEIGHTING
+        apply_attachment_weighting!(particle.type, particle)
+    elseif method == :EXPLICIT
         particle.alive = false
         particle.weight = 0.0
     else
         error("Unknown non-conservative method in ion_type")
     end
-    meas_inner.measg.coll_count[cs_no] += 1
+    particle
 end
 
 function scatteringAngle(cs_no, cs, mass, g, particle, model, params)
@@ -871,7 +878,7 @@ end
 # * Fetch Functions
 
 #### * Temperature
-@fastmath function findu(cs_ind, cs, mass, particle, model, params)
+function findu(cs_ind, cs, mass, particle, model, params)
     #TODO: make generic function based on inputs
     w = sqrt(2 * k * model.T.val / mass)
     v = particle.v#*params.time_scale/params.length_scale
@@ -880,33 +887,31 @@ end
 
     #TODO: get actual CF from CS
 
-    hcf = evalTotalFreq(params.gas, sqrt(he))
-    lcf = evalTotalFreq(params.gas, sqrt(le))
+    hcf = νₜ(params.gas, sqrt(he))
+    lcf = νₜ(params.gas, sqrt(le))
 
-    g = copy(v)
     mcf = max(hcf, lcf)
     while true
         # usually it only goes through one while loop iteration
-        u = SArray{Tuple{3},Float64,1,3}(randn(3)) * w ./ sqrt(2.0) # could only run this
+        u = (@SVector randn(3)) * (w / sqrt(2))
         g = v .- u
         # @show v
         # @show u
         # @show g
-        eg = uconvert(eV, electron_v2eV * dot(g, g))
+        #' eg = uconvert(eV, electron_v2eV * dot(g, g))
         # @show eg
-        ccf = evalTotalFreq(params.gas, sqrt(eg))
+        ccf = νₜ(params.gas, sqrt(uconvert(eV, electron_v2eV * dot(g, g))))
         # @show lcf
         # @show hcf
         # @show ccf
         # @show mcf
 
         if ccf / mcf == 0.0
-            throw("Zero relative energy")
+            error("Zero relative energy")
         end
         if rand() < ccf / mcf
-            break
+            return g
         end
     end
     #' @debug "Neutral velocity: x = $(g[1]), y = $(g[2]), z = $(g[3])"
-    return g - +SArray{Tuple{3},Float64,1,3}(1e2, 0, 0)m / s#*params.length_scale/params.time_scale
 end

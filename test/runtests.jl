@@ -76,7 +76,7 @@ end
                 [1.573e24 / s / m],
             ]]
         )
-        sol = LightLeptonMC.mc(HardSphereModel(), swarmData, N=100_000, t=1e-5s)
+        sol = LightLeptonMC.mc(HardSphereModel(), swarmData, N=500_000, t=2e-5s)
         compareSwarm(swarmData, sol)
     end
 
@@ -94,7 +94,7 @@ end
                 [1.640e24 / s / m],
             ]]
         )
-        sol = LightLeptonMC.mc(HardSphereModel(), swarmData, N=100_000, t=1e-5s)
+        sol = LightLeptonMC.mc(HardSphereModel(), swarmData, N=500_000, t=2e-5s)
         compareSwarm(swarmData, sol)
     end
 end
@@ -116,7 +116,7 @@ end
             [2.42e-17 * m^3 / s],
         ]]
     )
-    sol = LightLeptonMC.mc(LucasSaelee(F=1), swarmData, N=100_000, t=5e-7s)
+    sol = LightLeptonMC.mc(LucasSaelee(F=1), swarmData, N=500_000, t=5e-7s)
     compareSwarm(swarmData, sol)
 
     # Reference: Boyle, 2016, PhD Thesis.
@@ -134,7 +134,7 @@ end
             [1.33e-17 * m^3 / s],
         ]]
     )
-    sol = LightLeptonMC.mc(LucasSaelee(F=0.5), swarmData, N=100_000, t=5e-7s)
+    sol = LightLeptonMC.mc(LucasSaelee(F=0.5), swarmData, N=500_000, t=5e-7s)
     compareSwarm(swarmData, sol)
 end
 #' N = 100000
