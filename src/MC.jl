@@ -588,7 +588,11 @@ function getCollType(particle, model, params)
         #' v = sqrt(dot(particle.v, particle.v))#/params.length_scale
 
         for (cs_ind, (cs, weight, mass)) in enumerate(params.gas)
-            CS += CollisionFrequency(cs)(sqrt(en)) * weight
+            if model.ion_type.method === :WEIGHTING && (cs.type === :ATTACHMENT || cs.type === :THERMAL)
+                CS += 2 * CollisionFrequency(cs)(sqrt(en)) * weight
+            else
+                CS += CollisionFrequency(cs)(sqrt(en)) * weight
+            end
 
             if R < CS / getTotalFreq(particle, model, params)
                 return cs_ind

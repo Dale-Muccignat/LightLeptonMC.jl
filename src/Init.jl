@@ -6,7 +6,7 @@ function initParams(input_gas=MaxwellModel(), model::MCMODEL=MCMODEL())
     n0 = buildDensity(model.n0, rbins, zbins)
     a = buildField(model.En0)
 
-    total_freq = upreferred.(buildFreq(input_gas, cbins))
+    total_freq = upreferred.(buildFreq(input_gas, cbins, model))
 
     params = MCPARAMS(
         ebins=uconvert.(J̃, ebins),
@@ -32,15 +32,23 @@ end
 
 #### Frequency ####
 
-function buildFreq(gas::LLCS, cbins)
+function buildFreq(gas::LLCS, cbins, model)
     total_freq = zeros(length(cbins)) .* sqrt(eV) .* Å^2
     en_spacing = cbins[end] - cbins[end-1]
+    inv_total_weight(ε) = -νₜ(gas, ε) - sum(CollisionFrequency(σ)(sqrt(ε)) for σ in gas.attachment)
     inv_total(ε) = -νₜ(gas, ε)
 
-    for i in 1:length(total_freq)-1
-        total_freq[i] = -Optim.minimum(optimize(inv_total, ustrip(sqrt(eV), sqrt(cbins[i])), ustrip(sqrt(eV), sqrt(cbins[i+1])))) * sqrt(eV) * Å^2
+    if model.ion_type.method === :WEIGHTING
+        for i in 1:length(total_freq)-1
+            total_freq[i] = -Optim.minimum(optimize(inv_total_weight, ustrip(sqrt(eV), sqrt(cbins[i])), ustrip(sqrt(eV), sqrt(cbins[i+1])))) * sqrt(eV) * Å^2
+        end
+        total_freq[end] = -Optim.minimum(optimize(inv_total_weight, ustrip(sqrt(eV), sqrt(cbins[end])), ustrip(sqrt(eV), sqrt(cbins[end] + en_spacing)))) * sqrt(eV) * Å^2
+    else
+        for i in 1:length(total_freq)-1
+            total_freq[i] = -Optim.minimum(optimize(inv_total, ustrip(sqrt(eV), sqrt(cbins[i])), ustrip(sqrt(eV), sqrt(cbins[i+1])))) * sqrt(eV) * Å^2
+        end
+        total_freq[end] = -Optim.minimum(optimize(inv_total, ustrip(sqrt(eV), sqrt(cbins[end])), ustrip(sqrt(eV), sqrt(cbins[end] + en_spacing)))) * sqrt(eV) * Å^2
     end
-    total_freq[end] = -Optim.minimum(optimize(inv_total, ustrip(sqrt(eV), sqrt(cbins[end])), ustrip(sqrt(eV), sqrt(cbins[end] + en_spacing)))) * sqrt(eV) * Å^2
 
     return total_freq
 end
