@@ -66,9 +66,9 @@ macro jld2save(filename, vars...)
 end
 
 @doc "This function takes the output of prepareSwarmData and duplicates it for a given gas"
-function mc(gas::LLCS, prepared_swarm_data::DataFrame; N=100_000, t=Inf * s)
+function mc(gas::LLCS, prepared_swarm_data::DataFrame; kwargs...)
     mirrored_swarm_data = @transform prepared_swarm_data @byrow begin
-        :ys = mirrorSwarmDataRow(gas, :x, :T, :P, :types, N=N, t=t)
+        :ys = mirrorSwarmDataRow(gas, :x, :T, :P, :types; kwargs...)
         :gas = gas
     end
     return mirrored_swarm_data
@@ -80,12 +80,11 @@ function mirrorSwarmDataRow(gas::LLCS,
     T::Temperature,
     P::Union{Missing,Pressure},
     types::Vector{Symbol};
-    N=100_000,
-    t=Inf * s,
+    kwargs...
 )
     #TODO: Better Convergence handling...
     sols = [
-        mc(gas; P, T, E, N, t=t)[2]
+        mc(gas; P, T, E, kwargs...)[2]
         for E in Es
     ]
     [[t == :ε ? s.ε : t == :W ? s.bW : t == :WF ? -s.fW : t == :nDLF ? s.fDl : t == :nDTF ? s.fDt : t == :nDL ? s.bDl : t == :Keff ? s.R : t == :nDT ? s.bDt : error("$(t) not implemented") for s in sols] for t in types]
