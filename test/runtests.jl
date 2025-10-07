@@ -99,6 +99,69 @@ end
     end
 end
 
+@testset "Power Law Attachment - 293K" begin
+    # Reference: Boyle, 2016, PhD Thesis.
+    swarmData = DataFrame(
+        x=[[0.4Td]],
+        T=293.0K,
+        P=0.0kPa,
+        types=[[:ε, :W, :nDT, :nDL, :WF, :nDTF, :nDLF, :Keff]],
+        ys=[[
+            [0.0847eV],
+            [448m / s],
+            [1.154e23 / s / m],
+            [0.4072e23 / s / m],
+            [1186m / s],
+            [1.675e23 / s / m],
+            [1.675e23 / s / m],
+            [-5.026e-18 * m^3 / s],
+        ]]
+    )
+    sol = LightLeptonMC.mc(PowerLawAttachment(a=0.01, p=0.5), swarmData, N=500_000, t=2e-5s, meas=[:f, :t], ion_type=LightLeptonMC.UniformIonisation())
+    compareSwarm(swarmData, sol)
+
+    #' @testset "Power Law - 293K, p=-1/2, a=0.01" begin
+    # Reference: Boyle, 2016, PhD Thesis.
+    swarmData = DataFrame(
+        x=[[0.4Td]],
+        T=293.0K,
+        P=0.0kPa,
+        types=[[:ε, :W, :nDT, :nDL, :WF, :nDTF, :nDLF, :Keff]],
+        ys=[[
+            [0.1545 * eV],
+            [1186 * m / s],
+            [3.055e23 / s / m],
+            [3.055e23 / s / m],
+            [1186 * m / s],
+            [3.055e23 / s / m],
+            [3.055e23 / s / m],
+            [-5.931e-17 * m^3 / s],
+        ]]
+    )
+    sol = LightLeptonMC.mc(PowerLawAttachment(a=0.01, p=-0.5), swarmData, N=500_000, t=2e-5s, meas=[:f, :t], ion_type=LightLeptonMC.UniformIonisation())
+    compareSwarm(swarmData, sol)
+
+    #' @testset "Power Law - 293K, p=-1, a=0.001" begin
+    # Reference: Boyle, 2016, PhD Thesis.
+    swarmData = DataFrame(
+        x=[[0.4Td]],
+        T=293.0K,
+        P=0.0kPa,
+        types=[[:ε, :W, :nDT, :nDL, :WF, :nDTF, :nDLF, :Keff]],
+        ys=[[
+            [0.3303 * eV],
+            [4148 * m / s],
+            [10.69e23 / s / m],
+            [12.88e23 / s / m],
+            [1186 * m / s],
+            [6.531e23 / s / m],
+            [6.529e23 / s / m],
+            [-1.204e-17 * m^3 / s],
+        ]]
+    )
+    sol = LightLeptonMC.mc(PowerLawAttachment(a=0.001, p=-1), swarmData, N=500_000, t=2e-5s, meas=[:f, :t], ion_type=LightLeptonMC.UniformIonisation())
+    compareSwarm(swarmData, sol)
+end
 @testset "Lucas and Saelee Ionisation" begin
     # Reference: Boyle, 2016, PhD Thesis.
     # NOTE: There is a type in the thesis. The α values are off by a factor of 100
