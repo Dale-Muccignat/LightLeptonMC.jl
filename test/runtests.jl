@@ -107,18 +107,40 @@ end
         P=0.0kPa,
         types=[[:ε, :W, :nDT, :nDL, :WF, :nDTF, :nDLF, :Keff]],
         ys=[[
-            [0.0847eV],
-            [448m / s],
-            [1.154e23 / s / m],
-            [0.4072e23 / s / m],
+            [0.1364eV],
+            [937.5m / s],
+            [2.414e23 / s / m],
+            [1.73e23 / s / m],
             [1186m / s],
-            [1.675e23 / s / m],
-            [1.675e23 / s / m],
-            [-5.026e-18 * m^3 / s],
+            [2.697e23 / s / m],
+            [2.697e23 / s / m],
+            [-8.092e-19 * m^3 / s],
         ]]
     )
-    sol = LightLeptonMC.mc(PowerLawAttachment(a=0.01, p=0.5), swarmData, N=500_000, t=2e-5s, meas=[:f, :t], ion_type=LightLeptonMC.UniformIonisation())
+    sol = LightLeptonMC.mc(PowerLawAttachment(a=0.001, p=0.5), swarmData, N=100_000, t=2e-5s, meas=[:f, :t], ion_type=LightLeptonMC.UniformIonisation())
     compareSwarm(swarmData, sol)
+
+    # # Reference: Boyle, 2016, PhD Thesis.
+    # NOTE: This is too intensive
+    #
+    # swarmData = DataFrame(
+    #     x=[[0.4Td]],
+    #     T=293.0K,
+    #     P=0.0kPa,
+    #     types=[[:ε, :W, :nDT, :nDL, :WF, :nDTF, :nDLF, :Keff]],
+    #     ys=[[
+    #         [0.0847eV],
+    #         [448m / s],
+    #         [1.154e23 / s / m],
+    #         [0.4072e23 / s / m],
+    #         [1186m / s],
+    #         [1.675e23 / s / m],
+    #         [1.675e23 / s / m],
+    #         [-5.026e-18 * m^3 / s],
+    #     ]]
+    # )
+    # sol = LightLeptonMC.mc(PowerLawAttachment(a=0.01, p=0.5), swarmData, N=100_000, t=2e-5s, meas=[:f, :t], ion_type=LightLeptonMC.UniformIonisation())
+    # compareSwarm(swarmData, sol)
 
     #' @testset "Power Law - 293K, p=-1/2, a=0.01" begin
     # Reference: Boyle, 2016, PhD Thesis.
@@ -138,7 +160,7 @@ end
             [-5.931e-17 * m^3 / s],
         ]]
     )
-    sol = LightLeptonMC.mc(PowerLawAttachment(a=0.01, p=-0.5), swarmData, N=500_000, t=2e-5s, meas=[:f, :t], ion_type=LightLeptonMC.UniformIonisation())
+    sol = LightLeptonMC.mc(PowerLawAttachment(a=0.001, p=-0.5), swarmData, N=100_000, t=2e-5s, meas=[:f, :t], ion_type=LightLeptonMC.UniformIonisation())
     compareSwarm(swarmData, sol)
 
     #' @testset "Power Law - 293K, p=-1, a=0.001" begin
@@ -159,7 +181,7 @@ end
             [-1.204e-17 * m^3 / s],
         ]]
     )
-    sol = LightLeptonMC.mc(PowerLawAttachment(a=0.001, p=-1), swarmData, N=500_000, t=2e-5s, meas=[:f, :t], ion_type=LightLeptonMC.UniformIonisation())
+    sol = LightLeptonMC.mc(PowerLawAttachment(a=0.001, p=-1), swarmData, N=100_000, t=2e-5s, meas=[:f, :t], ion_type=LightLeptonMC.UniformIonisation())
     compareSwarm(swarmData, sol)
 end
 @testset "Lucas and Saelee Ionisation" begin

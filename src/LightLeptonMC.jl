@@ -87,7 +87,7 @@ function mirrorSwarmDataRow(gas::LLCS,
         mc(gas; P, T, E, kwargs...)[2]
         for E in Es
     ]
-    [[t == :ε ? s.ε : t == :W ? s.bW : t == :WF ? -s.fW : t == :nDLF ? s.fDl : t == :nDTF ? s.fDt : t == :nDL ? s.bDl : t == :Keff ? s.R : t == :nDT ? s.bDt : error("$(t) not implemented") for s in sols] for t in types]
+    [[t == :ε ? s.ε : t == :W ? s.bW : t == :WF ? s.fW : t == :nDLF ? s.fDl : t == :nDTF ? s.fDt : t == :nDL ? s.bDl : t == :Keff ? s.R : t == :nDT ? s.bDt : error("$(t) not implemented") for s in sols] for t in types]
     #TODO: rename these so that it's a 1:1 conversion to FVB
 end
 
