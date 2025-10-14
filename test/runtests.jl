@@ -7,16 +7,17 @@ addprocs()
 using Test
 
 using LightLeptonMC, LightLeptonTools
-using DataFrames, DataFramesMeta, Statistics
+using DataFrames, DataFramesMeta, Statistics, Measurements
+
 function compareSwarm(A, B)
     for row in 1:nrow(A)
         for (i, t) in enumerate(A.types[row])
             @info """
             type:    $(t)
-            Ref:     $(A.ys[row][i][1]|>upreferred)
-            Current: $(B.ys[row][i][1]|>upreferred)
+            Ref:     $(A.ys[row][i][1])
+            Current: $(B.ys[row][i][1])
             """
-            @test A.ys[row][i] ≈ B.ys[row][i] rtol = 1e-2
+            @test A.ys[row][i][1] ≈ Measurements.value(B.ys[row][i][1])  rtol = 1e-2
         end
     end
 end
@@ -38,7 +39,7 @@ end
                 [2.8831e24 / s / m],
             ]]
         )
-        sol = LightLeptonMC.mc(MaxwellModel(), swarmData, N=1_000_000, t=3e-5s)
+        sol = LightLeptonMC.mc(MaxwellModel(), swarmData, N=500_000, t=3e-5s, S=0.1eV)
         compareSwarm(swarmData, sol)
     end
 
@@ -56,7 +57,7 @@ end
                 [3.0328e24 / s / m],
             ]]
         )
-        sol = LightLeptonMC.mc(MaxwellModel(), swarmData, N=1_000_000, t=3e-5s)
+        sol = LightLeptonMC.mc(MaxwellModel(), swarmData, N=500_000, t=3e-5s, S=0.1eV)
         compareSwarm(swarmData, sol)
     end
 end
@@ -117,7 +118,9 @@ end
             [-8.092e-19 * m^3 / s],
         ]]
     )
-    sol = LightLeptonMC.mc(PowerLawAttachment(a=0.001, p=0.5), swarmData, N=100_000, t=2e-5s, meas=[:f, :t], ion_type=LightLeptonMC.UniformIonisation())
+    g = PowerLawAttachment(a=0.001, p=0.5)
+    sol = LightLeptonMC.mc(g, swarmData, N=1_000, t=2e-5s, meas=[:f, :t], ion_type=LightLeptonMC.UniformIonisation(), S=0.1eV)
+    sol = LightLeptonMC.mc(g, swarmData, N=500_000, t=2e-5s, meas=[:f, :t], ion_type=LightLeptonMC.UniformIonisation(), S=0.1eV)
     compareSwarm(swarmData, sol)
 
     # # Reference: Boyle, 2016, PhD Thesis.
@@ -157,33 +160,74 @@ end
             [1186 * m / s],
             [3.055e23 / s / m],
             [3.055e23 / s / m],
-            [-5.931e-17 * m^3 / s],
+            [-5.931e-20 * m^3 / s],
         ]]
     )
-    sol = LightLeptonMC.mc(PowerLawAttachment(a=0.001, p=-0.5), swarmData, N=100_000, t=2e-5s, meas=[:f, :t], ion_type=LightLeptonMC.UniformIonisation())
+    g = PowerLawAttachment(a=0.00001, p=-0.5)
+    sol = LightLeptonMC.mc(g, swarmData, N=1_000, t=2e-5s, meas=[:f, :t], ion_type=LightLeptonMC.UniformIonisation(), S=0.1eV)
+    sol = LightLeptonMC.mc(g, swarmData, N=500_000, t=2e-5s, meas=[:f, :t], ion_type=LightLeptonMC.UniformIonisation(), S=0.1eV)
     compareSwarm(swarmData, sol)
 
-    #' @testset "Power Law - 293K, p=-1, a=0.001" begin
+    #' @testset "Power Law - 293K, p=-1, a=0.00001" begin
     # Reference: Boyle, 2016, PhD Thesis.
+    # NOTE: The effective attachment rate has a type-o in the thesis, powers of 10 should be positive
     swarmData = DataFrame(
         x=[[0.4Td]],
         T=293.0K,
         P=0.0kPa,
         types=[[:ε, :W, :nDT, :nDL, :WF, :nDTF, :nDLF, :Keff]],
         ys=[[
-            [0.3303 * eV],
-            [4148 * m / s],
-            [10.69e23 / s / m],
-            [12.88e23 / s / m],
+            [0.1572 * eV],
+            [1227 * m / s],
+            [3.159e23 / s / m],
+            [3.199e23 / s / m],
             [1186 * m / s],
-            [6.531e23 / s / m],
-            [6.529e23 / s / m],
-            [-1.204e-17 * m^3 / s],
+            [3.107e23 / s / m],
+            [3.107e23 / s / m],
+            [-2.054e-19 * m^3 / s],
         ]]
     )
-    sol = LightLeptonMC.mc(PowerLawAttachment(a=0.001, p=-1), swarmData, N=100_000, t=2e-5s, meas=[:f, :t], ion_type=LightLeptonMC.UniformIonisation())
+    g = PowerLawAttachment(a=0.00001, p=-1)
+    sol = LightLeptonMC.mc(g, swarmData, N=1_000, t=2e-5s, meas=[:f, :t], ion_type=LightLeptonMC.UniformIonisation(), S=0.1eV)
+    sol = LightLeptonMC.mc(g, swarmData, N=1_000_000, t=2e-5s, meas=[:f, :t], ion_type=LightLeptonMC.UniformIonisation(), S=0.1eV)
     compareSwarm(swarmData, sol)
 end
+
+@testset "Reid's Ramp" begin
+    # Reference: Boyle, 2016, PhD Thesis.
+    swarmData = DataFrame(
+        x=[[1Td]],
+        T=0.0K,
+        P=0.0kPa,
+        types=[[:ε, :W, :nDT, :nDL]],
+        ys=[[
+            [0.1015 * eV],
+            [12720 * m / s],
+            [9.75e23 / s / m],
+            [7.591e23 / s / m],
+        ]]
+    )
+    sol = LightLeptonMC.mc(ReidRamp(), swarmData, N=500_000, t=2e-7s)
+    compareSwarm(swarmData, sol)
+
+    # Reference: Boyle, 2016, PhD Thesis.
+    swarmData = DataFrame(
+        x=[[24Td]],
+        T=0.0K,
+        P=0.0kPa,
+        types=[[:ε, :W, :nDT, :nDL]],
+        ys=[[
+            [0.4080 * eV],
+            [88870 * m / s],
+            [11.337e23 / s / m],
+            [4.606e23 / s / m],
+        ]]
+    )
+    sol = LightLeptonMC.mc(ReidRamp(), swarmData, N=500_000, t=2e-7s)
+    compareSwarm(swarmData, sol)
+end
+
+
 @testset "Lucas and Saelee Ionisation" begin
     # Reference: Boyle, 2016, PhD Thesis.
     # NOTE: There is a type in the thesis. The α values are off by a factor of 100
@@ -244,13 +288,13 @@ end
 #'     @testset "Maxwell" begin
 #'         @info "Elastic (Maxwell) Test"
 #'         meas, swarm, params = mc(MaxwellModel(), E=1.0, T=0.0, N=N, t=3e-5, meas=[:f, :t])
-#'         sol = pt(MaxwellModel(), E=1.0, T=0.0, lmax=9, N=5000)
+#'         sol = pt(MaxwellModel(), E=1.0, T=0.0, N=5000)
 #'         compare(sol, swarm)
 #'     end
 #'     @testset "ReidRamp" begin
 #'         @info "Inelastic (ReidRamp) Test"
 #'         meas, swarm, params = mc(ReidRamp(), E=1.0, T=0.0, N=N, t=2e-7, meas=[:f, :t])
-#'         sol = pt(ReidRamp(), E=1.0, T=0.0, lmax=9, N=5000)
+#'         sol = pt(ReidRamp(), E=1.0, T=0.0, N=5000)
 #'         compare(sol, swarm)
 #'     end
 #'     @testset "Anisotropic (ReidRamp)" begin
@@ -272,27 +316,27 @@ end
 #'         @info "Temperature (ReidRamp) Test"
 #'         T = 298.0
 #'         meas, swarm, params = mc(MaxwellModel(), E=1.0, T=T, N=N, meas=[:f, :t])
-#'         sol = pt(MaxwellModel(), E=1.0, T=T, lmax=9, N=5000)
+#'         sol = pt(MaxwellModel(), E=1.0, T=T, N=5000)
 #'         compare(sol, swarm)
 #'     end
 #'     @testset "Lucas-Saelee" begin
 #'         @info "Ionisation (Lucas-Saelee) Test"
 #'         T = 0.0
 #'         meas, swarm, params = mc(LucasSaelee(), E=10.0, T=T, N=N, t=5e-7, meas=[:f, :t])
-#'         sol = pt(LucasSaelee(), E=10.0, T=T, lmax=9, N=5000)
+#'         sol = pt(LucasSaelee(), E=10.0, T=T, N=5000)
 #'         compare(sol, swarm)
 #'     end
 #'     @testset "Ness-Robson" begin
 #'         @info "Attachment (Ness-Robson) Test"
 #'         T = 293.0
 #'         meas, swarm, params = mc(PowerLawAttachment(), E=0.4, T=T, N=N, t=3e-5, meas=[:f, :t])
-#'         sol = pt(PowerLawAttachment(), E=0.4, T=T, lmax=9, N=5000)
+#'         sol = pt(PowerLawAttachment(), E=0.4, T=T, N=5000)
 #'         compare(sol, swarm)
 #'         meas, swarm, params = mc(PowerLawAttachment(a=1 // 10000), E=0.4, T=T, N=N, t=3e-5, meas=[:f, :t])
-#'         sol = pt(PowerLawAttachment(a=1 // 10000), E=0.4, T=T, lmax=9, N=5000)
+#'         sol = pt(PowerLawAttachment(a=1 // 10000), E=0.4, T=T, N=5000)
 #'         compare(sol, swarm)
 #'         meas, swarm, params = mc(PowerLawAttachment(a=1 // 10000), E=0.4, T=T, N=N, t=3e-5, meas=[:f, :t])
-#'         sol = pt(PowerLawAttachment(a=1 // 1000), E=0.4, T=T, lmax=9, N=5000)
+#'         sol = pt(PowerLawAttachment(a=1 // 1000), E=0.4, T=T, N=5000)
 #'         compare(sol, swarm)
 #'     end
 #' end
