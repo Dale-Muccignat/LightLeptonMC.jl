@@ -34,7 +34,9 @@ function flight(particle_og::PART, model, params)
             checkBins(dt_EVENT(1.0 * s̃, :before, :before), particle_inner, params)
             dt = getDt(particle_inner, model, params)
 
-            :f in model.meas ? measureCumulative!(dt.time, particle_inner, model.En0, model.n0, model, params, meas_inner) : nothing
+            if :f in model.meas
+                measureCumulative!(dt.time, particle_inner, model.En0, model.n0, model, params, meas_inner)
+            end
             updateParticle!(dt.time, particle_inner, model.En0, model.n0, model, params, meas_inner)
             #' @debug debugParticle("after flight", particle_inner)
 
@@ -95,7 +97,9 @@ function flight(particle_og::Vector{<:PART}, model, params)
             checkBins(dt_EVENT(1.0 * s̃, :before, :before), particle_inner, params)
             dt = getDt(particle_inner, model, params)
 
-            :f in model.meas ? measureCumulative!(dt.time, particle_inner, model.En0, model.n0, model, params, meas_inner) : nothing
+            if :f in model.meas
+                measureCumulative!(dt.time, particle_inner, model.En0, model.n0, model, params, meas_inner)
+            end
             updateParticle!(dt.time, particle_inner, model.En0, model.n0, model, params, meas_inner)
             #' @debug debugParticle("after flight", particle_inner)
 
@@ -150,7 +154,9 @@ function flightGetParticles(particle_og::Vector{PART}, model, params; coll_limit
             dt = getDt(particle_inner, model, params)
 
             particle_inner.t + dt.time > model.type.t_f && @error debugParticle("Time error", particle_inner) dt
-            :f in model.meas ? measureCumulative!(dt.time, particle_inner, model.En0, model.n0, model, params, meas_inner) : nothing
+            if :f in model.meas
+                measureCumulative!(dt.time, particle_inner, model.En0, model.n0, model, params, meas_inner)
+            end
             updateParticle!(dt.time, particle_inner, model.En0, model.n0, model, params, meas_inner)
 
             event!(dt, particle_inner, model, params, meas_inner, new_particles)
@@ -203,7 +209,9 @@ function flightGetParticles(particle_og::PART, model, params; coll_limit=Inf, t_
             dt = getDt(particle_inner, model, params)
 
             particle_inner.t + dt.time > model.type.t_f && @error debugParticle("Time error", particle_inner) dt
-            :f in model.meas ? measureCumulative!(dt.time, particle_inner, model.En0, model.n0, model, params, meas_inner) : nothing
+            if :f in model.meas
+                measureCumulative!(dt.time, particle_inner, model.En0, model.n0, model, params, meas_inner)
+            end
             updateParticle!(dt.time, particle_inner, model.En0, model.n0, model, params, meas_inner)
 
             event!(dt, particle_inner, model, params, meas_inner, new_particles)
@@ -363,37 +371,45 @@ end
 @fastmath function measureCumulative!(dt, particle, En0, n0, model, params, meas_inner)
     # e_bin += particle.weight * 0.5*consts.me*(dot(particle.v,particle.v)+2*sum(particle.v.*vars.a)*dt+dot(vars.a,vars.a)*dt^2)*dt
     a = params.a * params.n0
-    meas_inner.measc.r[particle.tbin, :] += particle.weight * (particle.r + 0.5 * particle.v * dt + (1 / 6) * a * (dt^2)) * dt
-    meas_inner.measc.r²[particle.tbin, :] += @. particle.weight * dt * (
-                                                    a .^ 2 * dt .^ 4 / 20 +
-                                                    dt^2 * (a .* particle.r + particle.v .^ 2) / 3 +
-                                                    a * dt .^ 3 .* particle.v / 4 +
-                                                    particle.r .^ 2 +
-                                                    particle.r .* particle.v * dt
-                                                )
+    r = particle.r
+    v = particle.v
+    tbin = particle.tbin
+    w = particle.weight
+    @inbounds @views for i in 1:3
+        meas_inner.measc.r[tbin, i] += w * (r[i] + 0.5 * v[i] * dt + (1 / 6) * a[i] * (dt^2)) * dt
+        meas_inner.measc.r²[tbin, i] += w * dt * (
+                                            a[i]^2 * dt^4 / 20 +
+                                            dt^2 * (a[i] .* r[i] + v[i] .^ 2) / 3 +
+                                            a[i] * dt^3 .* v[i] / 4 +
+                                            r[i]^2 +
+                                            r[i] * v[i] * dt
+                                        )
 
-    meas_inner.measc.v[particle.tbin, :] += particle.weight * (particle.v + 0.5 * a * dt) * dt
-    meas_inner.measc.rv[particle.tbin, :] += particle.weight * (particle.r .* particle.v + 0.5 * (particle.r .* a + particle.v .^ 2) * dt + 0.5 * particle.v .* a * (dt^2) + (1 / 8) * ((a) .^ 2) * (dt^3)) * dt
-    # NOTE: These have been optimised for electric field in z direction
-    #
-    meas_inner.measc.r²v[particle.tbin, :] += 1 / 24 * dt * particle.weight * (
-                                                  a * dt + 2 * particle.v) .* (
-        6 * particle.r * dt .* (a * dt + 2 * particle.v) + dt^2 * (a * dt + 2particle.v) .^ 2 + 12particle.r .^ 2)
+        meas_inner.measc.v[tbin, i] += w * (v[i] + 0.5 * a[i] * dt) * dt
+        meas_inner.measc.rv[tbin, i] += w * (r[i] * v[i] + 0.5 * (r[i] * a[i] + v[i]^2) * dt + 0.5 * v[i] * a[i] * (dt^2) + (1 / 8) * (a[i]^2) * (dt^3)) * dt
+        # NOTE: These have been optimised for electric field in z direction
+        #
+        meas_inner.measc.r²v[tbin, i] += 1 / 24 * dt * w * (
+                                             a[i] * dt + 2 * v[i]) * (
+                                             6 * r[i] * dt * (a[i] * dt + 2 * v[i]) + dt^2 * (a[i] * dt + 2v[i])^2 + 12r[i]^2)
 
-    meas_inner.measc.rx²vz[particle.tbin] += 1 / 12 * dt^2 * particle.weight * (
-                                                 4 * dt * particle.v[1] * (2 * a[3] * particle.r[1] + particle.v[3] * particle.v[1]) +
-                                                 6 * particle.r[1] * (a[3] * particle.r[1] + 2 * particle.v[1] * particle.v[3]) +
-                                                 3 * a[3] * dt^2 * particle.v[1]^2 +
-                                                 12 * particle.v[3] * particle.r[1]^2 / dt)
+    end
+    @inbounds begin
+        meas_inner.measc.rx²vz[tbin] += 1 / 12 * dt^2 * w * (
+                                            4 * dt * v[1] * (2 * a[3] * r[1] + v[3] * v[1]) +
+                                            6 * r[1] * (a[3] * r[1] + 2 * v[1] * v[3]) +
+                                            3 * a[3] * dt^2 * v[1]^2 +
+                                            12 * v[3] * r[1]^2 / dt)
 
-    meas_inner.measc.rzrxvx[particle.tbin] += particle.weight * particle.v[1] * dt * (
-                                                  a[3] * particle.v[1] * dt^3 / 8 +
-                                                  dt^2 * (a[3] * particle.r[1] + 2 * particle.v[1] * particle.v[3]) / 6 +
-                                                  dt * (particle.v[1] * particle.r[3] + particle.v[3] * particle.r[1]) / 2 +
-                                                  particle.r[3] * particle.r[1])
+        meas_inner.measc.rzrxvx[tbin] += w * v[1] * dt * (
+                                             a[3] * v[1] * dt^3 / 8 +
+                                             dt^2 * (a[3] * r[1] + 2 * v[1] * v[3]) / 6 +
+                                             dt * (v[1] * r[3] + v[3] * r[1]) / 2 +
+                                             r[3] * r[1])
 
-    meas_inner.measc.weight[particle.tbin] += particle.weight * dt
-    meas_inner.measc.dt[particle.tbin] += dt
+        meas_inner.measc.weight[tbin] += w * dt
+        meas_inner.measc.dt[tbin] += dt
+    end
 end
 
 function measureDeath!(type::SWARM, particle, model, params, meas_inner)
@@ -512,25 +528,36 @@ function eventTbin!(dt, particle, model, params, meas_inner)
     measureTbin!(particle, model, params, meas_inner)
 end
 
-function measureTbin!(particle, model, params, meas_inner)
+@inbounds function measureTbin!(particle, model, params, meas_inner)
+    r = particle.r
+    v = particle.v
+    w = particle.weight
     if :t ∈ model.meas
-        @. meas_inner.meast.v²[particle.tbin, :] += particle.v^2 * particle.weight
-        @. meas_inner.meast.r²[particle.tbin, :] += particle.r^2 * particle.weight
-        @. meas_inner.meast.r³[particle.tbin, :] += particle.r^3 * particle.weight
-        @. meas_inner.meast.r[particle.tbin, :] += particle.r * particle.weight
-        @. meas_inner.meast.v[particle.tbin, :] += particle.v * particle.weight
-        @. meas_inner.meast.rv[particle.tbin, :] += particle.v * particle.r * particle.weight
-        meas_inner.meast.zx²[particle.tbin] += particle.r[3] * particle.r[2]^2 * particle.weight
-        meas_inner.meast.w[particle.tbin] += particle.weight
-        meas_inner.meast.εᵢ[particle.tbin] += 0.5 * me * dot(particle.v, particle.v) * particle.weight
+        @views for i in 1:3
+            meas_inner.meast.v²[particle.tbin, i] += v[i]^2 * w
+            meas_inner.meast.r²[particle.tbin, i] += r[i]^2 * w
+            meas_inner.meast.r³[particle.tbin, i] += r[i]^3 * w
+            meas_inner.meast.r[particle.tbin, i] += r[i] * w
+            meas_inner.meast.v[particle.tbin, i] += v[i] * w
+            meas_inner.meast.rv[particle.tbin, i] += v[i] * r[i] * w
+        end
+        meas_inner.meast.zx²[particle.tbin] += particle.r[3] * particle.r[2]^2 * w
+        meas_inner.meast.w[particle.tbin] += w
+        meas_inner.meast.εᵢ[particle.tbin] += 0.5 * me * dot(v, v) * w
     end
 
-    :zyt ∈ model.meas ? meas_inner.measLμJ.zyt[particle.zbin, particle.ybin, particle.tbin] += particle.weight : nothing
+    if :zyt ∈ model.meas
+        meas_inner.measLμJ.zyt[particle.zbin, particle.ybin, particle.tbin] += w
+    end
 
-    :tz ∈ model.meas ? meas_inner.measCell.tz[particle.tbin, particle.zbin] += particle.weight : nothing
-    :tz_v ∈ model.meas ? meas_inner.measCell.v_tz[particle.tbin, particle.zbin] += particle.weight * particle.v[3] : nothing
-    # :tz ∈ model.meas && params.zbins[2] < particle.r[3] < params.zbins[end] ? meas_inner.measCell.tz[particle.tbin,1] += particle.weight : nothing
-    # :tz ∈ model.meas && particle.r[3] < params.zbins[end] ? meas_inner.measCell.tz[particle.tbin,1] += particle.weight : nothing
+    if :tz ∈ model.meas
+        meas_inner.measCell.tz[particle.tbin, particle.zbin] += w
+    end
+    if :tz_v ∈ model.meas
+        meas_inner.measCell.v_tz[particle.tbin, particle.zbin] += w * v[3]
+    end
+    # :tz ∈ model.meas && params.zbins[2] < particle.r[3] < params.zbins[end] ? meas_inner.measCell.tz[particle.tbin,1] += w : nothing
+    # :tz ∈ model.meas && particle.r[3] < params.zbins[end] ? meas_inner.measCell.tz[particle.tbin,1] += w : nothing
 end
 
 
@@ -584,8 +611,9 @@ function getCollType(particle, model, params)
     begin
         R = rand()
         CS = 0.0Å^2 * sqrt(eV)
-        en = uconvert(eV, getEnergy(particle.v))#/params.energy_scale
+        en = uconvert(eV,getEnergy(particle.v))#/params.energy_scale
         #' v = sqrt(dot(particle.v, particle.v))#/params.length_scale
+        total_freq = getTotalFreq(particle, model, params)
 
         for (cs_ind, (cs, weight, mass)) in enumerate(params.gas)
             if model.ion_type.method === :WEIGHTING && (cs.type === :ATTACHMENT || cs.type === :THERMAL)
@@ -594,7 +622,7 @@ function getCollType(particle, model, params)
                 CS += CollisionFrequency(cs)(sqrt(en)) * weight
             end
 
-            if R < CS / getTotalFreq(particle, model, params)
+            if R < CS / total_freq 
                 return cs_ind
             end
         end
@@ -897,7 +925,9 @@ function findu(cs_ind, cs, mass, particle, model, params)
     mcf = max(hcf, lcf)
     while true
         # usually it only goes through one while loop iteration
-        u = (@SVector randn(3)) * (w / sqrt(2))
+        #' u = (@SVector randn(3)) * (w / sqrt(2))
+        u = SVector(randn(), randn(), randn()) * (w / sqrt(2))
+
         g = v .- u
         # @show v
         # @show u

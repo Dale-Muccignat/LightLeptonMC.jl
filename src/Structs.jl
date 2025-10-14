@@ -285,8 +285,11 @@ particle_type = Electron()        # Change particle type: Electron() or Positron
     T::AUTO = UniformTemp()
     ion_type::AUTO = UniformIonisation()
     non_conservative_method::AUTO = Weighting()
-    meas::AUTO = [:t]
+    meas::AUTO = Set([:t])
     optimise_spatial::AUTO = true
+    function MCMODEL(t, p, n, v0, r0, t0, n0, E0, T, ion_type, ncm, meas, os)
+        new(t, p, n, v0, r0, t0, n0, E0, T, ion_type, ncm, Set(meas), os)
+    end
 end
 
 @AutoParm mutable struct SWARM

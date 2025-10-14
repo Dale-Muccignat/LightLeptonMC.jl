@@ -1,6 +1,7 @@
 function initParams(input_gas=MaxwellModel(), model::MCMODEL=MCMODEL())
 
-    cbins = [0.0, (10.0 .^ (-8:0.1:4))...] .* eV
+    #' cbins = [0.0, (10.0 .^ (-8:0.1:4))...] .* eV
+    cbins = [0.0, (10.0 .^ (-8:1:-2))..., (10.0 .^ (-1.9:0.1:4))...] .* eV
 
     tbins, ebins, rbins, χbins, zbins, ybins, xbins = generateBins(model)
     n0 = buildDensity(model.n0, rbins, zbins)
@@ -83,7 +84,7 @@ function buildEnBins(type::SWARM, model)
 end
 
 function buildTBins(type::SWARM, model)
-    return LinRange(0s, type.t_f, 100)
+    return LinRange(0s, type.t_f, 200)
 end
 
 function buildχBins(type::SWARM, model)
