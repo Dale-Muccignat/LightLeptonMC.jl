@@ -91,7 +91,7 @@ function mirrorSwarmDataRow(gas::LLCS,
     #TODO: rename these so that it's a 1:1 conversion to FVB
 end
 
-function mc(gas::LLCS; P::Pressure=0kPa, S::Energy=0eV, E::ReducedVoltage=1.0Td, T::Temperature=0.0K, N=1000, t::Time=Inf * s, meas=[:t], ion_type=UniformIonisation(:EXPLICIT), n0::NumberDensity=1e23 / m^3)
+function mc(gas::LLCS; P::Pressure=0kPa, S::Energy=0.01eV, E::ReducedVoltage=1.0Td, T::Temperature=0.0K, N=1000, t::Time=Inf * s, meas=[:t], ion_type=UniformIonisation(:EXPLICIT), n0::NumberDensity=1e23 / m^3)
     if t == Inf * s
         t = findSimTime(gas, S, E, T, n0)[1] / n0
     end
