@@ -17,7 +17,7 @@ function compareSwarm(A, B)
             Ref:     $(A.ys[row][i][1])
             Current: $(B.ys[row][i][1])
             """
-            @test A.ys[row][i][1] ≈ Measurements.value(B.ys[row][i][1])  rtol = 1e-2
+            @test A.ys[row][i][1] ≈ Measurements.value(B.ys[row][i][1]) rtol = 1e-2
         end
     end
 end
@@ -189,7 +189,7 @@ end
     )
     g = PowerLawAttachment(a=0.00001, p=-1)
     sol = LightLeptonMC.mc(g, swarmData, N=1_000, t=2e-5s, meas=[:f, :t], ion_type=LightLeptonMC.UniformIonisation(), S=0.1eV)
-    sol = LightLeptonMC.mc(g, swarmData, N=1_000_000, t=2e-5s, meas=[:f, :t], ion_type=LightLeptonMC.UniformIonisation(), S=0.1eV)
+    sol = LightLeptonMC.mc(g, swarmData, N=5_000_000, t=2e-5s, meas=[:f, :t], ion_type=LightLeptonMC.UniformIonisation(), S=0.1eV)
     compareSwarm(swarmData, sol)
 end
 
