@@ -216,6 +216,7 @@ function mc(model::MCMODEL, params::MCPARAMS)
     end
 
     meas = @distributed (+) for n in eachindex(batches)
+        Ni = length(batches)
         #' Threads.@threads for n in 1:N
         #' id = Threads.threadid()
         #' @show id
@@ -223,9 +224,9 @@ function mc(model::MCMODEL, params::MCPARAMS)
         #' meas = @distributed (+) for n in 1:model.n
         #=     @debug "Distributing..." =#
         #==#
-        #=     if n % (model.n * 0.1) == 0.0 =#
-        #=         @info "Progress: " * string(100 * n / model.n) * "%" =#
-        #=     end =#
+        if n % (Ni * 0.1) == 0.0
+            @info "Progress: " * string(100 * n / Ni) * "%"
+        end
 
         # TODO: Account for no of ionisation events
         # meas_inner = flight(PART(model,params),model,params,verbose)
