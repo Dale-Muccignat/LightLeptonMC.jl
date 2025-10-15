@@ -361,6 +361,7 @@ end
     ebins::AUTO = nothing
     gas::AUTO = nothing
     total_freq::AUTO = nothing
+    DCS::AUTO = nothing
     a::AUTO = nothing
     # n0::Union{Vector{Float64},Float64,Nothing} = nothing
     n0::AUTO = nothing

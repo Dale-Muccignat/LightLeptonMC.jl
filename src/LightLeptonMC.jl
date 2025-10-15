@@ -15,7 +15,7 @@ module LightLeptonMC
 #TODO: Add Density Gradient (this is probably best solved through Danny's code though)
 
 using LightLeptonTools
-using Distributed, Statistics, Unitful, Optim, AutoParameters, StaticArrays, LinearAlgebra, Random, Measurements, SparseArrays
+using Distributed, Statistics, Unitful, Optim, AutoParameters, StaticArrays, LinearAlgebra, Random, Measurements, SparseArrays, QuadGK
 using DataFramesMeta, DataFrames
 
 Unitful.register(@__MODULE__)

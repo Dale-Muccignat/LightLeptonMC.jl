@@ -8,6 +8,7 @@ function initParams(input_gas=MaxwellModel(), model::MCMODEL=MCMODEL())
     a = buildField(model.En0)
 
     total_freq = upreferred.(buildFreq(input_gas, cbins, model))
+    # dcs = buildDCS(input_gas, cbins, model)
 
     params = MCPARAMS(
         ebins=uconvert.(J̃, ebins),
@@ -29,6 +30,32 @@ end
 
 function initMeas(model, params::MCPARAMS=MCPARAMS())
     MEAS(model.type, model, params)
+end
+
+#### DCS ####
+
+function buildDCS(σ::DifferentialCrossSection, cbins)
+    # Create a 2d matrix interpolation that takes ε and R as an input and returns χ
+    Rs = range(0, 1, 100)
+    χs = range(0, π, 100)
+    out = Matrix{typeof{1.0u"rad"}}(undef, length(cbins), length(Rs))
+
+    for (k, (g, _, _)) in enumerate(gas)
+        # create a minimising function
+        for (i, ε) in enumerate(cbins)
+            total = quadgk((χ) -> g(ε, χ) * sin(χ))[1]
+            for (j, r) in enumerate(Rs)
+                L(χ) = abs(r - quadgk((χ) -> g(ε, χ) * sin(χ) / total, 0, χ)[1])
+                out[i, j, k] = cos(Optim.minimizer(optimize(L, 0, 1)))
+            end
+        end
+    end
+    linear_interpolation((cbins, Rs), out)
+end
+
+function buildDCS(σ::AbstractCrossSection, cbins)
+    # Create a 2d matrix interpolation that takes ε and R as an input and returns χ
+    (R) -> 1 - 2 * R
 end
 
 #### Frequency ####
