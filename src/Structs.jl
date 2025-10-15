@@ -13,10 +13,10 @@ Velocity
 
 Parent type for each option for velocity. See subtypes for a list of options
 ```julia
-    ZeroVelocity()
-    InitVelocity()
-    GaussianEnergyVelocity()
-    GaussianDirectionVelocity()
+ZeroVelocity()
+InitVelocity()
+GaussianEnergyVelocity()
+GaussianDirectionVelocity()
 ```
 
 """
@@ -27,9 +27,9 @@ Spatial
 
 Parent type for each option for spatial config. See subtypes for a list of options
 ```julia
-    ZeroSpatial()
-    InitSpatial(val,axis)
-    GaussianLμJSpatial(val, Δy_source,gaussian_axis,axis)
+ZeroSpatial()
+InitSpatial(val,axis)
+GaussianLμJSpatial(val, Δy_source,gaussian_axis,axis)
 ```
 
 """
@@ -260,16 +260,16 @@ MCMODEL
 MCMODEL is the main constructor for MCSim.
 
 ```julia
-    type = SWARM()                   # Used to set up specific models: LμJ(), SWARM() or CELL().
+type = SWARM()                   # Used to set up specific models: LμJ(), SWARM() or CELL().
 particle_type = Electron()        # Change particle type: Electron() or Positron(). This will modify ionisation behaviour.
-    n = 100                          # Number of particles to simulate
-    v_0 = ZeroVelocity()             # Initial velocity: ZeroVelocity()...
-    r_0 = ZeroSpatial()              # Initial spatial: ZeroSpatial()...
-    n0 = UniformDensity()            # Density distribution:
-    En0 = UniformField()             # Electric field distribution:
-    T = UniformTemp()                # Temperature distribution:
-    ion_type = UniformIonisation()   # Ionisation sharing type:
-    meas = [:t]                      # Variables to measure. There are many possibilities, see ?MEASLμJ, ?MEASCELL or ?MEAST
+n = 100                          # Number of particles to simulate
+v_0 = ZeroVelocity()             # Initial velocity: ZeroVelocity()...
+r_0 = ZeroSpatial()              # Initial spatial: ZeroSpatial()...
+n0 = UniformDensity()            # Density distribution:
+En0 = UniformField()             # Electric field distribution:
+T = UniformTemp()                # Temperature distribution:
+ion_type = UniformIonisation()   # Ionisation sharing type:
+meas = [:t]                      # Variables to measure. There are many possibilities, see ?MEASLμJ, ?MEASCELL or ?MEAST
 ```
 
 """
@@ -303,11 +303,11 @@ This struct is used to initilize a micro-jet simulation. Used in `MCMODEL(type=L
 
 Parameters:
 ```julia
-    Δε_detector = 0.9       # Energy bin width for the detector
-    Δχ_detector = 2         # Angle bin width for the detector in degrees
-    thresh = 1.             # Set the minimum energy to simulate electrons too
-    jet_width = 15e-6       # Diameter for the liquid jet
-    jet_center = [0.,0.,0.] # Set's an offset for the jet_center
+Δε_detector = 0.9       # Energy bin width for the detector
+Δχ_detector = 2         # Angle bin width for the detector in degrees
+thresh = 1.             # Set the minimum energy to simulate electrons too
+jet_width = 15e-6       # Diameter for the liquid jet
+jet_center = [0.,0.,0.] # Set's an offset for the jet_center
 ```
 
 For more information, type ?MCMODEL
@@ -325,14 +325,14 @@ CELL
 
 Defines the parameters for a cell (rectangular prism) style experiment
 ```julia
-    Δε_detector = 0.9  # energy resolution of the detector
-    thresh = 1.        # minimum energy to simulate
-    z = 15e-6          # depth of the cell
-    z_n = 100          # number of z bins between 0 and z
-    x = 15e-6          # height of cell
-    y = 15e-6          # width of cell
-    bin_no = 100       # no_bins for radial measurement along back surface
-    r = 1e-6           # radius for measurements along the back surface of the cell
+Δε_detector = 0.9  # energy resolution of the detector
+thresh = 1.        # minimum energy to simulate
+z = 15e-6          # depth of the cell
+z_n = 100          # number of z bins between 0 and z
+x = 15e-6          # height of cell
+y = 15e-6          # width of cell
+bin_no = 100       # no_bins for radial measurement along back surface
+r = 1e-6           # radius for measurements along the back surface of the cell
 ```
 """
 @AutoParm mutable struct CELL
@@ -373,8 +373,8 @@ end
     ybins::AUTO = nothing
 end
 
-function MCPARAMS(; cbins=nothing, ebins=nothing, gas=nothing, total_freq=nothing, a=nothing, n0=nothing, rbins=nothing, χbins=nothing, tbins=nothing, zbins=nothing, xbins=nothing, ybins=nothing)
-    MCPARAMS(cbins, ebins, gas, total_freq, a, n0, rbins, χbins, tbins, zbins, xbins, ybins)
+function MCPARAMS(; cbins=nothing, ebins=nothing, gas=nothing, total_freq=nothing, a=nothing, n0=nothing, rbins=nothing, χbins=nothing, tbins=nothing, zbins=nothing, xbins=nothing, ybins=nothing, DCS=nothing)
+    MCPARAMS(cbins, ebins, gas, total_freq, DCS, a, n0, rbins, χbins, tbins, zbins, xbins, ybins)
 end
 
 
@@ -538,16 +538,16 @@ end
 function MEAST(params)
 
     MEAST(zeros(length(params.tbins)) .* eV,
-        zeros(length(params.tbins), 3) .* m,
-        zeros(length(params.tbins), 3) .* m / s,
-        zeros(length(params.tbins), 3) .* m^2,
-        zeros(length(params.tbins), 3) .* m^3,
-        zeros(length(params.tbins), 3) .* m^2 / s^2,
-        zeros(length(params.tbins), 3) .* m^2 / s,
-        zeros(length(params.tbins)) .* m^3,
-        zeros(length(params.tbins)),
-        zeros(length(params.tbins))
-    )
+          zeros(length(params.tbins), 3) .* m,
+          zeros(length(params.tbins), 3) .* m / s,
+          zeros(length(params.tbins), 3) .* m^2,
+          zeros(length(params.tbins), 3) .* m^3,
+          zeros(length(params.tbins), 3) .* m^2 / s^2,
+          zeros(length(params.tbins), 3) .* m^2 / s,
+          zeros(length(params.tbins)) .* m^3,
+          zeros(length(params.tbins)),
+          zeros(length(params.tbins))
+          )
 
 end
 

@@ -8,7 +8,7 @@ function initParams(input_gas=MaxwellModel(), model::MCMODEL=MCMODEL())
     a = buildField(model.En0)
 
     total_freq = upreferred.(buildFreq(input_gas, cbins, model))
-    # dcs = buildDCS(input_gas, cbins, model)
+    dcs = [buildDCS(g, cbins) for (g, _, _) in input_gas]
 
     params = MCPARAMS(
         ebins=uconvert.(J̃, ebins),
@@ -23,6 +23,7 @@ function initParams(input_gas=MaxwellModel(), model::MCMODEL=MCMODEL())
         n0=upreferred.(n0),
         a=upreferred.(a),
         total_freq=total_freq,
+        DCS=dcs,
     )
 
     return params
@@ -34,28 +35,28 @@ end
 
 #### DCS ####
 
-function buildDCS(σ::DifferentialCrossSection, cbins)
+@inbounds function buildDCS(σ::DifferentialCrossSection, cbins)
     # Create a 2d matrix interpolation that takes ε and R as an input and returns χ
-    Rs = range(0, 1, 100)
-    χs = range(0, π, 100)
-    out = Matrix{typeof{1.0u"rad"}}(undef, length(cbins), length(Rs))
+    Rs = range(0, 1, 25)
+    χs = range(0.0 * u"rad", π * u"rad", 25)
+    out = Matrix{Float64}(undef, length(cbins), length(Rs))
 
-    for (k, (g, _, _)) in enumerate(gas)
-        # create a minimising function
-        for (i, ε) in enumerate(cbins)
-            total = quadgk((χ) -> g(ε, χ) * sin(χ))[1]
-            for (j, r) in enumerate(Rs)
-                L(χ) = abs(r - quadgk((χ) -> g(ε, χ) * sin(χ) / total, 0, χ)[1])
-                out[i, j, k] = cos(Optim.minimizer(optimize(L, 0, 1)))
-            end
+    c1, c2 = χs[1], χs[end]
+    # create a minimising function
+    for (i, ε) in enumerate(cbins)
+        int(χ) = σ(ε, χ) * sin(χ)
+        total = quadgk(int, c1, c2)[1]::typeof(1.0u"Å^2*rad")
+        for (j, r) in enumerate(Rs)
+            L(χ) = abs(r - quadgk(int, c1, χ * u"rad")[1]::typeof(1.0u"Å^2*rad") / total)
+            out[i, j] = cos(Optim.minimizer(optimize(L, 0, π)))
         end
     end
     linear_interpolation((cbins, Rs), out)
 end
 
-function buildDCS(σ::AbstractCrossSection, cbins)
+function buildDCS(σ::T, cbins) where {T<:AbstractCrossSection}
     # Create a 2d matrix interpolation that takes ε and R as an input and returns χ
-    (R) -> 1 - 2 * R
+    (ε, R) -> 1 - 2 * R
 end
 
 #### Frequency ####
@@ -63,7 +64,7 @@ end
 function buildFreq(gas::LLCS, cbins, model)
     total_freq = zeros(length(cbins)) .* sqrt(eV) .* Å^2
     en_spacing = cbins[end] - cbins[end-1]
-    inv_total_weight(ε) = -νₜ(gas, ε) - sum(CollisionFrequency(σ)(sqrt(ε)) for σ in gas.attachment)
+    inv_total_weight(ε) = -νₜ(gas, ε) - sum(CollisionFrequency(σ)(sqrt(ε)) for σ in gas.attachment; init=0.0)
     inv_total(ε) = -νₜ(gas, ε)
 
     if model.ion_type.method === :WEIGHTING

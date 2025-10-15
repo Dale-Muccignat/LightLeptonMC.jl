@@ -4,7 +4,7 @@ LightLeptonMC
 This package takes gases from LightLeptonTools.jl and performs a Monte Carlo simulation in either a swarm or LμJ configuration. An example swarm simulation is included below.
 
 ```julia
-    meas, swarm, params = mc(MaxwellModel();E=1.,T=0.,N=1000,S=0.,verbose=false)
+meas, swarm, params = mc(MaxwellModel();E=1.,T=0.,N=1000,S=0.,verbose=false)
 ```
 
 For more information, type ?mc
@@ -15,7 +15,7 @@ module LightLeptonMC
 #TODO: Add Density Gradient (this is probably best solved through Danny's code though)
 
 using LightLeptonTools
-using Distributed, Statistics, Unitful, Optim, AutoParameters, StaticArrays, LinearAlgebra, Random, Measurements, SparseArrays, QuadGK
+using Distributed, Statistics, Unitful, Optim, AutoParameters, StaticArrays, LinearAlgebra, Random, Measurements, SparseArrays, QuadGK, Interpolations
 using DataFramesMeta, DataFrames
 
 Unitful.register(@__MODULE__)
@@ -76,12 +76,12 @@ end
 
 @doc "For a given  row, this function takes the output of prepareSwarmData and duplicates it for a given gas"
 function mirrorSwarmDataRow(gas::LLCS,
-    Es::Vector{<:ReducedVoltage},
-    T::Temperature,
-    P::Union{Missing,Pressure},
-    types::Vector{Symbol};
-    kwargs...
-)
+                            Es::Vector{<:ReducedVoltage},
+                            T::Temperature,
+                            P::Union{Missing,Pressure},
+                            types::Vector{Symbol};
+                            kwargs...
+                            )
     #TODO: Better Convergence handling...
     sols = [
         mc(gas; P, T, E, kwargs...)[2]
@@ -187,13 +187,13 @@ end
 
 General models
 ```julia
-    meas, swarm, params = mc(model::MCMODEL,params::MCPARAMS)
-    mean, swarm, params = mc(model,gas)
+meas, swarm, params = mc(model::MCMODEL,params::MCPARAMS)
+mean, swarm, params = mc(model,gas)
 ```
 
 Swarm models
 ```julia
-    meas, swarm, params = mc(MaxwellModel();E=1.,T=0.,N=1000,S=0.)
+meas, swarm, params = mc(MaxwellModel();E=1.,T=0.,N=1000,S=0.)
 ```
 
 """

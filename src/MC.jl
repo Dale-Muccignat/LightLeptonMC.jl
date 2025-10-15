@@ -243,36 +243,36 @@ function checkBins(dt, particle, params)
     # end
     if params.cbins != nothing && particle.cbin < length(params.cbins)
         (params.cbins[particle.cbin] - (eps() + 1e-8) * eV) <= getEnergy(particle.v) <= (params.cbins[particle.cbin+1] + (eps() + 1e-8) * eV) || error("""CBin error
-                        $(uconvert(eV,params.cbins[particle.cbin]))
-                        $(uconvert(eV,getEnergy(particle.v)))
-                        $(uconvert(eV,params.cbins[particle.cbin+1]))
-                        $(dt)
-                        """
+                                                                                                                                                       $(uconvert(eV,params.cbins[particle.cbin]))
+                                                                                                                                                       $(uconvert(eV,getEnergy(particle.v)))
+                                                                                                                                                       $(uconvert(eV,params.cbins[particle.cbin+1]))
+                                                                                                                                                       $(dt)
+                                                                                                                                                       """
         )
     end
     if params.zbins != nothing && 0 < particle.zbin < length(params.zbins)
         if (params.zbins[particle.zbin] - (1e-12 + eps()) * m̃) <= particle.r[3] <= (params.zbins[particle.zbin+1] + (1e-12 + eps()) * m̃) && particle.r[3] >= params.zbins[1]
         else
             error("""
-                    zbin error
+                  zbin error
                   $(params.zbins[1])
-                    $(params.zbins[particle.zbin] - (1e-12 + eps()) * m̃)
-                    $(params.zbins[particle.zbin])
-                    $(particle.r[3])
-                    $(params.zbins[particle.zbin+1])
-                    $(params.zbins[particle.zbin+1] + (1e-12 + eps()) * m̃)
-                    $(dt)
-                   """
+                  $(params.zbins[particle.zbin] - (1e-12 + eps()) * m̃)
+                  $(params.zbins[particle.zbin])
+                  $(particle.r[3])
+                  $(params.zbins[particle.zbin+1])
+                  $(params.zbins[particle.zbin+1] + (1e-12 + eps()) * m̃)
+                  $(dt)
+                  """
             )
         end
     end
     if params.tbins != nothing && particle.tbin < length(params.tbins) && particle.t > params.tbins[1]
         (params.tbins[particle.tbin] - eps() * s) <= particle.t <= (params.tbins[particle.tbin+1] + eps() * s) || error("""tbin error
-                    $(params.tbins[particle.tbin])
-                    $(particle.t)
-                    $(params.tbins[particle.tbin+1])
-                    $(dt)
-                    """)
+                                                                                                                        $(params.tbins[particle.tbin])
+                                                                                                                        $(particle.t)
+                                                                                                                        $(params.tbins[particle.tbin+1])
+                                                                                                                        $(dt)
+                                                                                                                        """)
         #= $(debugParticle("",particle_states[1])) =#
         #= $(debugDts(dts_states[1])) =#
         #= $(debugParticle("",particle_states[2])) =#
@@ -611,7 +611,7 @@ function getCollType(particle, model, params)
     begin
         R = rand()
         CS = 0.0Å^2 * sqrt(eV)
-        en = uconvert(eV,getEnergy(particle.v))#/params.energy_scale
+        en = uconvert(eV, getEnergy(particle.v))#/params.energy_scale
         #' v = sqrt(dot(particle.v, particle.v))#/params.length_scale
         total_freq = getTotalFreq(particle, model, params)
 
@@ -622,7 +622,7 @@ function getCollType(particle, model, params)
                 CS += CollisionFrequency(cs)(sqrt(en)) * weight
             end
 
-            if R < CS / total_freq 
+            if R < CS / total_freq
                 return cs_ind
             end
         end
@@ -787,7 +787,7 @@ function attachmentColl!(particle, method)
 end
 
 function scatteringAngle(cs_no, cs, mass, g, particle, model, params)
-    coschi = 1 - 2 * rand()
+    coschi = params.DCS[cs_no](getEnergy(g), rand())
     #' coschi = params.splat_gas.dcs[cs_no][particle.cbin](rand())::Float64
     #coschi = -1
     sinchi = sqrt(1 - coschi^2)
