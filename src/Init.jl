@@ -35,26 +35,35 @@ end
 
 #### DCS ####
 
-@inbounds function buildDCS(σ::DifferentialCrossSection, cbins)
+@inbounds function buildDCS(σ::DifferentialCrossSection, cbins=logrange(1e-2, 1e2, 41) .* eV)
     # Create a 2d matrix interpolation that takes ε and R as an input and returns χ
     Rs = range(0, 1, 25)
     χs = range(0.0 * u"rad", π * u"rad", 25)
     out = Matrix{Float64}(undef, length(cbins), length(Rs))
-
     c1, c2 = χs[1], χs[end]
+    spacing = χs[2] - χs[1]
     # create a minimising function
-    for (i, ε) in enumerate(cbins)
-        int(χ) = σ(ε, χ) * sin(χ)
-        total = quadgk(int, c1, c2)[1]::typeof(1.0u"Å^2*rad")
-        for (j, r) in enumerate(Rs)
-            L(χ) = abs(r - quadgk(int, c1, χ * u"rad")[1]::typeof(1.0u"Å^2*rad") / total)
-            out[i, j] = cos(Optim.minimizer(optimize(L, 0, π)))
+    last = 0.0
+    for i in eachindex(cbins)
+        function intχ(χ)
+            σ(cbins[i], χ) * sin(χ)
         end
+        total = quadgk(intχ, c1, c2,)[1]::typeof(1.0u"Å^2*rad")
+        for j in eachindex(Rs)
+            function L(χ)
+                partial = quadgk(intχ, c1, χ * u"rad")[1]::typeof(1.0u"Å^2*rad")
+                abs(Rs[j] - partial / total)
+            end
+            result = optimize(L, last, π)
+            last = Optim.minimizer(result)
+            out[i, j] = cos(last)
+        end
+        last = 0.0
     end
-    linear_interpolation((cbins, Rs), out)
+    linear_interpolation((cbins, Rs), out, extrapolation_bc=Interpolations.Flat())
 end
 
-function buildDCS(σ::T, cbins) where {T<:AbstractCrossSection}
+function buildDCS(σ::T, cbins=logrange(1e-2, 1e2, 41) .* eV) where {T<:AbstractCrossSection}
     # Create a 2d matrix interpolation that takes ε and R as an input and returns χ
     (ε, R) -> 1 - 2 * R
 end
