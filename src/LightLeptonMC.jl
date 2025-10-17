@@ -4,7 +4,7 @@ LightLeptonMC
 This package takes gases from LightLeptonTools.jl and performs a Monte Carlo simulation in either a swarm or LμJ configuration. An example swarm simulation is included below.
 
 ```julia
-    meas, swarm, params = mc(MaxwellModel();E=1.,T=0.,N=1000,S=0.,verbose=false)
+meas, swarm, params = mc(MaxwellModel();E=1.,T=0.,N=1000,S=0.,verbose=false)
 ```
 
 For more information, type ?mc
@@ -15,7 +15,7 @@ module LightLeptonMC
 #TODO: Add Density Gradient (this is probably best solved through Danny's code though)
 
 using LightLeptonTools
-using Distributed, Statistics, Unitful, Optim, AutoParameters, StaticArrays, LinearAlgebra, Random, Measurements, SparseArrays
+using Distributed, Statistics, Unitful, Optim, AutoParameters, StaticArrays, LinearAlgebra, Random, Measurements, SparseArrays, QuadGK, Interpolations
 using DataFramesMeta, DataFrames
 
 Unitful.register(@__MODULE__)
@@ -66,9 +66,9 @@ macro jld2save(filename, vars...)
 end
 
 @doc "This function takes the output of prepareSwarmData and duplicates it for a given gas"
-function mc(gas::LLCS, prepared_swarm_data::DataFrame; N=100_000, t=Inf * s)
+function mc(gas::LLCS, prepared_swarm_data::DataFrame; kwargs...)
     mirrored_swarm_data = @transform prepared_swarm_data @byrow begin
-        :ys = mirrorSwarmDataRow(gas, :x, :T, :P, :types, N=N, t=t)
+        :ys = mirrorSwarmDataRow(gas, :x, :T, :P, :types; kwargs...)
         :gas = gas
     end
     return mirrored_swarm_data
@@ -76,23 +76,22 @@ end
 
 @doc "For a given  row, this function takes the output of prepareSwarmData and duplicates it for a given gas"
 function mirrorSwarmDataRow(gas::LLCS,
-    Es::Vector{<:ReducedVoltage},
-    T::Temperature,
-    P::Union{Missing,Pressure},
-    types::Vector{Symbol};
-    N=100_000,
-    t=Inf * s,
-)
+                            Es::Vector{<:ReducedVoltage},
+                            T::Temperature,
+                            P::Union{Missing,Pressure},
+                            types::Vector{Symbol};
+                            kwargs...
+                            )
     #TODO: Better Convergence handling...
     sols = [
-        mc(gas; P, T, E, N, t=t)[2]
+        mc(gas; P, T, E, kwargs...)[2]
         for E in Es
     ]
-    [[t == :ε ? s.ε : t == :W ? s.bW : t == :WF ? -s.fW : t == :nDLF ? s.fDl : t == :nDTF ? s.fDt : t == :nDL ? s.bDl : t == :Keff ? s.R : t == :nDT ? s.bDt : error("$(t) not implemented") for s in sols] for t in types]
+    [[t == :ε ? s.ε : t == :W ? s.bW : t == :WF ? s.fW : t == :nDLF ? s.fDl : t == :nDTF ? s.fDt : t == :nDL ? s.bDl : t == :Keff ? s.R : t == :nDT ? s.bDt : error("$(t) not implemented") for s in sols] for t in types]
     #TODO: rename these so that it's a 1:1 conversion to FVB
 end
 
-function mc(gas::LLCS; P::Pressure=0kPa, S::Energy=0eV, E::ReducedVoltage=1.0Td, T::Temperature=0.0K, N=1000, t::Time=Inf * s, meas=[:t], ion_type=UniformIonisation(:EXPLICIT), n0::NumberDensity=1e23 / m^3)
+function mc(gas::LLCS; P::Pressure=0kPa, S::Energy=0.01eV, E::ReducedVoltage=1.0Td, T::Temperature=0.0K, N=1000, t::Time=Inf * s, meas=[:t], ion_type=UniformIonisation(:EXPLICIT), n0::NumberDensity=1e23 / m^3)
     if t == Inf * s
         t = findSimTime(gas, S, E, T, n0)[1] / n0
     end
@@ -188,13 +187,13 @@ end
 
 General models
 ```julia
-    meas, swarm, params = mc(model::MCMODEL,params::MCPARAMS)
-    mean, swarm, params = mc(model,gas)
+meas, swarm, params = mc(model::MCMODEL,params::MCPARAMS)
+mean, swarm, params = mc(model,gas)
 ```
 
 Swarm models
 ```julia
-    meas, swarm, params = mc(MaxwellModel();E=1.,T=0.,N=1000,S=0.)
+meas, swarm, params = mc(MaxwellModel();E=1.,T=0.,N=1000,S=0.)
 ```
 
 """
@@ -217,6 +216,7 @@ function mc(model::MCMODEL, params::MCPARAMS)
     end
 
     meas = @distributed (+) for n in eachindex(batches)
+        Ni = length(batches)
         #' Threads.@threads for n in 1:N
         #' id = Threads.threadid()
         #' @show id
@@ -224,9 +224,9 @@ function mc(model::MCMODEL, params::MCPARAMS)
         #' meas = @distributed (+) for n in 1:model.n
         #=     @debug "Distributing..." =#
         #==#
-        #=     if n % (model.n * 0.1) == 0.0 =#
-        #=         @info "Progress: " * string(100 * n / model.n) * "%" =#
-        #=     end =#
+        if n % (Ni * 0.1) == 0.0
+            @info "Progress: " * string(100 * n / Ni) * "%"
+        end
 
         # TODO: Account for no of ionisation events
         # meas_inner = flight(PART(model,params),model,params,verbose)

@@ -21,8 +21,8 @@ end
 function debugParticle(header, particle)
     """
     Particle $header: 
-      ε: $(uconvert(eV,getEnergy(particle.v)))
-      t: $(particle.t)
+    ε: $(uconvert(eV,getEnergy(particle.v)))
+    t: $(particle.t)
     pos: x=$(particle.r[1]) y=$(particle.r[2]) z=$(particle.r[3]) 
     vel: x=$(particle.v[1]) y=$(particle.v[2]) z=$(particle.v[3]) 
     rad: $(sqrt(particle.r[2]^2+particle.r[3]^2))
@@ -33,13 +33,13 @@ end
 
 function debugDts(dts)
     """ time of flights
-        CS Bin: $(dts[1].time)
-        En Bin: $(dts[2].time)
-        T  Bin: $(dts[3].time)
-        R  Bin: $(dts[4].time)
-        Z  Bin: $(dts[5].time)
-        Y  Bin: $(dts[6].time)
-        X  Bin: $(dts[7].time)
+    CS Bin: $(dts[1].time)
+    En Bin: $(dts[2].time)
+    T  Bin: $(dts[3].time)
+    R  Bin: $(dts[4].time)
+    Z  Bin: $(dts[5].time)
+    Y  Bin: $(dts[6].time)
+    X  Bin: $(dts[7].time)
     """
 end
 

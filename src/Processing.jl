@@ -102,28 +102,28 @@ function swarmMeasurements(meas, params, model)
         Rs[i-1] = (log(meas.meast.w[i]) - log(meas.meast.w[i-1])) / (params.tbins[2] - params.tbins[1])
 
         bWs[i-1] = (meas.meast.r[i, 3] -
-                    meas.meast.r[i-1, 3]) /
-                   (params.tbins[2] - params.tbins[1])
+            meas.meast.r[i-1, 3]) /
+            (params.tbins[2] - params.tbins[1])
 
         bDls[i-1] = (1 / 2 * (
             (meas.meast.r²[i, 3] - meas.meast.r[i, 3]^2) -
             (meas.meast.r²[i-1, 3] - meas.meast.r[i-1, 3]^2))) /
-                    (params.tbins[2] - params.tbins[1])
+            (params.tbins[2] - params.tbins[1])
 
         bDts[i-1] = (1 / 4 * (
             (meas.meast.r²[i, 2] + meas.meast.r²[i, 1]) -
             (meas.meast.r²[i-1, 2] + meas.meast.r²[i-1, 1]))) /
-                    (params.tbins[2] - params.tbins[1])
+            (params.tbins[2] - params.tbins[1])
 
         bQls[i-1] = (1 / 6 * (
             (meas.meast.r³[i, 3] - 3 * meas.meast.r[i, 3] * meas.meast.r²[i, 3] + 2 * meas.meast.r[i, 3]^3) -
             (meas.meast.r³[i-1, 3] - 3 * meas.meast.r[i-1, 3] * meas.meast.r²[i-1, 3] + 2 * meas.meast.r[i-1, 3]^3))) /
-                    (params.tbins[2] - params.tbins[1])
+            (params.tbins[2] - params.tbins[1])
 
         bQts[i-1] = (1 / 6 * (
             (meas.meast.zx²[i] - meas.meast.r[i, 3] * meas.meast.r²[i, 2]) -
             (meas.meast.zx²[i-1] - meas.meast.r[i-1, 3] * meas.meast.r²[i-1, 2]))) /
-                    (params.tbins[2] - params.tbins[1])
+            (params.tbins[2] - params.tbins[1])
 
         if :f in model.meas
             fWs[i-1] = sqrt(dot(meas.measc.v_final[i, :], meas.measc.v_final[i, :]))
@@ -158,30 +158,30 @@ function swarmMeasurements(meas, params, model)
     fQls = uconvert.(m^3 / s, fQls)
 
     swarm = SWARMMEAS(measurement(mean(εs[end÷2:end-1]),
-            std(εs[end÷2:end-1])), εs,
-        measurement(mean(Rs[end÷2:end-1] ./ uconvert(m^-3, params.n0)),
-            std(Rs[end÷2:end-1] ./ uconvert(m^-3, params.n0))), Rs ./ uconvert(m^-3, params.n0),
-        measurement(mean(bWs[end÷2:end-1]),
-            std(bWs[end÷2:end-1])), bWs,
-        measurement(mean(fWs[end÷2:end-1]),
-            std(fWs[end÷2:end-1])), fWs,
-        measurement(mean(bDts[end÷2:end-1] .* uconvert(m^-3, params.n0)),
-            std(bDts[end÷2:end-1] .* uconvert(m^-3, params.n0))), bDts .* uconvert(m^-3, params.n0),
-        measurement(mean(fDts[end÷2:end-1] .* uconvert(m^-3, params.n0)),
-            std(fDts[end÷2:end-1] .* uconvert(m^-3, params.n0))), fDts .* uconvert(m^-3, params.n0),
-        measurement(mean(bDls[end÷2:end-1] .* uconvert(m^-3, params.n0)),
-            std(bDls[end÷2:end-1] .* uconvert(m^-3, params.n0))), bDls .* uconvert(m^-3, params.n0),
-        measurement(mean(fDls[end÷2:end-1] .* uconvert(m^-3, params.n0)),
-            std(fDls[end÷2:end-1] .* uconvert(m^-3, params.n0))), fDls .* uconvert(m^-3, params.n0),
-        measurement(mean(bQls[end÷2:end-1] .* uconvert(m^-3, params.n0) .^ 2),
-            std(bQls[end÷2:end-1] .* uconvert(m^-3, params.n0) .^ 2)), bQls .* uconvert(m^-3, params.n0) .^ 2,
-        measurement(mean(bQts[end÷2:end-1] .* uconvert(m^-3, params.n0) .^ 2),
-            std(bQts[end÷2:end-1] .* uconvert(m^-3, params.n0) .^ 2)), bQts .* uconvert(m^-3, params.n0) .^ 2,
-        measurement(mean(fQls[end÷2:end-1] .* uconvert(m^-3, params.n0) .^ 2),
-            std(fQls[end÷2:end-1] .* uconvert(m^-3, params.n0) .^ 2)), fQls .* uconvert(m^-3, params.n0) .^ 2,
-        measurement(mean(fQts[end÷2:end-1] .* uconvert(m^-3, params.n0) .^ 2),
-            std(fQts[end÷2:end-1] .* uconvert(m^-3, params.n0) .^ 2)), fQts .* uconvert(m^-3, params.n0) .^ 2,
-    )
+                                  std(εs[end÷2:end-1])), εs,
+                      measurement(mean(Rs[end÷2:end-1] ./ uconvert(m^-3, params.n0)),
+                                  std(Rs[end÷2:end-1] ./ uconvert(m^-3, params.n0))), Rs ./ uconvert(m^-3, params.n0),
+                      measurement(mean(bWs[end÷2:end-1]),
+                                  std(bWs[end÷2:end-1])), bWs,
+                      measurement(mean(fWs[end÷2:end-1]),
+                                  std(fWs[end÷2:end-1])), fWs,
+                      measurement(mean(bDts[end÷2:end-1] .* uconvert(m^-3, params.n0)),
+                                  std(bDts[end÷2:end-1] .* uconvert(m^-3, params.n0))), bDts .* uconvert(m^-3, params.n0),
+                      measurement(mean(fDts[end÷2:end-1] .* uconvert(m^-3, params.n0)),
+                                  std(fDts[end÷2:end-1] .* uconvert(m^-3, params.n0))), fDts .* uconvert(m^-3, params.n0),
+                      measurement(mean(bDls[end÷2:end-1] .* uconvert(m^-3, params.n0)),
+                                  std(bDls[end÷2:end-1] .* uconvert(m^-3, params.n0))), bDls .* uconvert(m^-3, params.n0),
+                      measurement(mean(fDls[end÷2:end-1] .* uconvert(m^-3, params.n0)),
+                                  std(fDls[end÷2:end-1] .* uconvert(m^-3, params.n0))), fDls .* uconvert(m^-3, params.n0),
+                      measurement(mean(bQls[end÷2:end-1] .* uconvert(m^-3, params.n0) .^ 2),
+                                  std(bQls[end÷2:end-1] .* uconvert(m^-3, params.n0) .^ 2)), bQls .* uconvert(m^-3, params.n0) .^ 2,
+                      measurement(mean(bQts[end÷2:end-1] .* uconvert(m^-3, params.n0) .^ 2),
+                                  std(bQts[end÷2:end-1] .* uconvert(m^-3, params.n0) .^ 2)), bQts .* uconvert(m^-3, params.n0) .^ 2,
+                      measurement(mean(fQls[end÷2:end-1] .* uconvert(m^-3, params.n0) .^ 2),
+                                  std(fQls[end÷2:end-1] .* uconvert(m^-3, params.n0) .^ 2)), fQls .* uconvert(m^-3, params.n0) .^ 2,
+                      measurement(mean(fQts[end÷2:end-1] .* uconvert(m^-3, params.n0) .^ 2),
+                                  std(fQts[end÷2:end-1] .* uconvert(m^-3, params.n0) .^ 2)), fQts .* uconvert(m^-3, params.n0) .^ 2,
+                      )
     #' println("""
     #' Energy: $(swarm.ε)
     #' Rate: $(swarm.R)

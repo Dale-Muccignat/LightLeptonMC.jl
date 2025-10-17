@@ -1,12 +1,14 @@
 function initParams(input_gas=MaxwellModel(), model::MCMODEL=MCMODEL())
 
-    cbins = [0.0, (10.0 .^ (-8:0.1:4))...] .* eV
+    #' cbins = [0.0, (10.0 .^ (-8:0.1:4))...] .* eV
+    cbins = [0.0, (10.0 .^ (-8:1:-2))..., (10.0 .^ (-1.9:0.1:4))...] .* eV
 
     tbins, ebins, rbins, χbins, zbins, ybins, xbins = generateBins(model)
     n0 = buildDensity(model.n0, rbins, zbins)
     a = buildField(model.En0)
 
-    total_freq = upreferred.(buildFreq(input_gas, cbins))
+    total_freq = upreferred.(buildFreq(input_gas, cbins, model))
+    dcs = [buildDCS(g, cbins) for (g, _, _) in input_gas]
 
     params = MCPARAMS(
         ebins=uconvert.(J̃, ebins),
@@ -21,6 +23,7 @@ function initParams(input_gas=MaxwellModel(), model::MCMODEL=MCMODEL())
         n0=upreferred.(n0),
         a=upreferred.(a),
         total_freq=total_freq,
+        DCS=dcs,
     )
 
     return params
@@ -30,17 +33,60 @@ function initMeas(model, params::MCPARAMS=MCPARAMS())
     MEAS(model.type, model, params)
 end
 
+#### DCS ####
+
+@inbounds function buildDCS(σ::DifferentialCrossSection, cbins=logrange(1e-2, 1e2, 41) .* eV)
+    # Create a 2d matrix interpolation that takes ε and R as an input and returns χ
+    Rs = range(0, 1, 25)
+    χs = range(0.0 * u"rad", π * u"rad", 25)
+    out = Matrix{Float64}(undef, length(cbins), length(Rs))
+    c1, c2 = χs[1], χs[end]
+    spacing = χs[2] - χs[1]
+    # create a minimising function
+    last = 0.0
+    for i in eachindex(cbins)
+        function intχ(χ)
+            σ(cbins[i], χ) * sin(χ)
+        end
+        total = quadgk(intχ, c1, c2,)[1]::typeof(1.0u"Å^2*rad")
+        for j in eachindex(Rs)
+            function L(χ)
+                partial = quadgk(intχ, c1, χ * u"rad")[1]::typeof(1.0u"Å^2*rad")
+                abs(Rs[j] - partial / total)
+            end
+            result = optimize(L, last, π)
+            last = Optim.minimizer(result)
+            out[i, j] = cos(last)
+        end
+        last = 0.0
+    end
+    linear_interpolation((cbins, Rs), out, extrapolation_bc=Interpolations.Flat())
+end
+
+function buildDCS(σ::T, cbins=logrange(1e-2, 1e2, 41) .* eV) where {T<:AbstractCrossSection}
+    # Create a 2d matrix interpolation that takes ε and R as an input and returns χ
+    (ε, R) -> 1 - 2 * R
+end
+
 #### Frequency ####
 
-function buildFreq(gas::LLCS, cbins)
+function buildFreq(gas::LLCS, cbins, model)
     total_freq = zeros(length(cbins)) .* sqrt(eV) .* Å^2
     en_spacing = cbins[end] - cbins[end-1]
+    inv_total_weight(ε) = -νₜ(gas, ε) - sum(CollisionFrequency(σ)(sqrt(ε)) for σ in gas.attachment; init=0.0)
     inv_total(ε) = -νₜ(gas, ε)
 
-    for i in 1:length(total_freq)-1
-        total_freq[i] = -Optim.minimum(optimize(inv_total, ustrip(sqrt(eV), sqrt(cbins[i])), ustrip(sqrt(eV), sqrt(cbins[i+1])))) * sqrt(eV) * Å^2
+    if model.ion_type.method === :WEIGHTING
+        for i in 1:length(total_freq)-1
+            total_freq[i] = -Optim.minimum(optimize(inv_total_weight, ustrip(sqrt(eV), sqrt(cbins[i])), ustrip(sqrt(eV), sqrt(cbins[i+1])))) * sqrt(eV) * Å^2
+        end
+        total_freq[end] = -Optim.minimum(optimize(inv_total_weight, ustrip(sqrt(eV), sqrt(cbins[end])), ustrip(sqrt(eV), sqrt(cbins[end] + en_spacing)))) * sqrt(eV) * Å^2
+    else
+        for i in 1:length(total_freq)-1
+            total_freq[i] = -Optim.minimum(optimize(inv_total, ustrip(sqrt(eV), sqrt(cbins[i])), ustrip(sqrt(eV), sqrt(cbins[i+1])))) * sqrt(eV) * Å^2
+        end
+        total_freq[end] = -Optim.minimum(optimize(inv_total, ustrip(sqrt(eV), sqrt(cbins[end])), ustrip(sqrt(eV), sqrt(cbins[end] + en_spacing)))) * sqrt(eV) * Å^2
     end
-    total_freq[end] = -Optim.minimum(optimize(inv_total, ustrip(sqrt(eV), sqrt(cbins[end])), ustrip(sqrt(eV), sqrt(cbins[end] + en_spacing)))) * sqrt(eV) * Å^2
 
     return total_freq
 end
@@ -75,7 +121,7 @@ function buildEnBins(type::SWARM, model)
 end
 
 function buildTBins(type::SWARM, model)
-    return LinRange(0s, type.t_f, 100)
+    return LinRange(0s, type.t_f, 200)
 end
 
 function buildχBins(type::SWARM, model)
