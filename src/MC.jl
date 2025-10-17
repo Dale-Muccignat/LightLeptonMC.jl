@@ -576,16 +576,20 @@ function eventCollision!(dt::dt_EVENT, particle, model, params, meas_inner, new_
         cs, weight, mass = params.gas[cs_ind]
         g = getRelVel(cs_ind, cs, mass, particle, model, params)
 
-        if cs.type == :ELASTIC || cs.type == :EFFECTIVE
+        if cs.type === :ELASTIC || cs.type === :EFFECTIVE
             elasticColl!(cs_ind, cs, mass, g, particle, model, params, meas_inner)
-        elseif cs.type == :EXCITATION || cs.type == :ROTATION || cs.type == :VIBRATION || cs.type == :DISSOCIATION
+        elseif cs.type === :EXCITATION || cs.type === :ROTATION || cs.type === :VIBRATION || cs.type === :DISSOCIATION
             excitationColl!(cs_ind, cs, mass, g, particle, model, params, meas_inner)
             # energy_loss = cs.energy_loss
-        elseif cs.type == :IONIZATION
+        elseif cs.type === :IONIZATION
             ionisationColl!(cs_ind, cs, mass, model.ion_type, g, particle, model, params, meas_inner, new_particles)
             # energy_loss = cs.energy_loss
-        elseif cs.type == :ATTACHMENT || cs.type == :THERMAL || cs.type == :FORMATION || cs.type == :ANNIHILATION
+        elseif cs.type === :ATTACHMENT || cs.type === :THERMAL || cs.type === :FORMATION || cs.type === :ANNIHILATION
             attachmentColl!(particle, model.ion_type.method)
+        elseif cs.type === :ELASTIC_MOMENTUM
+            elasticMomentumColl!(cs_ind, cs, mass, g, particle, model, params, meas_inner)
+        elseif cs.type === :ELASTIC_ENERGY
+            elasticEnergyColl!(cs_ind, cs, mass, g, particle, model, params, meas_inner)
         end
         meas_inner.measg.coll_count[cs_ind] += 1
     end
@@ -640,6 +644,31 @@ function elasticColl!(cs_no, cs, mass, g, particle, model, params, meas_inner)
     meas_inner.measg.coschi += dot(particle.v, v2) / (norm(v2) * norm(particle.v))
     # meas_inner.no_elas += 1
     particle.v = v2
+end
+
+function elasticMomentumColl!(cs_no, cs, mass, g, particle, model, params, meas_inner)
+    #me2 = 4amu
+    # @debug uconvert(amu,me), uconvert(amu,mass)
+    coschi, sinchi, phi = scatteringAngle(cs_no, cs, mass, g, particle, model, params)
+    v2 = norm(g) * SArray{Tuple{3},Float64,1,3}(cos(phi) * sinchi, sin(phi) * sinchi, coschi)
+    v2 = shift(v2, g)
+    v2 = (me * particle.v + mass * (g - particle.v + v2)) / (me + mass)
+    meas_inner.measg.coschi += dot(particle.v, v2) / (norm(v2) * norm(particle.v))
+    v2 = v2 * norm(particle.v) / norm(v2)
+    # meas_inner.no_elas += 1
+    particle.v = v2
+end
+
+function elasticEnergyColl!(cs_no, cs, mass, g, particle, model, params, meas_inner)
+    #me2 = 4amu
+    # @debug uconvert(amu,me), uconvert(amu,mass)
+    coschi, sinchi, phi = scatteringAngle(cs_no, cs, mass, g, particle, model, params)
+    v2 = norm(g) * SArray{Tuple{3},Float64,1,3}(cos(phi) * sinchi, sin(phi) * sinchi, coschi)
+    v2 = shift(v2, g)
+    v2 = (me * particle.v + mass * (g - particle.v + v2)) / (me + mass)
+    meas_inner.measg.coschi += dot(particle.v, v2) / (norm(v2) * norm(particle.v))
+    # meas_inner.no_elas += 1
+    particle.v = particle.v * norm(v2) / norm(particle.v)
 end
 
 function excitationColl!(cs_no, cs, mass, g, particle, model, params, meas_inner)

@@ -68,6 +68,33 @@ function buildDCS(σ::T, cbins=logrange(1e-2, 1e2, 41) .* eV) where {T<:Abstract
     (ε, R) -> 1 - 2 * R
 end
 
+#### Liquid ####
+
+@inbounds function buildLiquid(σ::AbstractCrossSection, S, cbins)
+    # Takes an elastic cross section, σ, and an angle dependent static structure factor S
+    # Returns three cross sections, both, energy, momentum
+    function int(χ, ε)
+        0.5 * S(2 * 2 * sqrt(2 * me * ε) / ħ * sqrt((1 - cos(χ)) / 2)) * (1 - cos(χ)) * sin(χ)
+    end
+    σ_b = Vector{uÅ2}(undef, length(cbins))
+    σ_e = Vector{uÅ2}(undef, length(cbins))
+    σ_m = Vector{uÅ2}(undef, length(cbins))
+    for i in eachindex(cbins)
+        e = cbins[i]
+        res = quadgk((x) -> int(x, e), 0, pi)[1]::Float64
+        @show res
+        if res >= 1
+            σ_b[i] = σ(e)
+            σ_e[i] = 0.0u"Å^2"
+            σ_m[i] = σ(e) * (res - 1)
+        else
+            σ_b[i] = σ(e) * res
+            σ_e[i] = σ(e) * (1 - res)
+            σ_m[i] = 0.0u"Å^2"
+        end
+    end
+    return CrossSection(collect(cbins), σ_b; type=:ELASTIC), CrossSection(collect(cbins), σ_e; type=:ELASTIC_ENERGY), CrossSection(collect(cbins), σ_m; type=:ELASTIC_MOMENTUM)
+end
 #### Frequency ####
 
 function buildFreq(gas::LLCS, cbins, model)
