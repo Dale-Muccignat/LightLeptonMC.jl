@@ -74,7 +74,7 @@ end
     # Takes an elastic cross section, σ, and an angle dependent static structure factor S
     # Returns three cross sections, both, energy, momentum
     function int(χ, ε)
-        0.5 * S(2 * 2 * sqrt(2 * me * ε) / ħ * sqrt((1 - cos(χ)) / 2)) * (1 - cos(χ)) * sin(χ)
+        0.5 * S(2 * sqrt(2 * me * ε) / ħ * sqrt((1 - cos(χ)) / 2)) * (1 - cos(χ)) * sin(χ)
     end
     σ_b = Vector{uÅ2}(undef, length(cbins))
     σ_e = Vector{uÅ2}(undef, length(cbins))
