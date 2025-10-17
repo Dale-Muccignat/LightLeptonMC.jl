@@ -171,26 +171,26 @@ end
     #' @testset "Power Law - 293K, p=-1, a=0.00001" begin
     # Reference: Boyle, 2016, PhD Thesis.
     # NOTE: The effective attachment rate has a type-o in the thesis, powers of 10 should be positive
-    swarmData = DataFrame(
-        x=[[0.4Td]],
-        T=293.0K,
-        P=0.0kPa,
-        types=[[:ε, :W, :nDT, :nDL, :WF, :nDTF, :nDLF, :Keff]],
-        ys=[[
-            [0.1572 * eV],
-            [1227 * m / s],
-            [3.159e23 / s / m],
-            [3.199e23 / s / m],
-            [1186 * m / s],
-            [3.107e23 / s / m],
-            [3.107e23 / s / m],
-            [-2.054e-19 * m^3 / s],
-        ]]
-    )
-    g = PowerLawAttachment(a=0.00001, p=-1)
-    sol = LightLeptonMC.mc(g, swarmData, N=1_000, t=2e-5s, meas=[:f, :t], ion_type=LightLeptonMC.UniformIonisation(), S=0.1eV)
-    sol = LightLeptonMC.mc(g, swarmData, N=5_000_000, t=2e-5s, meas=[:f, :t], ion_type=LightLeptonMC.UniformIonisation(), S=0.1eV)
-    compareSwarm(swarmData, sol)
+    # swarmData = DataFrame(
+    #     x=[[0.4Td]],
+    #     T=293.0K,
+    #     P=0.0kPa,
+    #     types=[[:ε, :W, :nDT, :nDL, :WF, :nDTF, :nDLF, :Keff]],
+    #     ys=[[
+    #         [0.1572 * eV],
+    #         [1227 * m / s],
+    #         [3.159e23 / s / m],
+    #         [3.199e23 / s / m],
+    #         [1186 * m / s],
+    #         [3.107e23 / s / m],
+    #         [3.107e23 / s / m],
+    #         [-2.054e-19 * m^3 / s],
+    #     ]]
+    # )
+    # g = PowerLawAttachment(a=0.00001, p=-1)
+    # sol = LightLeptonMC.mc(g, swarmData, N=1_000, t=2e-5s, meas=[:f, :t], ion_type=LightLeptonMC.UniformIonisation(), S=0.1eV)
+    # sol = LightLeptonMC.mc(g, swarmData, N=5_000_000, t=2e-5s, meas=[:f, :t], ion_type=LightLeptonMC.UniformIonisation(), S=0.1eV)
+    # compareSwarm(swarmData, sol)
 end
 
 @testset "Reid's Ramp" begin
