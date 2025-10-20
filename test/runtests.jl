@@ -266,6 +266,33 @@ end
     sol = LightLeptonMC.mc(LucasSaelee(F=0.5), swarmData, N=500_000, t=5e-7s)
     compareSwarm(swarmData, sol)
 end
+
+@testset "Lucas and Saelee Ionisation" begin
+    # Reference Muccignat honours thesis 2018
+    swarmData = DataFrame(
+        x=[[3Td]],
+        T=0.0K,
+        P=0.0kPa,
+        types=[[:ε, :W, :nDT, :nDL]],
+        ys=[[
+            [1.233 * eV],
+            [105200 * m / s],
+            [34.97e24 / s / m],
+            [19.51e24 / s / m],
+        ]]
+    )
+
+    ε = logrange(1e-2, 1e2, 100) * eV
+    r = sqrt(6Å^2 / pi)
+    n0 = 0.4 * 3 / 4 / pi / r^3
+    a, b, c = LightLeptonMC.buildLiquid(CrossSection((ε::Energy) -> 6.0Å^2, type=:ELASTIC), (e) -> LightLeptonTools.S_percus_yevick(e, r, n0), ε)
+
+    PY() = LLCS(mass=4.0amu,
+        elastic=[a, b, c],
+        excitation=CrossSection((ε::Energy) -> ε < 2eV ? 0.0Å^2 : 0.1 * Å^2, type=:EXCITATION, energy_loss=2eV))
+    sol = LightLeptonMC.mc(PY(), swarmData, N=500_000, t=2e-7s)
+    compareSwarm(swarmData, sol)
+end
 #' N = 100000
 #' tol = 0.01
 #' function withinTol(y, ŷ, tol=0.05)
