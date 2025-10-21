@@ -793,10 +793,10 @@ function getIonisationEnergy(thresh, ion_type::DiscreteFunctionalIonisation, g, 
     return part_energy, other_part_energy
 end
 
-function apply_attachment_weighting!(::Positron, particle)
-    particle.alive = false
-    particle
-end
+# function apply_attachment_weighting!(::Positron, particle)
+#     particle.alive = false
+#     particle
+# end
 
 function apply_attachment_weighting!(::Lepton, particle)
     particle.weight /= 2
