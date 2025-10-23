@@ -63,7 +63,7 @@ end
     axis::AUTO = [0, 0, 1]
 end
 
-function GaussianLμJSpatial(; val=-7.5μm, Δy_source=7.5μm, gaussian_axis=[0, 1, 0], axis=[0, 0, 1])
+function GaussianLμJSpatial(; val = -7.5μm, Δy_source = 7.5μm, gaussian_axis = [0, 1, 0], axis = [0, 0, 1])
     gaussian_axis = @SVector [gaussian_axis[1], gaussian_axis[2], gaussian_axis[3]]
     axis = @SVector [axis[1], axis[2], axis[3]]
     return GaussianLμJSpatial(val, Δy_source, gaussian_axis, axis)
@@ -80,7 +80,7 @@ FunctionalSpatial(spatialDist;axis)
 spatialDist - Two element tuple. First element is the dependent variable of the density vector (second element)
 axis - function that returns the axis for the distribution, can be a random vector to simulate symmetry
 """
-function FunctionalSpatial(spatialDist::Tuple{Any,Any}, axis=() -> [0, 0, 1])
+function FunctionalSpatial(spatialDist::Tuple{Any, Any}, axis = () -> [0, 0, 1])
     # Takes a two element vector spatial histogram/density distribution, creates a cumulative distribution function
     # assumes isotropic scattering
     dependent = spatialDist[1]
@@ -88,42 +88,42 @@ function FunctionalSpatial(spatialDist::Tuple{Any,Any}, axis=() -> [0, 0, 1])
     independent_func = LinearInterpolation(dependent, independent)
     vals = zero(dependent)
 
-    norm = quadgk(independent_func, dependent[1], dependent[end], order=100)[1]
+    norm = quadgk(independent_func, dependent[1], dependent[end], order = 100)[1]
 
     # vals[1] = quadgk(independent,dependent[1],dependent[1],order=100)[1]
     vals[1] = zero(independent[1] * dependent[1])
-    for i in 2:(length(dependent)-1)
-        vals[i] = quadgk(independent_func, dependent[i-1], dependent[i], order=100)[1]
+    for i in 2:(length(dependent) - 1)
+        vals[i] = quadgk(independent_func, dependent[i - 1], dependent[i], order = 100)[1]
     end
     vals = vals ./ norm
     vals[end] = 1.0 - sum(vals)
     vals = cumsum(vals)
 
-    spl(x) = LinearInterpolation(Interpolations.deduplicate_knots!(vals), dependent, extrapolation_bc=Flat())(x)
+    spl(x) = LinearInterpolation(Interpolations.deduplicate_knots!(vals), dependent, extrapolation_bc = Flat())(x)
 
     return FunctionalSpatial(axis, spl)
 end
 
 @AutoParm struct UniformDensity <: ConfigDensity
-    val::AUTO = 1e23m^-3
+    val::AUTO = 1.0e23m^-3
 end
 @AutoParm struct LμJDensityGradient <: ConfigDensity
-    val::AUTO = 1e28m^-3
-    background::AUTO = 2e18m^-3
-    func::AUTO = (x) -> 0.5 * (1e28m^-3 + 1e23m^-3) - 0.5 * (1e28m^-3 - 1e23m^-3) * tanh(2 * ustrip(x) / 1e-9)
+    val::AUTO = 1.0e28m^-3
+    background::AUTO = 2.0e18m^-3
+    func::AUTO = (x) -> 0.5 * (1.0e28m^-3 + 1.0e23m^-3) - 0.5 * (1.0e28m^-3 - 1.0e23m^-3) * tanh(2 * ustrip(x) / 1.0e-9)
     δtol::AUTO = 0.1
     δphase::AUTO = 1nm
 end
-function LμJDensityGradient(; val=1e28m^-3, background=2e18m^-3, jet_width=15μm, δphase=2nm, δtol=0.01)
+function LμJDensityGradient(; val = 1.0e28m^-3, background = 2.0e18m^-3, jet_width = 15μm, δphase = 2nm, δtol = 0.01)
     func = (x) -> 0.5 * (val + background) - 0.5 * (val - background) * tanh(2 * (x - jet_width) / 2 / δphase)
     return LμJDensityGradient(val, background, func, δtol, δphase)
 end
 @AutoParm struct LμJDensity <: ConfigDensity
-    val::AUTO = 1e28m^-3
-    background::AUTO = 2e18m^-3
+    val::AUTO = 1.0e28m^-3
+    background::AUTO = 2.0e18m^-3
 end
 @AutoParm struct CellDensity <: ConfigDensity
-    val::AUTO = 1e28m^-3
+    val::AUTO = 1.0e28m^-3
 end
 @AutoParm struct ZeroField <: ConfigField
     val::AUTO = 0.0 * Td
@@ -149,12 +149,12 @@ end
     func::AUTO = (e) -> 0.5
 end
 
-function FunctionalIonisationInit(; func=(e, E2) -> 1.0, thresh=10.0, method=:WEIGHTING)
+function FunctionalIonisationInit(; func = (e, E2) -> 1.0, thresh = 10.0, method = :WEIGHTING)
     cbins = [0.0, (10.0 .^ (-3:0.1:6.0))...] .* eV #TODO: This is a dubplicate and depends on the initParams funciton
     cbins2 = [0.0, (10.0 .^ (-3:0.1:6.0))...] .* eV
     matrix::Matrix{Float64} = zeros(length(cbins), length(cbins2))
     for i in eachindex(cbins)
-        func2(E2) = func(cbins[i], E2) < 1e-10 ? 1e-10 : func(cbins[i], E2)
+        func2(E2) = func(cbins[i], E2) < 1.0e-10 ? 1.0e-10 : func(cbins[i], E2)
         if cbins[i] > thresh
             norm = quadgk(func2, 0, cbins[i] - thresh)[1]
         else
@@ -167,15 +167,15 @@ function FunctionalIonisationInit(; func=(e, E2) -> 1.0, thresh=10.0, method=:WE
             elseif j == length(cbins2)
                 # matrix[i,j] = 1. - sum(matrix[i,:])
             else
-                matrix[i, j] = quadgk(func2, cbins2[j-1], cbins2[j])[1] / norm
+                matrix[i, j] = quadgk(func2, cbins2[j - 1], cbins2[j])[1] / norm
             end
         end
     end
     # matrix = replace_0(replace_nan(matrix))
-    matrix2 = cumsum(matrix, dims=2)
-    spl2 = LinearInterpolation((cbins, cbins2), matrix2, extrapolation_bc=Flat())#2D spline of the matrix
-    spl3 = [LinearInterpolation(Interpolations.deduplicate_knots!(spl2(c, cbins2), move_knots=true), cbins2, extrapolation_bc=Flat()) for c in cbins]
-    return FunctionalIonisation(spl3, method)#, matrix,matrix2
+    matrix2 = cumsum(matrix, dims = 2)
+    spl2 = LinearInterpolation((cbins, cbins2), matrix2, extrapolation_bc = Flat()) #2D spline of the matrix
+    spl3 = [LinearInterpolation(Interpolations.deduplicate_knots!(spl2(c, cbins2), move_knots = true), cbins2, extrapolation_bc = Flat()) for c in cbins]
+    return FunctionalIonisation(spl3, method) #, matrix,matrix2
 end
 
 
@@ -222,7 +222,7 @@ function delta()
     return [0, 0, 1]
 end
 
-function FunctionalEnergy(velocityDist; direction=delta)
+function FunctionalEnergy(velocityDist; direction = delta)
     # takes velocityDist and creates a cumulative distribution function to sample from
     # assumes isotropic scattering
     energies = 10.0 .^ (-4:0.001:2) .* sqrt(eV)
@@ -231,15 +231,15 @@ function FunctionalEnergy(velocityDist; direction=delta)
     # energies = sqrt.(0eV:1e-5eV:100eV)
     vals = zeros(length(energies))
 
-    norm = quadgk(velocityDist, sqrt(0eV), energies[end], order=100)[1]
+    norm = quadgk(velocityDist, sqrt(0eV), energies[end], order = 100)[1]
     # norm = energies .* P |> sum
     # @show norm
     # vals = energies .* P
     # vals ./= sum(vals)
 
-    vals[1] = quadgk(velocityDist, sqrt(0eV), energies[1], order=100)[1]
-    for i in 2:(length(energies)-1)
-        vals[i] = quadgk(velocityDist, energies[i-1], energies[i], order=100)[1]
+    vals[1] = quadgk(velocityDist, sqrt(0eV), energies[1], order = 100)[1]
+    for i in 2:(length(energies) - 1)
+        vals[i] = quadgk(velocityDist, energies[i - 1], energies[i], order = 100)[1]
         vals[i] < 0 && (vals[i] = 0)
     end
     # return vals
@@ -249,7 +249,7 @@ function FunctionalEnergy(velocityDist; direction=delta)
 
     @show energies[1], vals[1]
 
-    spl = LinearInterpolation(Interpolations.deduplicate_knots!(vals), energies .^ 2, extrapolation_bc=0eV)
+    spl = LinearInterpolation(Interpolations.deduplicate_knots!(vals), energies .^ 2, extrapolation_bc = 0eV)
 
     return FunctionalEnergy(direction, spl)
 end
@@ -293,7 +293,7 @@ meas = [:t]                      # Variables to measure. There are many possibil
 end
 
 @AutoParm mutable struct SWARM
-    t_f::AUTO = 2e-5s
+    t_f::AUTO = 2.0e-5s
 end
 
 """
@@ -316,7 +316,7 @@ For more information, type ?MCMODEL
     Δε_detector::AUTO = 0.9eV
     Δχ_detector::AUTO = 2°
     thresh::AUTO = 1.0 * eV
-    jet_width::AUTO = 15e-6m
+    jet_width::AUTO = 15.0e-6m
     jet_center::AUTO = [0.0, 0.0, 0.0] .* m
 end
 
@@ -339,21 +339,21 @@ r = 1e-6           # radius for measurements along the back surface of the cell
     # Defined spatial parameters for the CELL
     Δε_detector::AUTO = 0.9eV
     thresh::AUTO = 1.0 * eV
-    z::AUTO = 15e-6m
+    z::AUTO = 15.0e-6m
     z_n::AUTO = 100
-    x::AUTO = 15e-6m
-    y::AUTO = 15e-6m
+    x::AUTO = 15.0e-6m
+    y::AUTO = 15.0e-6m
     bin_no::AUTO = 100
-    r::AUTO = 1e-6m
-    t_f::AUTO = 2e-5s
+    r::AUTO = 1.0e-6m
+    t_f::AUTO = 2.0e-5s
 end
 
-function LμJ(; jet_center=[0.0, 0.0, 0.0] .* m, Δε_detector=0.9eV, Δχ_detector=2°, thresh=1.0 * eV, jet_width=15μm)
-    LμJ(Δε_detector, Δχ_detector, thresh, jet_width, jet_center)
+function LμJ(; jet_center = [0.0, 0.0, 0.0] .* m, Δε_detector = 0.9eV, Δχ_detector = 2°, thresh = 1.0 * eV, jet_width = 15μm)
+    return LμJ(Δε_detector, Δχ_detector, thresh, jet_width, jet_center)
 end
 
-function CELL(; Δε_detector=0.9eV, thresh=1.0 * eV, z=15μm, z_n=100, x=15μm, y=15μm, bin_no=100, r=1μm, t_f=2e-5s)
-    CELL(Δε_detector, thresh, z, z_n, x, y, bin_no, r, t_f)
+function CELL(; Δε_detector = 0.9eV, thresh = 1.0 * eV, z = 15μm, z_n = 100, x = 15μm, y = 15μm, bin_no = 100, r = 1μm, t_f = 2.0e-5s)
+    return CELL(Δε_detector, thresh, z, z_n, x, y, bin_no, r, t_f)
 end
 
 @AutoParm mutable struct MCPARAMS
@@ -367,14 +367,14 @@ end
     n0::AUTO = nothing
     rbins::AUTO = nothing
     χbins::AUTO = nothing
-    tbins::AUTO = collect(LinRange(0, 1e-5, 10)) .* s
+    tbins::AUTO = collect(LinRange(0, 1.0e-5, 10)) .* s
     zbins::AUTO = nothing
     xbins::AUTO = nothing
     ybins::AUTO = nothing
 end
 
-function MCPARAMS(; cbins=nothing, ebins=nothing, gas=nothing, total_freq=nothing, a=nothing, n0=nothing, rbins=nothing, χbins=nothing, tbins=nothing, zbins=nothing, xbins=nothing, ybins=nothing, DCS=nothing)
-    MCPARAMS(cbins, ebins, gas, total_freq, DCS, a, n0, rbins, χbins, tbins, zbins, xbins, ybins)
+function MCPARAMS(; cbins = nothing, ebins = nothing, gas = nothing, total_freq = nothing, a = nothing, n0 = nothing, rbins = nothing, χbins = nothing, tbins = nothing, zbins = nothing, xbins = nothing, ybins = nothing, DCS = nothing)
+    return MCPARAMS(cbins, ebins, gas, total_freq, DCS, a, n0, rbins, χbins, tbins, zbins, xbins, ybins)
 end
 
 
@@ -396,11 +396,11 @@ end
 
 function PART()
 
-    r = SArray{Tuple{3},Float64,1,3}(0.0, 0.0, 0.0)
+    r = SArray{Tuple{3}, Float64, 1, 3}(0.0, 0.0, 0.0)
     r = r * m̃
-    v = SArray{Tuple{3},Float64,1,3}(0.0, 0.0, 0.0)
+    v = SArray{Tuple{3}, Float64, 1, 3}(0.0, 0.0, 0.0)
     v = v * m̃ / s̃
-    return PART(r=r, v=v)
+    return PART(r = r, v = v)
 end
 
 
@@ -413,16 +413,16 @@ end
     measc::AUTO = MEASC()
 end
 
-function MEAS(type::SWARM, model, params::MCPARAMS=MCPARAMS())
-    MEAS(MEASLμJ(), MEASCELL(), MEASG(model, params), MEAST(params), MEASS(), MEASC(params))
+function MEAS(type::SWARM, model, params::MCPARAMS = MCPARAMS())
+    return MEAS(MEASLμJ(), MEASCELL(), MEASG(model, params), MEAST(params), MEASS(), MEASC(params))
 end
 
-function MEAS(type::LμJ, model, params::MCPARAMS=MCPARAMS())
-    MEAS(MEASLμJ(model, params), MEASCELL(), MEASG(), MEAST(), MEASS(), MEASC())
+function MEAS(type::LμJ, model, params::MCPARAMS = MCPARAMS())
+    return MEAS(MEASLμJ(model, params), MEASCELL(), MEASG(), MEAST(), MEASS(), MEASC())
 end
 
-function MEAS(type::CELL, model, params::MCPARAMS=MCPARAMS())
-    MEAS(MEASLμJ(), MEASCELL(model, params), MEASG(model, params), MEAST(), MEASS(), MEASC())
+function MEAS(type::CELL, model, params::MCPARAMS = MCPARAMS())
+    return MEAS(MEASLμJ(), MEASCELL(model, params), MEASG(model, params), MEAST(), MEASS(), MEASC())
 end
 
 @AutoParm mutable struct MEASLμJ
@@ -537,17 +537,18 @@ end
 
 function MEAST(params)
 
-    MEAST(zeros(length(params.tbins)) .* eV,
-          zeros(length(params.tbins), 3) .* m,
-          zeros(length(params.tbins), 3) .* m / s,
-          zeros(length(params.tbins), 3) .* m^2,
-          zeros(length(params.tbins), 3) .* m^3,
-          zeros(length(params.tbins), 3) .* m^2 / s^2,
-          zeros(length(params.tbins), 3) .* m^2 / s,
-          zeros(length(params.tbins)) .* m^3,
-          zeros(length(params.tbins)),
-          zeros(length(params.tbins))
-          )
+    return MEAST(
+        zeros(length(params.tbins)) .* eV,
+        zeros(length(params.tbins), 3) .* m,
+        zeros(length(params.tbins), 3) .* m / s,
+        zeros(length(params.tbins), 3) .* m^2,
+        zeros(length(params.tbins), 3) .* m^3,
+        zeros(length(params.tbins), 3) .* m^2 / s^2,
+        zeros(length(params.tbins), 3) .* m^2 / s,
+        zeros(length(params.tbins)) .* m^3,
+        zeros(length(params.tbins)),
+        zeros(length(params.tbins))
+    )
 
 end
 
@@ -668,7 +669,7 @@ function findMinInd(x::AbstractVector, y)::Int
 end
 
 
-@fastmath function findMinInd(x::Array{Int64,1}, y::Int64)::Int64
+@fastmath function findMinInd(x::Array{Int64, 1}, y::Int64)::Int64
     left::Int64 = 1
     right::Int64 = length(x)
     d::Float64 = Inf

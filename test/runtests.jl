@@ -17,9 +17,10 @@ function compareSwarm(A, B)
             Ref:     $(A.ys[row][i][1])
             Current: $(B.ys[row][i][1])
             """
-            @test A.ys[row][i][1] ≈ Measurements.value(B.ys[row][i][1]) rtol = 1e-2
+            @test A.ys[row][i][1] ≈ Measurements.value(B.ys[row][i][1]) rtol = 1.0e-2
         end
     end
+    return
 end
 
 @testset "Maxwell Model" begin
@@ -28,36 +29,40 @@ end
     @testset "Maxwell Model - 0K" begin
         # Reference: Boyle, 2016, PhD Thesis.
         swarmData = DataFrame(
-            x=[[1.0Td]],
-            T=0.0K,
-            P=0.0kPa,
-            types=[[:ε, :W, :nDT, :nDL]],
-            ys=[[
-                [0.72916eV],
-                [5931.0m / s],
-                [2.8831e24 / s / m],
-                [2.8831e24 / s / m],
-            ]]
+            x = [[1.0Td]],
+            T = 0.0K,
+            P = 0.0kPa,
+            types = [[:ε, :W, :nDT, :nDL]],
+            ys = [
+                [
+                    [0.72916eV],
+                    [5931.0m / s],
+                    [2.8831e24 / s / m],
+                    [2.8831e24 / s / m],
+                ],
+            ]
         )
-        sol = LightLeptonMC.mc(MaxwellModel(), swarmData, N=500_000, t=3e-5s, S=0.1eV)
+        sol = LightLeptonMC.mc(MaxwellModel(), swarmData, N = 500_000, t = 3.0e-5s, S = 0.1eV)
         compareSwarm(swarmData, sol)
     end
 
     @testset "Maxwell Model - 293K" begin
         # Reference: Boyle, 2016, PhD Thesis.
         swarmData = DataFrame(
-            x=[[1.0Td]],
-            T=293.0K,
-            P=0.0kPa,
-            types=[[:ε, :W, :nDT, :nDL]],
-            ys=[[
-                [0.76703eV],
-                [5931.0m / s],
-                [3.0328e24 / s / m],
-                [3.0328e24 / s / m],
-            ]]
+            x = [[1.0Td]],
+            T = 293.0K,
+            P = 0.0kPa,
+            types = [[:ε, :W, :nDT, :nDL]],
+            ys = [
+                [
+                    [0.76703eV],
+                    [5931.0m / s],
+                    [3.0328e24 / s / m],
+                    [3.0328e24 / s / m],
+                ],
+            ]
         )
-        sol = LightLeptonMC.mc(MaxwellModel(), swarmData, N=500_000, t=3e-5s, S=0.1eV)
+        sol = LightLeptonMC.mc(MaxwellModel(), swarmData, N = 500_000, t = 3.0e-5s, S = 0.1eV)
         compareSwarm(swarmData, sol)
     end
 end
@@ -66,36 +71,40 @@ end
     # Reference: Boyle, 2016, PhD Thesis.
     @testset "HardSphere Model - 0K" begin
         swarmData = DataFrame(
-            x=[[1.0Td]],
-            T=0.0K,
-            P=0.0kPa,
-            types=[[:ε, :W, :nDT, :nDL]],
-            ys=[[
-                [0.72932eV],
-                [5759.5m / s],
-                [3.202e24 / s / m],
-                [1.573e24 / s / m],
-            ]]
+            x = [[1.0Td]],
+            T = 0.0K,
+            P = 0.0kPa,
+            types = [[:ε, :W, :nDT, :nDL]],
+            ys = [
+                [
+                    [0.72932eV],
+                    [5759.5m / s],
+                    [3.202e24 / s / m],
+                    [1.573e24 / s / m],
+                ],
+            ]
         )
-        sol = LightLeptonMC.mc(HardSphereModel(), swarmData, N=500_000, t=2e-5s)
+        sol = LightLeptonMC.mc(HardSphereModel(), swarmData, N = 500_000, t = 2.0e-5s)
         compareSwarm(swarmData, sol)
     end
 
     @testset "HardSphere Model - 293K" begin
         # Reference: Boyle, 2016, PhD Thesis.
         swarmData = DataFrame(
-            x=[[1.0Td]],
-            T=293.0K,
-            P=0.0kPa,
-            types=[[:ε, :W, :nDT, :nDL]],
-            ys=[[
-                [0.75057eV],
-                [5639.6m / s],
-                [3.247e24 / s / m],
-                [1.640e24 / s / m],
-            ]]
+            x = [[1.0Td]],
+            T = 293.0K,
+            P = 0.0kPa,
+            types = [[:ε, :W, :nDT, :nDL]],
+            ys = [
+                [
+                    [0.75057eV],
+                    [5639.6m / s],
+                    [3.247e24 / s / m],
+                    [1.64e24 / s / m],
+                ],
+            ]
         )
-        sol = LightLeptonMC.mc(HardSphereModel(), swarmData, N=500_000, t=2e-5s)
+        sol = LightLeptonMC.mc(HardSphereModel(), swarmData, N = 500_000, t = 2.0e-5s)
         compareSwarm(swarmData, sol)
     end
 end
@@ -103,24 +112,26 @@ end
 @testset "Power Law Attachment - 293K" begin
     # Reference: Boyle, 2016, PhD Thesis.
     swarmData = DataFrame(
-        x=[[0.4Td]],
-        T=293.0K,
-        P=0.0kPa,
-        types=[[:ε, :W, :nDT, :nDL, :WF, :nDTF, :nDLF, :Keff]],
-        ys=[[
-            [0.1364eV],
-            [937.5m / s],
-            [2.414e23 / s / m],
-            [1.73e23 / s / m],
-            [1186m / s],
-            [2.697e23 / s / m],
-            [2.697e23 / s / m],
-            [-8.092e-19 * m^3 / s],
-        ]]
+        x = [[0.4Td]],
+        T = 293.0K,
+        P = 0.0kPa,
+        types = [[:ε, :W, :nDT, :nDL, :WF, :nDTF, :nDLF, :Keff]],
+        ys = [
+            [
+                [0.1364eV],
+                [937.5m / s],
+                [2.414e23 / s / m],
+                [1.73e23 / s / m],
+                [1186m / s],
+                [2.697e23 / s / m],
+                [2.697e23 / s / m],
+                [-8.092e-19 * m^3 / s],
+            ],
+        ]
     )
-    g = PowerLawAttachment(a=0.001, p=0.5)
-    sol = LightLeptonMC.mc(g, swarmData, N=1_000, t=2e-5s, meas=[:f, :t], ion_type=LightLeptonMC.UniformIonisation(), S=0.1eV)
-    sol = LightLeptonMC.mc(g, swarmData, N=500_000, t=2e-5s, meas=[:f, :t], ion_type=LightLeptonMC.UniformIonisation(), S=0.1eV)
+    g = PowerLawAttachment(a = 0.001, p = 0.5)
+    sol = LightLeptonMC.mc(g, swarmData, N = 1_000, t = 2.0e-5s, meas = [:f, :t], ion_type = LightLeptonMC.UniformIonisation(), S = 0.1eV)
+    sol = LightLeptonMC.mc(g, swarmData, N = 500_000, t = 2.0e-5s, meas = [:f, :t], ion_type = LightLeptonMC.UniformIonisation(), S = 0.1eV)
     compareSwarm(swarmData, sol)
 
     # # Reference: Boyle, 2016, PhD Thesis.
@@ -148,24 +159,26 @@ end
     #' @testset "Power Law - 293K, p=-1/2, a=0.01" begin
     # Reference: Boyle, 2016, PhD Thesis.
     swarmData = DataFrame(
-        x=[[0.4Td]],
-        T=293.0K,
-        P=0.0kPa,
-        types=[[:ε, :W, :nDT, :nDL, :WF, :nDTF, :nDLF, :Keff]],
-        ys=[[
-            [0.1545 * eV],
-            [1186 * m / s],
-            [3.055e23 / s / m],
-            [3.055e23 / s / m],
-            [1186 * m / s],
-            [3.055e23 / s / m],
-            [3.055e23 / s / m],
-            [-5.931e-20 * m^3 / s],
-        ]]
+        x = [[0.4Td]],
+        T = 293.0K,
+        P = 0.0kPa,
+        types = [[:ε, :W, :nDT, :nDL, :WF, :nDTF, :nDLF, :Keff]],
+        ys = [
+            [
+                [0.1545 * eV],
+                [1186 * m / s],
+                [3.055e23 / s / m],
+                [3.055e23 / s / m],
+                [1186 * m / s],
+                [3.055e23 / s / m],
+                [3.055e23 / s / m],
+                [-5.931e-20 * m^3 / s],
+            ],
+        ]
     )
-    g = PowerLawAttachment(a=0.00001, p=-0.5)
-    sol = LightLeptonMC.mc(g, swarmData, N=1_000, t=2e-5s, meas=[:f, :t], ion_type=LightLeptonMC.UniformIonisation(), S=0.1eV)
-    sol = LightLeptonMC.mc(g, swarmData, N=500_000, t=2e-5s, meas=[:f, :t], ion_type=LightLeptonMC.UniformIonisation(), S=0.1eV)
+    g = PowerLawAttachment(a = 0.00001, p = -0.5)
+    sol = LightLeptonMC.mc(g, swarmData, N = 1_000, t = 2.0e-5s, meas = [:f, :t], ion_type = LightLeptonMC.UniformIonisation(), S = 0.1eV)
+    sol = LightLeptonMC.mc(g, swarmData, N = 500_000, t = 2.0e-5s, meas = [:f, :t], ion_type = LightLeptonMC.UniformIonisation(), S = 0.1eV)
     compareSwarm(swarmData, sol)
 
     #' @testset "Power Law - 293K, p=-1, a=0.00001" begin
@@ -196,34 +209,38 @@ end
 @testset "Reid's Ramp" begin
     # Reference: Boyle, 2016, PhD Thesis.
     swarmData = DataFrame(
-        x=[[1Td]],
-        T=0.0K,
-        P=0.0kPa,
-        types=[[:ε, :W, :nDT, :nDL]],
-        ys=[[
-            [0.1015 * eV],
-            [12720 * m / s],
-            [9.75e23 / s / m],
-            [7.591e23 / s / m],
-        ]]
+        x = [[1Td]],
+        T = 0.0K,
+        P = 0.0kPa,
+        types = [[:ε, :W, :nDT, :nDL]],
+        ys = [
+            [
+                [0.1015 * eV],
+                [12720 * m / s],
+                [9.75e23 / s / m],
+                [7.591e23 / s / m],
+            ],
+        ]
     )
-    sol = LightLeptonMC.mc(ReidRamp(), swarmData, N=500_000, t=2e-7s)
+    sol = LightLeptonMC.mc(ReidRamp(), swarmData, N = 500_000, t = 2.0e-7s)
     compareSwarm(swarmData, sol)
 
     # Reference: Boyle, 2016, PhD Thesis.
     swarmData = DataFrame(
-        x=[[24Td]],
-        T=0.0K,
-        P=0.0kPa,
-        types=[[:ε, :W, :nDT, :nDL]],
-        ys=[[
-            [0.4080 * eV],
-            [88870 * m / s],
-            [11.337e23 / s / m],
-            [4.606e23 / s / m],
-        ]]
+        x = [[24Td]],
+        T = 0.0K,
+        P = 0.0kPa,
+        types = [[:ε, :W, :nDT, :nDL]],
+        ys = [
+            [
+                [0.408 * eV],
+                [88870 * m / s],
+                [11.337e23 / s / m],
+                [4.606e23 / s / m],
+            ],
+        ]
     )
-    sol = LightLeptonMC.mc(ReidRamp(), swarmData, N=500_000, t=2e-7s)
+    sol = LightLeptonMC.mc(ReidRamp(), swarmData, N = 500_000, t = 2.0e-7s)
     compareSwarm(swarmData, sol)
 end
 
@@ -233,64 +250,72 @@ end
     # NOTE: There is a type in the thesis. The α values are off by a factor of 100
     # F=1
     swarmData = DataFrame(
-        x=[[10Td]],
-        T=0.0K,
-        P=0.0kPa,
-        types=[[:ε, :W, :nDT, :nDL, :Keff]],
-        ys=[[
-            [4.969 * eV],
-            [94740 * m / s],
-            [27.23e24 / s / m],
-            [29.33e24 / s / m],
-            [2.42e-17 * m^3 / s],
-        ]]
+        x = [[10Td]],
+        T = 0.0K,
+        P = 0.0kPa,
+        types = [[:ε, :W, :nDT, :nDL, :Keff]],
+        ys = [
+            [
+                [4.969 * eV],
+                [94740 * m / s],
+                [27.23e24 / s / m],
+                [29.33e24 / s / m],
+                [2.42e-17 * m^3 / s],
+            ],
+        ]
     )
-    sol = LightLeptonMC.mc(LucasSaelee(F=1), swarmData, N=500_000, t=5e-7s)
+    sol = LightLeptonMC.mc(LucasSaelee(F = 1), swarmData, N = 500_000, t = 5.0e-7s)
     compareSwarm(swarmData, sol)
 
     # Reference: Boyle, 2016, PhD Thesis.
     # F=0.5
     swarmData = DataFrame(
-        x=[[10Td]],
-        T=0.0K,
-        P=0.0kPa,
-        types=[[:ε, :W, :nDT, :nDL, :Keff]],
-        ys=[[
-            [5.224 * eV],
-            [85930 * m / s],
-            [27.26e24 / s / m],
-            [28.65e24 / s / m],
-            [1.33e-17 * m^3 / s],
-        ]]
+        x = [[10Td]],
+        T = 0.0K,
+        P = 0.0kPa,
+        types = [[:ε, :W, :nDT, :nDL, :Keff]],
+        ys = [
+            [
+                [5.224 * eV],
+                [85930 * m / s],
+                [27.26e24 / s / m],
+                [28.65e24 / s / m],
+                [1.33e-17 * m^3 / s],
+            ],
+        ]
     )
-    sol = LightLeptonMC.mc(LucasSaelee(F=0.5), swarmData, N=500_000, t=5e-7s)
+    sol = LightLeptonMC.mc(LucasSaelee(F = 0.5), swarmData, N = 500_000, t = 5.0e-7s)
     compareSwarm(swarmData, sol)
 end
 
 @testset "Lucas and Saelee Ionisation" begin
     # Reference Muccignat honours thesis 2018
     swarmData = DataFrame(
-        x=[[3Td]],
-        T=0.0K,
-        P=0.0kPa,
-        types=[[:ε, :W, :nDT, :nDL]],
-        ys=[[
-            [1.233 * eV],
-            [105200 * m / s],
-            [34.97e24 / s / m],
-            [19.51e24 / s / m],
-        ]]
+        x = [[3Td]],
+        T = 0.0K,
+        P = 0.0kPa,
+        types = [[:ε, :W, :nDT, :nDL]],
+        ys = [
+            [
+                [1.233 * eV],
+                [105200 * m / s],
+                [34.97e24 / s / m],
+                [19.51e24 / s / m],
+            ],
+        ]
     )
 
-    ε = logrange(1e-2, 1e2, 100) * eV
+    ε = logrange(1.0e-2, 1.0e2, 100) * eV
     r = sqrt(6Å^2 / pi)
     n0 = 0.4 * 3 / 4 / pi / r^3
-    a, b, c = LightLeptonMC.buildLiquid(CrossSection((ε::Energy) -> 6.0Å^2, type=:ELASTIC), (e) -> LightLeptonTools.S_percus_yevick(e, r, n0), ε)
+    a, b, c = LightLeptonMC.buildLiquid(CrossSection((ε::Energy) -> 6.0Å^2, type = :ELASTIC), (e) -> LightLeptonTools.S_percus_yevick(e, r, n0), ε)
 
-    PY() = LLCS(mass=4.0amu,
-        elastic=[a, b, c],
-        excitation=CrossSection((ε::Energy) -> ε < 2eV ? 0.0Å^2 : 0.1 * Å^2, type=:EXCITATION, energy_loss=2eV))
-    sol = LightLeptonMC.mc(PY(), swarmData, N=500_000, t=2e-7s)
+    PY() = LLCS(
+        mass = 4.0amu,
+        elastic = [a, b, c],
+        excitation = CrossSection((ε::Energy) -> ε < 2eV ? 0.0Å^2 : 0.1 * Å^2, type = :EXCITATION, energy_loss = 2eV)
+    )
+    sol = LightLeptonMC.mc(PY(), swarmData, N = 500_000, t = 2.0e-7s)
     compareSwarm(swarmData, sol)
 end
 #' N = 100000

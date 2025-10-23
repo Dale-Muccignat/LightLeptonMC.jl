@@ -1,4 +1,4 @@
-function initParams(input_gas=MaxwellModel(), model::MCMODEL=MCMODEL())
+function initParams(input_gas = MaxwellModel(), model::MCMODEL = MCMODEL())
 
     #' cbins = [0.0, (10.0 .^ (-8:0.1:4))...] .* eV
     cbins = [0.0, (10.0 .^ (-8:1:-2))..., (10.0 .^ (-1.9:0.1:4))...] .* eV
@@ -11,31 +11,31 @@ function initParams(input_gas=MaxwellModel(), model::MCMODEL=MCMODEL())
     dcs = [buildDCS(g, cbins) for (g, _, _) in input_gas]
 
     params = MCPARAMS(
-        ebins=uconvert.(J̃, ebins),
-        tbins=upreferred.(tbins),
-        zbins=upreferred.(zbins),
-        ybins=upreferred.(ybins),
-        xbins=upreferred.(xbins),
-        cbins=uconvert.(J̃, cbins),
-        rbins=upreferred.(rbins),
-        χbins=upreferred.(χbins),
-        gas=input_gas,
-        n0=upreferred.(n0),
-        a=upreferred.(a),
-        total_freq=total_freq,
-        DCS=dcs,
+        ebins = uconvert.(J̃, ebins),
+        tbins = upreferred.(tbins),
+        zbins = upreferred.(zbins),
+        ybins = upreferred.(ybins),
+        xbins = upreferred.(xbins),
+        cbins = uconvert.(J̃, cbins),
+        rbins = upreferred.(rbins),
+        χbins = upreferred.(χbins),
+        gas = input_gas,
+        n0 = upreferred.(n0),
+        a = upreferred.(a),
+        total_freq = total_freq,
+        DCS = dcs,
     )
 
     return params
 end
 
-function initMeas(model, params::MCPARAMS=MCPARAMS())
-    MEAS(model.type, model, params)
+function initMeas(model, params::MCPARAMS = MCPARAMS())
+    return MEAS(model.type, model, params)
 end
 
 #### DCS ####
 
-@inbounds function buildDCS(σ::DifferentialCrossSection, cbins=logrange(1e-2, 1e2, 41) .* eV)
+@inbounds function buildDCS(σ::DifferentialCrossSection, cbins = logrange(1.0e-2, 1.0e2, 41) .* eV)
     # Create a 2d matrix interpolation that takes ε and R as an input and returns χ
     Rs = range(0, 1, 25)
     χs = range(0.0 * u"rad", π * u"rad", 25)
@@ -48,7 +48,7 @@ end
         function intχ(χ)
             σ(cbins[i], χ) * sin(χ)
         end
-        total = quadgk(intχ, c1, c2,)[1]::typeof(1.0u"Å^2*rad")
+        total = quadgk(intχ, c1, c2)[1]::typeof(1.0u"Å^2*rad")
         for j in eachindex(Rs)
             function L(χ)
                 partial = quadgk(intχ, c1, χ * u"rad")[1]::typeof(1.0u"Å^2*rad")
@@ -60,12 +60,12 @@ end
         end
         last = 0.0
     end
-    linear_interpolation((cbins, Rs), out, extrapolation_bc=Interpolations.Flat())
+    linear_interpolation((cbins, Rs), out, extrapolation_bc = Interpolations.Flat())
 end
 
-function buildDCS(σ::T, cbins=logrange(1e-2, 1e2, 41) .* eV) where {T<:AbstractCrossSection}
+function buildDCS(σ::T, cbins = logrange(1.0e-2, 1.0e2, 41) .* eV) where {T <: AbstractCrossSection}
     # Create a 2d matrix interpolation that takes ε and R as an input and returns χ
-    (ε, R) -> 1 - 2 * R
+    return (ε, R) -> 1 - 2 * R
 end
 
 #### Liquid ####
@@ -93,24 +93,24 @@ end
             σ_m[i] = 0.0u"Å^2"
         end
     end
-    return CrossSection(collect(cbins), σ_b; type=:ELASTIC), CrossSection(collect(cbins), σ_e; type=:ELASTIC_ENERGY), CrossSection(collect(cbins), σ_m; type=:ELASTIC_MOMENTUM)
+    return CrossSection(collect(cbins), σ_b; type = :ELASTIC), CrossSection(collect(cbins), σ_e; type = :ELASTIC_ENERGY), CrossSection(collect(cbins), σ_m; type = :ELASTIC_MOMENTUM)
 end
 #### Frequency ####
 
 function buildFreq(gas::LLCS, cbins, model)
     total_freq = zeros(length(cbins)) .* sqrt(eV) .* Å^2
-    en_spacing = cbins[end] - cbins[end-1]
-    inv_total_weight(ε) = -νₜ(gas, ε) - sum(CollisionFrequency(σ)(sqrt(ε)) for σ in gas.attachment; init=0.0)
+    en_spacing = cbins[end] - cbins[end - 1]
+    inv_total_weight(ε) = -νₜ(gas, ε) - sum(CollisionFrequency(σ)(sqrt(ε)) for σ in gas.attachment; init = 0.0)
     inv_total(ε) = -νₜ(gas, ε)
 
     if model.ion_type.method === :WEIGHTING
-        for i in 1:length(total_freq)-1
-            total_freq[i] = -Optim.minimum(optimize(inv_total_weight, ustrip(sqrt(eV), sqrt(cbins[i])), ustrip(sqrt(eV), sqrt(cbins[i+1])))) * sqrt(eV) * Å^2
+        for i in 1:(length(total_freq) - 1)
+            total_freq[i] = -Optim.minimum(optimize(inv_total_weight, ustrip(sqrt(eV), sqrt(cbins[i])), ustrip(sqrt(eV), sqrt(cbins[i + 1])))) * sqrt(eV) * Å^2
         end
         total_freq[end] = -Optim.minimum(optimize(inv_total_weight, ustrip(sqrt(eV), sqrt(cbins[end])), ustrip(sqrt(eV), sqrt(cbins[end] + en_spacing)))) * sqrt(eV) * Å^2
     else
-        for i in 1:length(total_freq)-1
-            total_freq[i] = -Optim.minimum(optimize(inv_total, ustrip(sqrt(eV), sqrt(cbins[i])), ustrip(sqrt(eV), sqrt(cbins[i+1])))) * sqrt(eV) * Å^2
+        for i in 1:(length(total_freq) - 1)
+            total_freq[i] = -Optim.minimum(optimize(inv_total, ustrip(sqrt(eV), sqrt(cbins[i])), ustrip(sqrt(eV), sqrt(cbins[i + 1])))) * sqrt(eV) * Å^2
         end
         total_freq[end] = -Optim.minimum(optimize(inv_total, ustrip(sqrt(eV), sqrt(cbins[end])), ustrip(sqrt(eV), sqrt(cbins[end] + en_spacing)))) * sqrt(eV) * Å^2
     end
@@ -140,7 +140,7 @@ end
 # TODO: Combine these into one function per model
 
 function buildRBins(type::SWARM, model, n0::UniformDensity)
-    return LinRange(0m, 1e-6m, 10)
+    return LinRange(0m, 1.0e-6m, 10)
 end
 
 function buildEnBins(type::SWARM, model)
@@ -160,11 +160,11 @@ function buildZBins(type::SWARM, model)
 end
 
 function buildYBins(type::SWARM, model)
-    return LinRange(-7e-7, 7e-7, 200) .* m
+    return LinRange(-7.0e-7, 7.0e-7, 200) .* m
 end
 
 function buildXBins(type::SWARM, model)
-    return LinRange(-7e-7, 7e-7, 200) .* m
+    return LinRange(-7.0e-7, 7.0e-7, 200) .* m
 end
 
 function buildRBins(type::CELL, model, n0)
@@ -180,7 +180,7 @@ end
 
 function buildTBins(type::CELL, model)
     # return LinRange(0s,type.t_f,10000)
-    return [-Inf * s, (0s:1e-9s:type.t_f)...]
+    return [-Inf * s, (0s:1.0e-9s:type.t_f)...]
 end
 
 function buildχBins(type::CELL, model)
@@ -209,11 +209,11 @@ function buildRBins(type::LμJ, model, n0::LμJDensityGradient)
 end
 
 function buildEnBins(type::LμJ, model)
-    return collect(model.type.thresh:0.3eV:(model.v_0.ε+4*model.v_0.Δε_source))
+    return collect(model.type.thresh:0.3eV:(model.v_0.ε + 4 * model.v_0.Δε_source))
 end
 
 function buildTBins(type::LμJ, model)
-    return LinRange(3e-13, 320e-13, 10) .* s
+    return LinRange(3.0e-13, 320.0e-13, 10) .* s
 end
 
 function buildχBins(type::LμJ, model)
@@ -225,39 +225,39 @@ function buildZBins(type::LμJ, model)
 end
 
 function buildYBins(type::LμJ, model)
-    return LinRange(-7e-7, 7e-7, 200) .* m
+    return LinRange(-7.0e-7, 7.0e-7, 200) .* m
 end
 
 function buildXBins(type::LμJ, model)
-    return LinRange(-7e-7, 7e-7, 200) .* m
+    return LinRange(-7.0e-7, 7.0e-7, 200) .* m
 end
 
 #### Density ####
 
 function buildDensity(n0::UniformDensity, rbins, zbins)
-    n0.val
+    return n0.val
 end
 
 function buildDensity(n0::LμJDensityGradient, rbins, zbins)
-    n0.func.(sqrt.(rbins))
+    return n0.func.(sqrt.(rbins))
 end
 
 function buildDensity(n0::LμJDensity, rbins, zbins)
-    [n0.val, n0.background, 0.0 * m^-3]
+    return [n0.val, n0.background, 0.0 * m^-3]
 end
 
 function buildDensity(n0::CellDensity, rbins, zbins)
-    n0.val .* ones(length(zbins))
+    return n0.val .* ones(length(zbins))
 end
 
 #### Electric Field ####
 
 function buildField(En0::UniformField)
-    SVector(0.0 * m^4 * s^-2, 0.0 * m^4 * s^-2, upreferred((q * En0.val / me)))
+    return SVector(0.0 * m^4 * s^-2, 0.0 * m^4 * s^-2, upreferred((q * En0.val / me)))
 end
 
 function buildField(En0::ZeroField)
-    SVector(0.0 * m^4 / s^-2, 0.0 * m^4 / s^-2, 0.0 * m^4 / s^-2)
+    return SVector(0.0 * m^4 / s^-2, 0.0 * m^4 / s^-2, 0.0 * m^4 / s^-2)
 end
 
 
@@ -267,8 +267,8 @@ function PART(model, params)
 
     particle = PART()
     particle.type = model.particle_type
-    particle.r = upreferred.(initPartr(model.r_0, params))#.*params.length_scale
-    particle.v = upreferred.(initPartv(model.v_0, params))#.*params.length_scale ./params.time_scale
+    particle.r = upreferred.(initPartr(model.r_0, params)) #.*params.length_scale
+    particle.v = upreferred.(initPartv(model.v_0, params)) #.*params.length_scale ./params.time_scale
     particle.t = upreferred.(initPartt(model.t_0, params))
     particle.cbin = findMinInd(params.cbins, getEnergy(particle.v))
     if params.ebins != nothing
@@ -300,23 +300,22 @@ function PART(model, params)
 end
 
 
-
 function initPartr(r_0::ZeroSpatial, params)
-    r = SArray{Tuple{3},Float64,1,3}(0.0, 0.0, 0.0)
+    r = SArray{Tuple{3}, Float64, 1, 3}(0.0, 0.0, 0.0)
     return r * m
 end
 function initPartr(r_0::InitSpatial, params)
-    r = r_0.axis .* r_0.val
+    return r = r_0.axis .* r_0.val
 end
 function initPartr(r_0::FunctionalSpatial, params)
-    r_0.getAxis() .* r_0.getPosition(rand())
+    return r_0.getAxis() .* r_0.getPosition(rand())
 end
 function initPartr(r_0::GaussianLμJSpatial, params)
     # SD = r_0.Δy_source/(2*sqrt(2*log(2)))
 
     return r_0.Δy_source / (2 * sqrt(2 * log(2))) * randn() .* r_0.gaussian_axis .+ r_0.val .* r_0.axis
     # val = Inf*m .* r_0.gaussian_axis .+ r_0.val .* r_0.axis
-    # while -7.5μm > val[2] || val[2] > 7.5μm 
+    # while -7.5μm > val[2] || val[2] > 7.5μm
     #     R=randn()
     #     # while val < -SD*R
     #         # R=randn()
@@ -327,7 +326,7 @@ function initPartr(r_0::GaussianLμJSpatial, params)
 end
 
 function initPartt(t_0::InitTemporal, params)
-    t_0.val
+    return t_0.val
 end
 
 function initPartt(t_0::GaussianTemporal, params)
@@ -340,7 +339,7 @@ function initPartt(t_0::GaussianTemporal, params)
 end
 
 function initPartv(v_0::ZeroVelocity, params)
-    r = SArray{Tuple{3},Float64,1,3}(0.0, 0.0, 0.0)
+    r = SArray{Tuple{3}, Float64, 1, 3}(0.0, 0.0, 0.0)
     return r * m / s
 end
 
@@ -361,7 +360,7 @@ function initPartv(v_0::GaussianDirectionVelocity, params)
     sinchi = sqrt(1 - coschi^2)
     phi = rand() * 2 * pi
 
-    sqrt(v_0.ε / electron_v2eV) * SArray{Tuple{3},Float64,1,3}(cos(phi) * sinchi, sin(phi) * sinchi, coschi)
+    return sqrt(v_0.ε / electron_v2eV) * SArray{Tuple{3}, Float64, 1, 3}(cos(phi) * sinchi, sin(phi) * sinchi, coschi)
 end
 
 
@@ -377,6 +376,5 @@ function initPartv(v_0::GaussianEnergyVelocity, params)
     end
     new_ea = ea + SD * R
 
-    sqrt.(new_ea / electron_v2eV) * v_0.axis
+    return sqrt.(new_ea / electron_v2eV) * v_0.axis
 end
-
