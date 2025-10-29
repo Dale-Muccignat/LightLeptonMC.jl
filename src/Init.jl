@@ -5,25 +5,25 @@ function initParams(input_gas=MaxwellModel(), model::MCMODEL=MCMODEL())
 
     tbins, ebins, rbins, χbins, zbins, ybins, xbins = generateBins(model)
     n0 = buildDensity(model.n0, rbins, zbins)
-    a = buildField(model.En0)
+    a = buildField(model.En0, rbins, zbins)
 
     total_freq = upreferred.(buildFreq(input_gas, cbins, model))
     dcs = [buildDCS(g, cbins) for (g, _, _) in input_gas]
 
     params = MCPARAMS(
-        ebins=uconvert.(J̃, ebins),
-        tbins=upreferred.(tbins),
-        zbins=upreferred.(zbins),
-        ybins=upreferred.(ybins),
-        xbins=upreferred.(xbins),
-        cbins=uconvert.(J̃, cbins),
-        rbins=upreferred.(rbins),
-        χbins=upreferred.(χbins),
-        gas=input_gas,
-        n0=upreferred.(n0),
-        a=upreferred.(a),
-        total_freq=total_freq,
-        DCS=dcs,
+        ebins = uconvert.(J̃, ebins),
+        tbins = upreferred.(tbins),
+        zbins = upreferred.(zbins),
+        ybins = upreferred.(ybins),
+        xbins = upreferred.(xbins),
+        cbins = uconvert.(J̃, cbins),
+        rbins = upreferred.(rbins),
+        χbins = upreferred.(χbins),
+        gas = input_gas,
+        n0 = upreferred.(n0),
+        a = a,
+        total_freq = total_freq,
+        DCS = dcs,
     )
 
     return params
@@ -156,7 +156,7 @@ function buildχBins(type::SWARM, model)
 end
 
 function buildZBins(type::SWARM, model)
-    return LinRange(-10mm, 10mm, 200)
+    return LinRange(0mm, 100mm, 100)
 end
 
 function buildYBins(type::SWARM, model)
@@ -252,12 +252,16 @@ end
 
 #### Electric Field ####
 
-function buildField(En0::UniformField)
-    SVector(0.0 * m^4 * s^-2, 0.0 * m^4 * s^-2, upreferred((q * En0.val / me)))
+function buildField(En0::CellField, rbins, zbins)
+    return [z < En0.z ? SVector(0.0 * m^4 * s^-2, 0.0 * m^4 * s^-2, upreferred((q * En0.val / me))) : SVector(0.0 * m^4 * s^-2, 0.0 * m^4 * s^-2, upreferred((q * En0.background / me))) for z in zbins]
 end
 
-function buildField(En0::ZeroField)
-    SVector(0.0 * m^4 / s^-2, 0.0 * m^4 / s^-2, 0.0 * m^4 / s^-2)
+function buildField(En0::UniformField, rbins, zbins)
+    return SVector(0.0 * m^4 * s^-2, 0.0 * m^4 * s^-2, upreferred((q * En0.val / me)))
+end
+
+function buildField(En0::ZeroField, rbins, zbins)
+    return SVector(0.0 * m^4 / s^-2, 0.0 * m^4 / s^-2, 0.0 * m^4 / s^-2)
 end
 
 

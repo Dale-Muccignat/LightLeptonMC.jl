@@ -4,7 +4,7 @@
 
 function flight(particle_og::PART, model, params)
     #' @debug "Conducting flight..."
-    :f in model.meas && (params.a[1] > 0m^4 / s^2 || params.a[2] > 0m^4 / s^2) && @warn "Measuring flux with x or y field, third order will be wrong."
+    #= :f in model.meas && (params.a[1] > 0m^4 / s^2 || params.a[2] > 0m^4 / s^2) && @warn "Measuring flux with x or y field, third order will be wrong." =#
     meas_inner = initMeas(model, params)
     # Preallocate arrays
     #= dts = Array{dt_EVENT,1}(undef, 7) =#
@@ -61,7 +61,7 @@ end
 
 function flight(particle_og::Vector{<:PART}, model, params)
     #' @debug "Conducting flight..."
-    :f in model.meas && (params.a[1] > 0m^4 / s^2 || params.a[2] > 0m^4 / s^2) && @warn "Measuring flux with x or y field, third order will be wrong."
+    #= :f in model.meas && (params.a[1] > 0m^4 / s^2 || params.a[2] > 0m^4 / s^2) && @warn "Measuring flux with x or y field, third order will be wrong." =#
     meas_inner = initMeas(model, params)
     # Preallocate arrays
     #= dts = Array{dt_EVENT,1}(undef, 7) =#
@@ -124,7 +124,7 @@ end
 
 function flightGetParticles(particle_og::Vector{PART}, model, params; coll_limit=Inf, t_limit=Inf * s)
     #' @debug "Conducting flight..."
-    :f in model.meas && (params.a[1] > 0m^4 / s^2 || params.a[2] > 0m^4 / s^2) && @warn "Measuring flux with x or y field, third order will be wrong."
+    #= :f in model.meas && (params.a[1] > 0m^4 / s^2 || params.a[2] > 0m^4 / s^2) && @warn "Measuring flux with x or y field, third order will be wrong." =#
     meas_inner = initMeas(model, params)
     # Preallocate arrays
     #= dts = Array{dt_EVENT,1}(undef, 7) =#
@@ -179,7 +179,7 @@ end
 
 function flightGetParticles(particle_og::PART, model, params; coll_limit=Inf, t_limit=Inf * s)
     #' @debug "Conducting flight..."
-    :f in model.meas && (params.a[1] > 0m^4 / s^2 || params.a[2] > 0m^4 / s^2) && @warn "Measuring flux with x or y field, third order will be wrong."
+    #= :f in model.meas && (params.a[1] > 0m^4 / s^2 || params.a[2] > 0m^4 / s^2) && @warn "Measuring flux with x or y field, third order will be wrong." =#
     meas_inner = initMeas(model, params)
     # Preallocate arrays
     #= dts = Array{dt_EVENT,1}(undef, 7) =#
@@ -370,7 +370,7 @@ end
 
 @fastmath function measureCumulative!(dt, particle, En0, n0, model, params, meas_inner)
     # e_bin += particle.weight * 0.5*consts.me*(dot(particle.v,particle.v)+2*sum(particle.v.*vars.a)*dt+dot(vars.a,vars.a)*dt^2)*dt
-    a = params.a * params.n0
+    a = getAcceleration(particle, En0, params) * params.n0
     r = particle.r
     v = particle.v
     tbin = particle.tbin
@@ -511,9 +511,9 @@ function event!(dt, particle, model, params, meas_inner, new_particles)
     end
 end
 
-@fastmath function updateParticle!(dt, particle, En0::UniformField, n0::UniformDensity, model, params, meas_inner)
-    particle.r += (particle.v + 0.5 * params.a * params.n0 * dt) * dt
-    particle.v += params.a * params.n0 * dt
+@fastmath function updateParticle!(dt, particle, En0::T, n0::UniformDensity, model, params, meas_inner) where {T <: ConfigField}
+    particle.r += (particle.v + 0.5 * getAcceleration(particle, En0, params) * params.n0 * dt) * dt
+    particle.v += getAcceleration(particle, En0, params) * params.n0 * dt
     particle.t += dt
 end
 
@@ -521,6 +521,7 @@ end
     particle.r += particle.v * dt
     particle.t += dt
 end
+
 #### * TBins Measurements
 function eventTbin!(dt, particle, model, params, meas_inner)
     #' @debug "TBin Up: #$(particle.zbin) $(dt.time)"

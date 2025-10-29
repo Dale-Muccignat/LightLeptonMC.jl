@@ -25,6 +25,9 @@ function getDt(particle, model, params)
             getYDt(particle, model, params),
             getXDt(particle, model, params)
         )
+        #= if getAcceleration(particle, model.En0, params) == zero(getAcceleration(particle, model.En0, params)) =#
+        #=     Main.@infiltrate =#
+        #= end =#
 
         for dt in candidates
             if dt.time < min_dt.time
@@ -36,7 +39,8 @@ function getDt(particle, model, params)
     return min_dt
 end
 
-function getEnDt(En0::UniformField, n0::UniformDensity, particle, model, params)
+function getEnDt(En0::T, n0::UniformDensity, particle, model, params) where {T <: ConfigField}
+    a = getAcceleration(particle, En0, params)[3] * params.n0
     if params.cbins != nothing
         v_perp = particle.v[1]^2 + particle.v[2]^2 #Seperate out of the vz velocity
         if (particle.v[3] < 0m / s) && (((params.cbins[particle.cbin]) / electron_v2eV - v_perp) > 0 * (m / s)^2) && (particle.cbin != 1)
@@ -45,14 +49,14 @@ function getEnDt(En0::UniformField, n0::UniformDensity, particle, model, params)
             #The second condition is to ensure that the energy can go down considering the perpindicular velocity... or something along those lines. It just makes sure the squareroot doesn't return an imaginary number
             vf_z = sqrt((params.cbins[particle.cbin]) / electron_v2eV - v_perp)
             # vf_z is the velocity the particle will need to reach the lower boundry of the energy bin
-            return dt_EVENT(-(particle.v[3] + vf_z) / (params.a[3] * params.n0), :dt_energy, :Down)
+            return dt_EVENT(-(particle.v[3] + vf_z) / a, :dt_energy, :Down)
             #Just finding the time until the particles velocity reaches vf_z
         else#if (particle.cbin_no < length(vars.cbins))
             # here the vz is positive, and also making sure we aren't at the max bin value
             #Don't need to check the second  condition above as the particle can only increase in energy
             vf_z = sqrt((params.cbins[particle.cbin+1]) / electron_v2eV - v_perp)
             #same as before except with the lower boundry of the next bin up
-            return dt_EVENT(-(particle.v[3] - vf_z) / (params.a[3] * params.n0), :dt_energy, :Up)
+            return dt_EVENT(-(particle.v[3] - vf_z) / a, :dt_energy, :Up)
         end
     end
     return dt_EVENT(Inf * s, :dt_energy, :Up)
@@ -193,58 +197,49 @@ function getCDt(particle, model, params)
     dt_EVENT(randexp() / (getTotalFreq(particle, model, params) / sqrt(electron_v2eV) * getDensity(particle, model.n0, params)), :dt_collision, :Up)
 end
 
-function getZDt(field::ZeroField, particle, model, params)
+function getZDt(field::T, particle, model, params) where {T <: ConfigField}
+    accel = getAcceleration(particle, field, params)[3] * params.n0
     if params.zbins != nothing
-        if model.optimise_spatial == true
-            if (particle.v[3] < 0m̃ / s̃) && (particle.zbin != 0)
-                return dt_EVENT((params.zbins[1] - particle.r[3]) / particle.v[3], :dt_zbin, :Down)
-            elseif (particle.zbin < length(params.zbins)) && (particle.v[3] > 0m / s)
-                return dt_EVENT((params.zbins[end] + 1e-12m̃ - particle.r[3]) / particle.v[3], :dt_zbin, :Up)
-            end
-        else
+        if accel == zero(accel)
             if (particle.v[3] < 0m̃ / s̃) && (particle.zbin != 0)
                 return dt_EVENT((params.zbins[particle.zbin] - 1e-12m̃ - particle.r[3]) / particle.v[3], :dt_zbin, :Down)
             elseif (particle.zbin < length(params.zbins)) && (particle.v[3] > 0m / s)
                 return dt_EVENT((params.zbins[particle.zbin+1] + 1e-12m̃ - particle.r[3]) / particle.v[3], :dt_zbin, :Up)
             end
         end
-    end
-    return dt_EVENT(Inf * s, :dt_zbin, :Up)
-end
-
-function getZDt(field::UniformField, particle, model, params)
-    if params.zbins != nothing
         # if (particle.v[3] < 0m/s) && (( (particle.v[3]^2)/(params.a[3]*params.n0) + 2*params.zbins[particle.zbin]-2e-10m ) > 2*particle.r[3]) && (particle.zbin != 0)
-        if (particle.v[3] < 0m / s) && ((particle.v[3])^2 - 2 * (params.a[3] * params.n0) * (particle.r[3] - params.zbins[particle.zbin] + 1e-12m̃) > 0m^2 / s^2) && (particle.zbin != 0)
-            # return dt_EVENT((- particle.v[3] - sqrt( (particle.v[3])^2 - 2*(params.a[3]*params.n0)*(particle.r[3]-params.zbins[particle.zbin]+1e-11m) ))/(params.a[3]*params.n0), :dt_zbin,:Down)
-            a = (-particle.v[3] - sqrt((particle.v[3])^2 - 2 * (params.a[3] * params.n0) * (particle.r[3] - params.zbins[particle.zbin] + 1e-12m̃))) / (params.a[3] * params.n0)
-            b = (-particle.v[3] + sqrt((particle.v[3])^2 - 2 * (params.a[3] * params.n0) * (particle.r[3] - params.zbins[particle.zbin] + 1e-12m̃))) / (params.a[3] * params.n0)
+        if (particle.v[3] < 0m / s) && ((particle.v[3])^2 - 2 * accel * (particle.r[3] - params.zbins[particle.zbin] + 1.0e-12m̃) > 0m^2 / s^2) && (particle.zbin != 0)
+            # return dt_EVENT((- particle.v[3] - sqrt( (particle.v[3])^2 - 2*(a*params.n0)*(particle.r[3]-params.zbins[particle.zbin]+1e-11m) ))/(a*params.n0), :dt_zbin,:Down)
+            a = (-particle.v[3] - sqrt((particle.v[3])^2 - 2 * accel * (particle.r[3] - params.zbins[particle.zbin] + 1.0e-12m̃))) / accel
+            b = (-particle.v[3] + sqrt((particle.v[3])^2 - 2 * accel * (particle.r[3] - params.zbins[particle.zbin] + 1.0e-12m̃))) / accel
             b > 0s && b < a && error("Zbin calculation error down: a=$(a), b=$(b)")
-            # if particle.v[3]^2 - 2*(params.a[3]*params.n0)*(particle.r[3]-params.zbins[particle.zbin+1]-1e-14m̃ ) > 0m̃^2/s̃^2
-            #     c = (- particle.v[3] + sqrt( particle.v[3]^2 - 2*(params.a[3]*params.n0)*(particle.r[3]-params.zbins[particle.zbin+1]-1e-14m̃ ) ))/(params.a[3]*params.n0)
-            #     d = (- particle.v[3] - sqrt( particle.v[3]^2 - 2*(params.a[3]*params.n0)*(particle.r[3]-params.zbins[particle.zbin+1]-1e-14m̃ ) ))/(params.a[3]*params.n0)
+            # if particle.v[3]^2 - 2*(a*params.n0)*(particle.r[3]-params.zbins[particle.zbin+1]-1e-14m̃ ) > 0m̃^2/s̃^2
+            #     c = (- particle.v[3] + sqrt( particle.v[3]^2 - 2*(a*params.n0)*(particle.r[3]-params.zbins[particle.zbin+1]-1e-14m̃ ) ))/(a*params.n0)
+            #     d = (- particle.v[3] - sqrt( particle.v[3]^2 - 2*(a*params.n0)*(particle.r[3]-params.zbins[particle.zbin+1]-1e-14m̃ ) ))/(a*params.n0)
             #     (c > 0s && c < a) || (d > 0s && d < a) && error("Zbin calculation error down: a=$(a), b=$(b), c=$(c), d=$(d)")
             # end
             return dt_EVENT(a, :dt_zbin, :Down)
         elseif (particle.zbin < length(params.zbins))
             # @debug particle.r[3] particle.v[3] params.zbins[particle.zbin:(particle.zbin+1)]
-            # return dt_EVENT((- particle.v[3] + sqrt( particle.v[3]^2 - 2*(params.a[3]*params.n0)*(particle.r[3]-params.zbins[particle.zbin+1]-1e-10m) ))/(params.a[3]*params.n0), :dt_zbin, :Up)
-            if (particle.v[3]^2 - 2 * (params.a[3] * params.n0) * (particle.r[3] - params.zbins[particle.zbin+1])) < 0m^2 / s^2
+            # return dt_EVENT((- particle.v[3] + sqrt( particle.v[3]^2 - 2*(a*params.n0)*(particle.r[3]-params.zbins[particle.zbin+1]-1e-10m) ))/(a*params.n0), :dt_zbin, :Up)
+            if (particle.v[3]^2 - 2 * (accel) * (particle.r[3] - params.zbins[particle.zbin + 1])) < 0m^2 / s^2
                 @info debugParticle("Zbin error", particle)
                 @info params.zbins[particle.zbin]
                 @info params.zbins[particle.zbin+1]
             end
-            a = (-particle.v[3] + sqrt(particle.v[3]^2 - 2 * (params.a[3] * params.n0) * (particle.r[3] - params.zbins[particle.zbin+1] - 1e-12m̃))) / (params.a[3] * params.n0)
-            b = (-particle.v[3] - sqrt(particle.v[3]^2 - 2 * (params.a[3] * params.n0) * (particle.r[3] - params.zbins[particle.zbin+1] - 1e-12m̃))) / (params.a[3] * params.n0)
+            a = (-particle.v[3] + sqrt(particle.v[3]^2 - 2 * accel * (particle.r[3] - params.zbins[particle.zbin + 1] - 1.0e-12m̃))) / accel
+            b = (-particle.v[3] - sqrt(particle.v[3]^2 - 2 * accel * (particle.r[3] - params.zbins[particle.zbin + 1] - 1.0e-12m̃))) / accel
             b > 0s && b < a && error("Zbin calculation error up: a=$(a), b=$(b)")
-            if (particle.v[3])^2 - 2 * (params.a[3] * params.n0) * (particle.r[3] - params.zbins[particle.zbin] + 1e-11m̃) > 0m̃^2 / s̃^2
-                c = (-particle.v[3] - sqrt((particle.v[3])^2 - 2 * (params.a[3] * params.n0) * (particle.r[3] - params.zbins[particle.zbin] + 1e-12m̃))) / (params.a[3] * params.n0)
-                d = (-particle.v[3] + sqrt((particle.v[3])^2 - 2 * (params.a[3] * params.n0) * (particle.r[3] - params.zbins[particle.zbin] + 1e-12m̃))) / (params.a[3] * params.n0)
-                (c > 0s && c < a) || (d > 0s && d < a) && error(""" Zbin calculation error up: a=$(a), b=$(b), c=$(c), d=$(d)
-                                                                $(debugParticle("Zbin error",particle))
-                                                                $(params.zbins[particle.zbin])
-                                                                $(params.zbins[particle.zbin+1])
-                                                                """)
+            if (particle.v[3])^2 - 2 * accel * (particle.r[3] - params.zbins[particle.zbin] + 1.0e-11m̃) > 0m̃^2 / s̃^2
+                c = (-particle.v[3] - sqrt((particle.v[3])^2 - 2 * accel * (particle.r[3] - params.zbins[particle.zbin] + 1.0e-12m̃))) / accel
+                d = (-particle.v[3] + sqrt((particle.v[3])^2 - 2 * accel * (particle.r[3] - params.zbins[particle.zbin] + 1.0e-12m̃))) / accel
+                (c > 0s && c < a) || (d > 0s && d < a) && error(
+                    """ Zbin calculation error up: a=$(a), b=$(b), c=$(c), d=$(d)
+                    $(debugParticle("Zbin error", particle))
+                    $(params.zbins[particle.zbin])
+                    $(params.zbins[particle.zbin + 1])
+                    """
+                )
             end
             return dt_EVENT(a, :dt_zbin, :Up)
         end

@@ -128,6 +128,11 @@ end
 @AutoParm struct ZeroField <: ConfigField
     val::AUTO = 0.0 * Td
 end
+@AutoParm struct CellField <: ConfigField
+    val::AUTO = 1.0 * Td
+    background::AUTO = 0.0 * Td
+    z::AUTO = 1.0e-5m
+end
 @AutoParm struct UniformField <: ConfigField
     val::AUTO = 1.0 * Td
 end

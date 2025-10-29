@@ -2,6 +2,14 @@ function getTotalFreq(particle, model, params)
     params.total_freq[particle.cbin]
 end
 
+function getAcceleration(particle, En0::CellField, params)
+    return params.a[particle.zbin]
+end
+
+function getAcceleration(particle, En0::UniformField, params)
+    return params.a
+end
+
 function getDensity(particle, n0::UniformDensity, params)
     params.n0
 end
