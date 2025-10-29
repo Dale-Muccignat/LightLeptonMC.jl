@@ -318,6 +318,27 @@ end
     sol = LightLeptonMC.mc(PY(), swarmData, N = 500_000, t = 2.0e-7s)
     compareSwarm(swarmData, sol)
 end
+
+@testset "Casey Super-elastic Model" begin
+    # Reference Muccignat honours thesis 2018
+    swarmData = DataFrame(
+        x = [[1Td]],
+        T = 293.0K,
+        P = 0.0kPa,
+        types = [[:ε, :W, :nDL]],
+        ys = [
+            [
+                [0.994 * eV],
+                [2600 * m / s],
+                [0.68e24 / s / m],
+            ],
+        ]
+    )
+
+    sol = LightLeptonMC.mc(SuperModel(), swarmData, N = 100_000, t = 2.0e-7s)
+    compareSwarm(swarmData, sol)
+end
+
 #' N = 100000
 #' tol = 0.01
 #' function withinTol(y, ŷ, tol=0.05)
