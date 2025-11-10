@@ -418,7 +418,7 @@ function MEAS(type::SWARM, model, params::MCPARAMS = MCPARAMS())
 end
 
 function MEAS(type::LμJ, model, params::MCPARAMS = MCPARAMS())
-    return MEAS(MEASLμJ(model, params), MEASCELL(), MEASG(), MEAST(), MEASS(), MEASC())
+    return MEAS(MEASLμJ(model, params), MEASCELL(), MEASG(model, params), MEAST(), MEASS(), MEASC())
 end
 
 function MEAS(type::CELL, model, params::MCPARAMS = MCPARAMS())
