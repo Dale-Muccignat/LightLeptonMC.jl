@@ -81,10 +81,10 @@ function flight(particle_og::Vector{<:PART}, model, params)
         particle_no += 1
         particle_inner = new_particles[1]
         particle_no % 200000 == 0 && @info "Particles Done: $(particle_no)"
-        if length(new_particles) / og_num * model.n > 1000000000
-            @info "Alot of ionisation events, consider stopping..."
-            #= throw("Too many ionisation events") =#
-        end
+        #= if length(new_particles) / og_num * model.n > 1000000000 =#
+        #=     @info "Alot of ionisation events, consider stopping..." =#
+        #=     #= throw("Too many ionisation events") =# =#
+        #= end =#
         #= event_number = 0 =#
         #= particle_states = fill(deepcopy(particle_inner), 3) =#
         #= dts_states = fill(fill(dt_EVENT(1.0 * s̃, :before, :before), 7), 3) =#
