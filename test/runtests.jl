@@ -335,7 +335,7 @@ end
         ]
     )
 
-    sol = LightLeptonMC.mc(SuperModel(), swarmData, N = 100_000, t = 2.0e-7s)
+    sol = LightLeptonMC.mc(SuperModel(), swarmData, N = 100_000, t = 2.0e-5s)
     compareSwarm(swarmData, sol)
 end
 
