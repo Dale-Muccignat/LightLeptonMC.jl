@@ -139,7 +139,7 @@ function checkAlive(type, particle, model, meas_inner, params)
     if params.tbins |> !isempty
         alive = alive && particle.t < model.type.t_f #*params.time_scale
         alive || @debug "Particle timed out"
-        # alive = alive && sum(meas_inner.measg.coll_count) < 5
+        #= alive = alive && sum(meas_inner.measg.coll_count) < 1 =#
     end
 
     return alive && checkAliveModel(type, particle, model, meas_inner, params)
@@ -319,6 +319,32 @@ function measureDeath!(type::LμJ, particle, model, params, meas_inner)
                 inds_angle = findMinInd(params.χbins, angle_position - type.Δχ_detector / 2):findMinInd(params.χbins, angle_position + type.Δχ_detector / 2)
                 meas_inner.measLμJ.εχ[inds, inds_angle] .+= particle.weight
                 @debug "rejected"
+            end
+        elseif :εχ_coll in model.meas
+            angle_position = abs(atan(°, particle.r[2], particle.r[3]))
+            angle_velocity = abs(atan(°, particle.v[2], particle.v[3]))
+            height_position = abs(particle.r[1])
+            @debug """
+            Velocity angle:  $(abs(atan(°, particle.v[2], particle.v[3])))
+            Spatial angle:  $(abs(atan(°, particle.r[2], particle.r[3])))
+            Velocity angle:  $(atan(°, particle.v[2], particle.v[3]))
+            Spatial angle:  $(atan(°, particle.r[2], particle.r[3]))
+            height: $(height_position)
+            """
+            if abs(angle_position - angle_velocity) < type.Δχ_detector #&& height_position < 5mm
+                # TODO: Add detection at +- 1eV
+                inds = findMinInd(params.ebins, getEnergy(particle.v) - type.Δε_detector):findMinInd(params.ebins, getEnergy(particle.v) + type.Δε_detector)
+                inds_angle = findMinInd(params.χbins, angle_position - type.Δχ_detector / 2):findMinInd(params.χbins, angle_position + type.Δχ_detector / 2)
+                @debug "accepted - $(inds) $(inds_angle)"
+            else
+                inds = findMinInd(params.ebins, getEnergy(particle.v) - type.Δε_detector / 2):findMinInd(params.ebins, getEnergy(particle.v) + type.Δε_detector / 2)
+                inds_angle = findMinInd(params.χbins, angle_position - type.Δχ_detector / 2):findMinInd(params.χbins, angle_position + type.Δχ_detector / 2)
+                @debug "rejected"
+            end
+            if sum(meas_inner.measg.coll_count) == 1
+                meas_inner.measLμJ.εχ[1][inds, inds_angle] .+= particle.weight
+            else
+                meas_inner.measLμJ.εχ[2][inds, inds_angle] .+= particle.weight
             end
         end
 
