@@ -10,9 +10,10 @@ meas, swarm, params = mc(MaxwellModel();E=1.,T=0.,N=1000,S=0.,verbose=false)
 For more information, type ?mc
 """
 module LightLeptonMC
-#TODO: Add super-eleastic, liquid
+#TODO: Add liquid
 #TODO: Add Potential
 #TODO: Add Density Gradient (this is probably best solved through Danny's code though)
+#TODO: Reform struct system into a generic Detector/Object system
 
 using LightLeptonTools
 using Distributed, Statistics, Unitful, Optim, AutoParameters, StaticArrays, LinearAlgebra, Random, Measurements, SparseArrays, QuadGK, Interpolations
