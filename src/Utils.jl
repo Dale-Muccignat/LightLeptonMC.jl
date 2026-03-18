@@ -1,38 +1,38 @@
 function getTotalFreq(particle, model, params)
-    params.total_freq[particle.cbin]
+    return params.total_freq[particle.cbin]
 end
 
 function getDensity(particle, n0::UniformDensity, params)
-    params.n0
+    return params.n0
 end
 
 function getDensity(particle, n0::LμJDensity, params)
-    params.n0[particle.rbin]
+    return params.n0[particle.rbin]
 end
 
 function getDensity(particle, n0::LμJDensityGradient, params)
-    params.n0[particle.rbin]
+    return params.n0[particle.rbin]
 end
 
 function getDensity(particle, n0::CellDensity, params)
-    params.n0[particle.zbin]
+    return params.n0[particle.zbin]
 end
 
 function debugParticle(header, particle)
-    """
+    return """
     Particle $header: 
-    ε: $(uconvert(eV,getEnergy(particle.v)))
+    ε: $(uconvert(eV, getEnergy(particle.v)))
     t: $(particle.t)
     pos: x=$(particle.r[1]) y=$(particle.r[2]) z=$(particle.r[3]) 
     vel: x=$(particle.v[1]) y=$(particle.v[2]) z=$(particle.v[3]) 
-    rad: $(sqrt(particle.r[2]^2+particle.r[3]^2))
+    rad: $(sqrt(particle.r[2]^2 + particle.r[3]^2))
     weight: $(particle.weight) alive: $(particle.alive)
     bin: t=$(particle.tbin) | c=$(particle.cbin) | e=$(particle.ebin) | z=$(particle.zbin) 
     """
 end
 
 function debugDts(dts)
-    """ time of flights
+    return """ time of flights
     CS Bin: $(dts[1].time)
     En Bin: $(dts[2].time)
     T  Bin: $(dts[3].time)
@@ -44,11 +44,11 @@ function debugDts(dts)
 end
 
 function getEnergy(v)
-    0.5 * me * dot(v, v)
+    return 0.5 * me * dot(v, v)
 end
 
 function getVelocity(ε)
-    sqrt(ε * 2 / me)
+    return sqrt(ε * 2 / me)
 end
 
 
@@ -149,5 +149,5 @@ end
     push!(expr.args, :(contents = $(contents_expr)))
     push!(expr.args, :(obj = T(contents...)))
 
-    expr
+    return expr
 end

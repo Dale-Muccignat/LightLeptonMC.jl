@@ -10,9 +10,10 @@ meas, swarm, params = mc(MaxwellModel();E=1.,T=0.,N=1000,S=0.,verbose=false)
 For more information, type ?mc
 """
 module LightLeptonMC
-#TODO: Add super-eleastic, liquid
+#TODO: Add liquid
 #TODO: Add Potential
 #TODO: Add Density Gradient (this is probably best solved through Danny's code though)
+#TODO: Reform struct system into a generic Detector/Object system
 
 using LightLeptonTools
 using Distributed, Statistics, Unitful, Optim, AutoParameters, StaticArrays, LinearAlgebra, Random, Measurements, SparseArrays, QuadGK, Interpolations
@@ -21,7 +22,7 @@ using DataFramesMeta, DataFrames
 Unitful.register(@__MODULE__)
 function __init__()
     Unitful.register(@__MODULE__)
-    Unitful.preferunits(m̃, s̃)
+    return Unitful.preferunits(m̃, s̃)
 end
 
 const electron_v2eV = 0.5 * me
@@ -53,7 +54,7 @@ macro jld2save(filename, vars...)
         :($JLD2.write(f, $(string(var)), $(esc(var)), wsession))
     end
 
-    quote
+    return quote
         if !isdefined(@__MODULE__, :JLD2)
             error("Need to have the JLD2 module included for this to work.")
         end
@@ -75,33 +76,34 @@ function mc(gas::LLCS, prepared_swarm_data::DataFrame; kwargs...)
 end
 
 @doc "For a given  row, this function takes the output of prepareSwarmData and duplicates it for a given gas"
-function mirrorSwarmDataRow(gas::LLCS,
-                            Es::Vector{<:ReducedVoltage},
-                            T::Temperature,
-                            P::Union{Missing,Pressure},
-                            types::Vector{Symbol};
-                            kwargs...
-                            )
+function mirrorSwarmDataRow(
+        gas::LLCS,
+        Es::Vector{<:ReducedVoltage},
+        T::Temperature,
+        P::Union{Missing, Pressure},
+        types::Vector{Symbol};
+        kwargs...
+    )
     #TODO: Better Convergence handling...
     sols = [
         mc(gas; P, T, E, kwargs...)[2]
-        for E in Es
+            for E in Es
     ]
-    [[t == :ε ? s.ε : t == :W ? s.bW : t == :WF ? s.fW : t == :nDLF ? s.fDl : t == :nDTF ? s.fDt : t == :nDL ? s.bDl : t == :Keff ? s.R : t == :nDT ? s.bDt : error("$(t) not implemented") for s in sols] for t in types]
+    return [[t == :ε ? s.ε : t == :W ? s.bW : t == :WF ? s.fW : t == :nDLF ? s.fDl : t == :nDTF ? s.fDt : t == :nDL ? s.bDl : t == :Keff ? s.R : t == :nDT ? s.bDt : error("$(t) not implemented") for s in sols] for t in types]
     #TODO: rename these so that it's a 1:1 conversion to FVB
 end
 
-function mc(gas::LLCS; P::Pressure=0kPa, S::Energy=0.01eV, E::ReducedVoltage=1.0Td, T::Temperature=0.0K, N=1000, t::Time=Inf * s, meas=[:t], ion_type=UniformIonisation(:EXPLICIT), n0::NumberDensity=1e23 / m^3)
+function mc(gas::LLCS; P::Pressure = 0kPa, S::Energy = 0.01eV, E::ReducedVoltage = 1.0Td, T::Temperature = 0.0K, N = 1000, t::Time = Inf * s, meas = [:t], ion_type = UniformIonisation(:EXPLICIT), n0::NumberDensity = 1.0e23 / m^3)
     if t == Inf * s
         t = findSimTime(gas, S, E, T, n0)[1] / n0
     end
-    model = MCMODEL(meas=meas, type=SWARM(t), n=N, En0=UniformField(E), T=UniformTemp(T), ion_type=ion_type, v_0=InitVelocity(S, [0, 0, 1]), n0=UniformDensity(n0), optimise_spatial=false)
-    mc(model, initParams(gas, model))
+    model = MCMODEL(meas = meas, type = SWARM(t), n = N, En0 = UniformField(E), T = UniformTemp(T), ion_type = ion_type, v_0 = InitVelocity(S, [0, 0, 1]), n0 = UniformDensity(n0), optimise_spatial = false)
+    return mc(model, initParams(gas, model))
 end
 
 function findSimTime(gas, S, E, T, n0)
     #= curr_time = 1e-9s * n0 =#
-    curr_time = 1e13s / m^3
+    curr_time = 1.0e13s / m^3
     unconverged = true
     N::Int64 = 10000
     N_og = N
@@ -114,12 +116,12 @@ function findSimTime(gas, S, E, T, n0)
         end
         iterations += 1
         @debug "Current Time: " curr_time
-        model = MCMODEL(type=SWARM(curr_time / n0), n=N, n0=UniformDensity(n0), En0=UniformField(E), T=UniformTemp(T), ion_type=UniformIonisation(:EXPLICIT), v_0=InitVelocity(S, [0, 0, 1]))
+        model = MCMODEL(type = SWARM(curr_time / n0), n = N, n0 = UniformDensity(n0), En0 = UniformField(E), T = UniformTemp(T), ion_type = UniformIonisation(:EXPLICIT), v_0 = InitVelocity(S, [0, 0, 1]))
         params = initParams(gas, model)
         measures, swarm = mc(model, params)
-        particle_change = mean(measures.meast.w[3*end÷4:end])
-        first, second = mean(measures.meast.εᵢ[end÷3:2*end÷3]), mean(measures.meast.εᵢ[2*end÷3:end])
-        first_std, second_std = std(measures.meast.εᵢ[end÷3:2*end÷3]), std(measures.meast.εᵢ[2*end÷3:end])
+        particle_change = mean(measures.meast.w[(3 * end ÷ 4):end])
+        first, second = mean(measures.meast.εᵢ[(end ÷ 3):(2 * end ÷ 3)]), mean(measures.meast.εᵢ[(2 * end ÷ 3):end])
+        first_std, second_std = std(measures.meast.εᵢ[(end ÷ 3):(2 * end ÷ 3)]), std(measures.meast.εᵢ[(2 * end ÷ 3):end])
         if particle_change < N_og * 0.75
             # if we've lost half our particles
             N = round(Int, N * N_og / particle_change)
@@ -131,7 +133,7 @@ function findSimTime(gas, S, E, T, n0)
             if N < 100
                 N = 100
             end
-            @debug "Gained $(particle_change-N_og) particles, changing N to $(N)"
+            @debug "Gained $(particle_change - N_og) particles, changing N to $(N)"
             #= iterations += 1 =#
             continue # retry
         end
@@ -154,11 +156,11 @@ end
 
 
 function mc(model::MCMODEL, gas::LLCS)
-    mc(model, initParams(gas, model))
+    return mc(model, initParams(gas, model))
 end
 
-function mc(model::MCMODEL, gases, indicies, w=1.0, ref_gas=MaxwellModel(), save=false, dcs=false)
-    distribution_data::Dict{Int64,Tuple{Vector{Float64},Vector{Float64}}} = Dict()
+function mc(model::MCMODEL, gases, indicies, w = 1.0, ref_gas = MaxwellModel(), save = false, dcs = false)
+    distribution_data::Dict{Int64, Tuple{Vector{Float64}, Vector{Float64}}} = Dict()
     # @info "Batch: " indicies[1]
     for i in indicies
         # @info "Number: " i
@@ -170,7 +172,7 @@ function mc(model::MCMODEL, gases, indicies, w=1.0, ref_gas=MaxwellModel(), save
 
         meas, swarm, params = mc(model, params)
         if dcs
-            distribution_data[i] = (params.χbins[4:end-1], sum(meas.measLμJ.εχ[:, :], dims=1)'[4:end-1])
+            distribution_data[i] = (params.χbins[4:(end - 1)], sum(meas.measLμJ.εχ[:, :], dims = 1)'[4:(end - 1)])
         else
             distribution_data[i] = (params.ebins, meas.measLμJ.ε)
         end
@@ -246,7 +248,7 @@ function mc(model::MCMODEL, params::MCPARAMS)
     return process(model.type, meas, params, model)
 end
 
-function mcGetParticles(model::MCMODEL, params::MCPARAMS, coll_limit=Inf)
+function mcGetParticles(model::MCMODEL, params::MCPARAMS, coll_limit = Inf)
     # @debug model.n=1
 
     #scale!(model,model.type,params)
@@ -269,7 +271,7 @@ function mcGetParticles(model::MCMODEL, params::MCPARAMS, coll_limit=Inf)
 
         # end
         # [meas_inner]
-        flightGetParticles(PART(model, params), model, params, coll_limit=coll_limit)
+        flightGetParticles(PART(model, params), model, params, coll_limit = coll_limit)
     end
     @debug "Finished Sim"
     # @show params.rbins
@@ -277,7 +279,7 @@ function mcGetParticles(model::MCMODEL, params::MCPARAMS, coll_limit=Inf)
     return particles
 end
 
-function mcInitParticles(particles_og::Vector{<:PART}, model::MCMODEL, params::MCPARAMS; N=0, meas=initMeas(model, params))
+function mcInitParticles(particles_og::Vector{<:PART}, model::MCMODEL, params::MCPARAMS; N = 0, meas = initMeas(model, params))
     N != 0 && (model.n += N)
     N == 0 && (N = model.n)
     if N / nprocs() < 1000
@@ -327,7 +329,7 @@ end
 
 # The goal of the function is to provide a framework to progressibely build the electron swarm. There are two facets. I need to ensure that there are a sufficient number of particles and that they have to simulated for long enough.
 
-function mcAddParticles(model, params; N=0, meas=initMeas(model, params))
+function mcAddParticles(model, params; N = 0, meas = initMeas(model, params))
     # this takes a vector of particles and simulates them until some end condition is met...
     # Status: work in progress. The flaw is having to redefine params everytime anyway.
     N != 0 && (model.n += N)
@@ -398,6 +400,7 @@ function buildModel()
             εs = readline()
         end
     end
+    return
 end
 
 function GenericAddition!(this::T, other::T) where {T}
@@ -452,7 +455,7 @@ function saveBatch(dists, model, indicies, w)
     filename = "ML/" * "$w" * "/" * "$en" * "eV/" * "$en" * "_no" * "$n" * "_#" * "$i" * ":" * "$j" * "_" * string(Dates.today()) * "_" * string(Dates.hour(now())) * "-" * string(Dates.minute(now())) * "-" * string(Dates.second(now())) * "-" * string(Dates.millisecond(now()))
     @jld2save filename * "TEMP" * ".jld2" dists
     cp(filename * "TEMP" * ".jld2", filename * ".jld2")
-    rm(filename * "TEMP" * ".jld2")
+    return rm(filename * "TEMP" * ".jld2")
 end
 
 function saveDist(name, model, params, meas)
@@ -463,7 +466,7 @@ function saveDist(name, model, params, meas)
     filename = "$name" * "_" * "$en" * "_no" * "$n" * "_" * string(Dates.today()) * "_" * string(Dates.hour(now())) * "-" * string(Dates.minute(now())) * "-" * string(Dates.second(now())) * "-" * string(Dates.millisecond(now()))
     @jld2save filename * "TEMP" * ".jld2" dist ebins
     cp(filename * "TEMP" * ".jld2", filename * ".jld2")
-    rm(filename * "TEMP" * ".jld2")
+    return rm(filename * "TEMP" * ".jld2")
 end
 
 end
