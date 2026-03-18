@@ -26,9 +26,9 @@ function getDt(particle, model, params)
             getXDt(particle, model, params),
         )
 
-        for dt in candidates
-            if dt.time < min_dt.time
-                min_dt = dt
+        for dt in eachindex(candidates)
+            if candidates[dt].time < min_dt.time
+                min_dt = candidates[dt]
             end
         end
     end
