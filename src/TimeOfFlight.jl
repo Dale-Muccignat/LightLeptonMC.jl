@@ -37,7 +37,7 @@ function getDt(particle, model, params)
 end
 
 function getEnDt(En0::UniformField, n0::UniformDensity, particle, model, params)
-    if params.cbins != nothing
+    if params.cbins |> !isempty
         v_perp = particle.v[1]^2 + particle.v[2]^2 #Seperate out of the vz velocity
         if (particle.v[3] < 0m / s) && (((params.cbins[particle.cbin]) / electron_v2eV - v_perp) > 0 * (m / s)^2) && (particle.cbin != 1)
             # if (particle.v[3] < 0m/s) && (((params.cbins[particle.cbin]-1e-6eV)/electron_v2eV - v_perp) > 0*(m/s)^2) && (particle.cbin!= 1)
@@ -145,7 +145,7 @@ end
 @fastmath function getRDt(particle, model, type, params)
     #NOTE: Only for fields of 0
     up, down = Inf * s, Inf * s
-    if params.rbins != nothing
+    if params.rbins |> !isempty
         p = particle.r
         v = particle.v
         r21 = params.rbins[particle.rbin]
@@ -194,7 +194,7 @@ function getCDt(particle, model, params)
 end
 
 function getZDt(field::ZeroField, particle, model, params)
-    if params.zbins != nothing
+    if params.zbins |> !isempty
         if model.optimise_spatial == true
             if (particle.v[3] < 0m̃ / s̃) && (particle.zbin != 0)
                 return dt_EVENT((params.zbins[1] - particle.r[3]) / particle.v[3], :dt_zbin, :Down)
@@ -213,7 +213,7 @@ function getZDt(field::ZeroField, particle, model, params)
 end
 
 function getZDt(field::UniformField, particle, model, params)
-    if params.zbins != nothing
+    if params.zbins |> !isempty
         # if (particle.v[3] < 0m/s) && (( (particle.v[3]^2)/(params.a[3]*params.n0) + 2*params.zbins[particle.zbin]-2e-10m ) > 2*particle.r[3]) && (particle.zbin != 0)
         if (particle.v[3] < 0m / s) && ((particle.v[3])^2 - 2 * (params.a[3] * params.n0) * (particle.r[3] - params.zbins[particle.zbin] + 1.0e-12m̃) > 0m^2 / s^2) && (particle.zbin != 0)
             # return dt_EVENT((- particle.v[3] - sqrt( (particle.v[3])^2 - 2*(params.a[3]*params.n0)*(particle.r[3]-params.zbins[particle.zbin]+1e-11m) ))/(params.a[3]*params.n0), :dt_zbin,:Down)
@@ -255,7 +255,7 @@ function getZDt(field::UniformField, particle, model, params)
 end
 
 function getYDt(particle, model, params)
-    if params.ybins != nothing
+    if params.ybins |> !isempty
         if model.optimise_spatial == true
             if (particle.v[2] < 0m / s) && (particle.ybin != 0)
                 return dt_EVENT((params.ybins[1] - particle.r[2]) / particle.v[2], :dt_ybin, :Down)
@@ -263,7 +263,7 @@ function getYDt(particle, model, params)
                 return dt_EVENT((params.ybins[end] + 1.0e-12m - particle.r[2]) / particle.v[2], :dt_ybin, :Up)
             end
         else
-            if params.ybins != nothing
+            if params.ybins |> !isempty
                 if (particle.v[2] < 0m / s) && (particle.ybin != 0)
                     return dt_EVENT((params.ybins[particle.ybin] - 1.0e-12m - particle.r[2]) / particle.v[2], :dt_ybin, :Down)
                 elseif (particle.ybin < length(params.ybins)) && (particle.v[2] > 0.0)
@@ -276,7 +276,7 @@ function getYDt(particle, model, params)
 end
 
 function getXDt(particle, model, params)
-    if params.xbins != nothing
+    if params.xbins |> !isempty
         if model.optimise_spatial == true
             if (particle.v[1] < 0m / s) && (particle.xbin != 0)
                 return dt_EVENT((params.xbins[1] - particle.r[1]) / particle.v[1], :dt_xbin, :Down)
@@ -284,7 +284,7 @@ function getXDt(particle, model, params)
                 return dt_EVENT((params.xbins[end] + 1.0e-12m - particle.r[1]) / particle.v[1], :dt_xbin, :Up)
             end
         else
-            if params.xbins != nothing
+            if params.xbins |> !isempty
                 if (particle.v[1] < 0m / s) && (particle.xbin != 0)
                     return dt_EVENT((params.xbins[particle.xbin]m - particle.r[1]) / particle.v[1], :dt_xbin, :Down)
                 elseif (particle.xbin < length(params.xbins)) && (particle.v[1] > 0.0)
@@ -297,7 +297,7 @@ function getXDt(particle, model, params)
 end
 
 function getTDt(particle, model, params)
-    if params.tbins != nothing
+    if params.tbins |> !isempty
         if particle.tbin < length(params.tbins) && particle.t >= params.tbins[1]
             return dt_EVENT(params.tbins[particle.tbin + 1] - particle.t, :dt_tbin, :Up)
         end

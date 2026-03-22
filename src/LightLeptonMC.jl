@@ -313,10 +313,10 @@ function mcInitParticles(particles_og::Vector{<:PART}, model::MCMODEL, params::M
             particles[i].v = sample_particles[i].v
             particles[i].weight = sample_particles[i].weight
             particles[i].cbin = findMinInd(params.cbins, getEnergy(particles[i].v))
-            if params.ebins != nothing
+            if params.ebins |> !isempty
                 particles[i].ebin = findMinInd(params.ebins, getEnergy(particles[i].v))
             end
-            if params.zbins != nothing
+            if params.zbins |> !isempty
                 particles[i].zbin = findMinInd(params.zbins, particles[i].r[3])
             end
         end

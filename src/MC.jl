@@ -81,7 +81,7 @@ end
 
 function checkBins(dt, particle, params)
     # ebin is not a tracked quantity
-    # if params.ebins != nothing && particle.ebin < length(params.ebins)
+    # if params.ebins |> !isempty && particle.ebin < length(params.ebins)
     #     (params.ebins[particle.ebin]-(eps()+1e-6)*eV) <= getEnergy(particle.v) <= (params.ebins[particle.ebin+1]+(eps()+1e-6)*eV) || error("""ebin error
     #         $(uconvert(eV,params.ebins[particle.ebin]))
     #         $(uconvert(eV,getEnergy(particle.v)))
@@ -89,7 +89,7 @@ function checkBins(dt, particle, params)
     #         $(dt)
     #                                                                                                                                """)
     # end
-    if params.cbins != nothing && particle.cbin < length(params.cbins)
+    if params.cbins |> !isempty && particle.cbin < length(params.cbins)
         (params.cbins[particle.cbin] - (eps() + 1.0e-8) * eV) <= getEnergy(particle.v) <= (params.cbins[particle.cbin + 1] + (eps() + 1.0e-8) * eV) || error(
             """CBin error
             $(uconvert(eV, params.cbins[particle.cbin]))
@@ -99,7 +99,7 @@ function checkBins(dt, particle, params)
             """
         )
     end
-    if params.zbins != nothing && 0 < particle.zbin < length(params.zbins)
+    if params.zbins |> !isempty && 0 < particle.zbin < length(params.zbins)
         if (params.zbins[particle.zbin] - (1.0e-12 + eps()) * m̃) <= particle.r[3] <= (params.zbins[particle.zbin + 1] + (1.0e-12 + eps()) * m̃) && particle.r[3] >= params.zbins[1]
         else
             error(
@@ -116,7 +116,7 @@ function checkBins(dt, particle, params)
             )
         end
     end
-    return if params.tbins != nothing && particle.tbin < length(params.tbins) && particle.t > params.tbins[1]
+    return if params.tbins |> !isempty && particle.tbin < length(params.tbins) && particle.t > params.tbins[1]
         (params.tbins[particle.tbin] - eps() * s) <= particle.t <= (params.tbins[particle.tbin + 1] + eps() * s) || error(
             """tbin error
             $(params.tbins[particle.tbin])
@@ -136,7 +136,7 @@ end
 
 function checkAlive(type, particle, model, meas_inner, params)
     alive = true
-    if params.tbins != nothing
+    if params.tbins |> !isempty
         alive = alive && particle.t < model.type.t_f #*params.time_scale
         alive || @debug "Particle timed out"
         # alive = alive && sum(meas_inner.measg.coll_count) < 5
@@ -171,19 +171,19 @@ function checkAliveModel(type::CELL, particle, model, meas_inner, params)
         @debug "Absorbed"
     end
 
-    if params.zbins != nothing
+    if params.zbins |> !isempty
         # :SP_z in model.meas ? alive = alive && particle.zbin != length(params.zbins) : alive = alive && particle.zbin != length(params.zbins) && particle.zbin != 0
         #= alive = alive && particle.zbin != length(params.zbins) && particle.zbin > 1 =#
         alive = alive && particle.zbin != length(params.zbins) && particle.zbin != 1
         (particle.zbin == length(params.zbins) || particle.zbin == 1) && @debug "Detected Z"
     end
 
-    if params.ybins != nothing
+    if params.ybins |> !isempty
         alive = alive && particle.ybin != length(params.ybins)
         particle.ybin == length(params.ybins) && @debug "Detected Y"
     end
 
-    if params.xbins != nothing
+    if params.xbins |> !isempty
         alive = alive && particle.xbin != length(params.xbins)
         particle.xbin == length(params.xbins) && @debug "Detected X"
     end

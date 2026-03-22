@@ -123,15 +123,15 @@ end
 
 function generateBins(model)
 
-    m = string.(model.meas)
+    m_bins = string.(model.meas)
 
-    tbins = 1 ∈ occursin.("t", m) ? buildTBins(model.type, model) : nothing
-    ebins = 1 ∈ occursin.("ε", m) ? buildEnBins(model.type, model) : nothing
-    zbins = 1 ∈ occursin.("z", m) ? buildZBins(model.type, model) : nothing
-    ybins = 1 ∈ occursin.("y", m) ? buildYBins(model.type, model) : nothing
-    xbins = 1 ∈ occursin.("x", m) ? buildXBins(model.type, model) : nothing
-    rbins = 1 ∈ occursin.("r", m) ? buildRBins(model.type, model, model.n0) : nothing
-    χbins = 1 ∈ occursin.("χ", m) ? buildχBins(model.type, model) : nothing
+    tbins = 1 ∈ occursin.("t", m_bins) ? buildTBins(model.type, model) : LinRange(0.0s, 0.0s, 0)
+    ebins = 1 ∈ occursin.("ε", m_bins) ? buildEnBins(model.type, model) : LinRange(0.0eV, 0.0eV, 0)
+    zbins = 1 ∈ occursin.("z", m_bins) ? buildZBins(model.type, model) : LinRange(0.0m, 0.0m, 0)
+    ybins = 1 ∈ occursin.("y", m_bins) ? buildYBins(model.type, model) : LinRange(0.0m, 0.0m, 0)
+    xbins = 1 ∈ occursin.("x", m_bins) ? buildXBins(model.type, model) : LinRange(0.0m, 0.0m, 0)
+    rbins = 1 ∈ occursin.("r", m_bins) ? buildRBins(model.type, model, model.n0) : LinRange(0.0m^2, 0.0m^2, 0)
+    χbins = 1 ∈ occursin.("χ", m_bins) ? buildχBins(model.type, model) : LinRange(0.0 * u"rad", 0.0 * u"rad", 0)
 
     return tbins, ebins, rbins, χbins, zbins, ybins, xbins
 
@@ -140,7 +140,7 @@ end
 # TODO: Combine these into one function per model
 
 function buildRBins(type::SWARM, model, n0::UniformDensity)
-    return LinRange(0m, 1.0e-6m, 10)
+    return LinRange(0m^2, 1.0e-6m^2, 10)
 end
 
 function buildEnBins(type::SWARM, model)
@@ -271,26 +271,26 @@ function PART(model, params)
     particle.v = upreferred.(initPartv(model.v_0, params)) #.*params.length_scale ./params.time_scale
     particle.t = upreferred.(initPartt(model.t_0, params))
     particle.cbin = findMinInd(params.cbins, getEnergy(particle.v))
-    if params.ebins != nothing
+    if params.ebins |> !isempty
         particle.ebin = findMinInd(params.ebins, getEnergy(particle.v))
     end
-    if params.tbins != nothing
+    if params.tbins |> !isempty
         particle.tbin = findMinInd(params.tbins, particle.t)
     end
 
-    if params.rbins != nothing
+    if params.rbins |> !isempty
         particle.rbin = findMinInd(params.rbins, dot(particle.r, particle.r))
     end
 
-    if params.zbins != nothing
+    if params.zbins |> !isempty
         particle.zbin = findMinInd(params.zbins, particle.r[3])
     end
 
-    if params.xbins != nothing
+    if params.xbins |> !isempty
         particle.xbin = findMinInd(params.xbins, particle.r[1])
     end
 
-    if params.ybins != nothing
+    if params.ybins |> !isempty
         particle.ybin = findMinInd(params.ybins, particle.r[2])
     end
 
