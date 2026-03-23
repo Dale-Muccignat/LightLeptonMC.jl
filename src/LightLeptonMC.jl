@@ -26,6 +26,8 @@ function __init__()
 end
 
 const electron_v2eV = 0.5 * me
+const uLr = typeof(1.0m̃)
+const uTr = typeof(1.0s̃)
 
 include("Structs.jl")
 export MCMODEL, initParams, CELL, LμJ, InitVelocity, InitSpatial, UniformDensity, UniformField, GaussianTemporal, UniformTemp

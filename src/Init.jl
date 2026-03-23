@@ -305,7 +305,7 @@ function initPartr(r_0::ZeroSpatial, params)
     return r * m
 end
 function initPartr(r_0::InitSpatial, params)
-    return r = r_0.axis .* r_0.val
+    return r_0.axis .* r_0.val
 end
 function initPartr(r_0::FunctionalSpatial, params)
     return r_0.getAxis() .* r_0.getPosition(rand())

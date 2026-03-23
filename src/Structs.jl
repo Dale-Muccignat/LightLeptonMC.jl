@@ -358,33 +358,46 @@ end
 
 @AutoParm mutable struct MCPARAMS
     cbins::AUTO = [0.0, (10.0 .^ (-3:0.01:2))...] .* eV
-    ebins::AUTO = nothing
-    gas::AUTO = nothing
-    total_freq::AUTO = nothing
-    DCS::AUTO = nothing
-    a::AUTO = nothing
+    ebins::AUTO
+    gas::AUTO
+    total_freq::AUTO = typeof(1.0 * kg^(1 / 2) * m̃^3 / s̃)[]
+    DCS::AUTO
+    a::AUTO
     # n0::Union{Vector{Float64},Float64,Nothing} = nothing
-    n0::AUTO = nothing
-    rbins::AUTO = nothing
-    χbins::AUTO = nothing
-    tbins::AUTO = collect(LinRange(0, 1.0e-5, 10)) .* s
-    zbins::AUTO = nothing
-    xbins::AUTO = nothing
-    ybins::AUTO = nothing
+    n0::AUTO
+    rbins::AUTO
+    χbins::AUTO
+    tbins::AUTO
+    zbins::AUTO
+    xbins::AUTO
+    ybins::AUTO
 end
 
-function MCPARAMS(; cbins = nothing, ebins = nothing, gas = nothing, total_freq = nothing, a = nothing, n0 = nothing, rbins = nothing, χbins = nothing, tbins = nothing, zbins = nothing, xbins = nothing, ybins = nothing, DCS = nothing)
-    return MCPARAMS(cbins, ebins, gas, total_freq, DCS, a, n0, rbins, χbins, tbins, zbins, xbins, ybins)
-end
+# function MCPARAMS(;
+#         cbins,
+#         ebins,
+#         gas,
+#         total_freq,
+#         a,
+#         n0,
+#         rbins,
+#         χbins,
+#         tbins,
+#         zbins,
+#         xbins,
+#         ybins,
+#         DCS
+#     )
+#     return MCPARAMS(cbins, ebins, gas, total_freq, DCS, a, n0, rbins, χbins, tbins, zbins, xbins, ybins)
+# end
 
-
-@AutoParm mutable struct PART
-    type::Lepton = Electron()
+@AutoParm mutable struct PART{T <: Lepton}
+    type::T = Electron()
     alive::Bool = true
-    v::AUTO = [0.0, 0.0, 0.0]
-    r::AUTO = [0.0, 0.0, 0.0]
-    t::AUTO = 0.0 * s̃
-    weight::AUTO = 1.0
+    v::typeof(SArray{Tuple{3}, Float64, 1, 3}(0.0, 0.0, 0.0) * m̃ / s̃) = SArray{Tuple{3}, Float64, 1, 3}(0.0, 0.0, 0.0) * m̃ / s̃
+    r::typeof(SArray{Tuple{3}, Float64, 1, 3}(0.0, 0.0, 0.0) * m̃) = SArray{Tuple{3}, Float64, 1, 3}(0.0, 0.0, 0.0) * m̃
+    t::uTr = 0.0 * s̃
+    weight::Float64 = 1.0
     tbin::Int64 = 1
     cbin::Int64 = 1
     ebin::Int64 = 1
@@ -392,15 +405,6 @@ end
     ybin::Int64 = 1
     xbin::Int64 = 1
     rbin::Int64 = 1
-end
-
-function PART()
-
-    r = SArray{Tuple{3}, Float64, 1, 3}(0.0, 0.0, 0.0)
-    r = r * m̃
-    v = SArray{Tuple{3}, Float64, 1, 3}(0.0, 0.0, 0.0)
-    v = v * m̃ / s̃
-    return PART(r = r, v = v)
 end
 
 

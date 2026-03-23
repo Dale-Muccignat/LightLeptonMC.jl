@@ -24,7 +24,7 @@ function step_particle!(p, model, params, meas, new_particles; coll_limit = Inf)
     return measureDeath!(model.type, p, model, params, meas)
 end
 
-function flight(particles::Vector{<:PART}, model, params)
+function flight(particles::Vector{P}, model, params) where {P <: PART}
     :f in model.meas &&
         (params.a[1] > 0m^4 / s^2 || params.a[2] > 0m^4 / s^2) &&
         @warn "Measuring flux with x or y field, third order will be wrong."
@@ -46,9 +46,9 @@ function flight(particles::Vector{<:PART}, model, params)
 end
 
 function flightGetParticles(
-        particles::Vector{PART}, model, params;
+        particles::Vector{P}, model, params;
         coll_limit = Inf, t_limit = Inf * s
-    )
+    ) where {P <: PART}
 
     :f in model.meas &&
         (params.a[1] > 0m^4 / s^2 || params.a[2] > 0m^4 / s^2) &&

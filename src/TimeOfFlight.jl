@@ -65,7 +65,7 @@ end
 @fastmath function getRDt(particle, model, type::LμJ, params)
     #NOTE: Only for fields of 0
     up, down = Inf * s, Inf * s
-    if params.rbins !== nothing
+    if params.rbins |> !isempty
         # Equation of circle
         # r²=x²+y²
         # Projectile motion
