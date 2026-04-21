@@ -343,8 +343,10 @@ function measureDeath!(type::LμJ, particle, model, params, meas_inner)
             end
             if sum(meas_inner.measg.coll_count) == 1
                 meas_inner.measLμJ.εχ[1][inds, inds_angle] .+= particle.weight
-            else
+            elseif sum(meas_inner.measg.coll_count) == 2
                 meas_inner.measLμJ.εχ[2][inds, inds_angle] .+= particle.weight
+            else
+                meas_inner.measLμJ.εχ[3][inds, inds_angle] .+= particle.weight
             end
         end
 

@@ -456,6 +456,11 @@ function MEASLμJ(model::MCMODEL, params::MCPARAMS)
         εχ_reject = zeros(length(params.ebins), length(params.χbins))
     end
 
+    if :εχ_coll ∈ model.meas
+        εχ = [spzeros(length(params.ebins), length(params.χbins)), spzeros(length(params.ebins), length(params.χbins)), spzeros(length(params.ebins), length(params.χbins))]
+        εχ_reject = [spzeros(length(params.ebins), length(params.χbins)), spzeros(length(params.ebins), length(params.χbins)), spzeros(length(params.ebins), length(params.χbins))]
+    end
+
     return MEASLμJ(ε, χ, εχ, εχ_reject, zyt)
 
 end
