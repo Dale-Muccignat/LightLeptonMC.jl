@@ -16,8 +16,8 @@ module LightLeptonMC
 #TODO: Reform struct system into a generic Detector/Object system
 
 using LightLeptonTools
-using Distributed, Statistics, Unitful, Optim, AutoParameters, StaticArrays, LinearAlgebra, Random, Measurements, SparseArrays, QuadGK, Interpolations
-using DataFramesMeta, DataFrames
+using AutoParameters, Distributed, Interpolations, LinearAlgebra, Measurements, Optim, QuadGK, Random, SparseArrays, StaticArrays, Statistics, Unitful
+using DataFrames, DataFramesMeta
 
 Unitful.register(@__MODULE__)
 function __init__()
@@ -30,7 +30,17 @@ const uLr = typeof(1.0m̃)
 const uTr = typeof(1.0s̃)
 
 include("Structs.jl")
-export MCMODEL, initParams, CELL, LμJ, InitVelocity, InitSpatial, UniformDensity, UniformField, GaussianTemporal, UniformTemp
+export MCMODEL, MCPARAMS, initParams
+export CELL, LμJ, Swarm
+export LμJDensity, UniformDensity
+export GaussianTemporal
+export UniformTemp
+export GaussianDirectionVelocity, GaussianEnergyVelocity, InitVelocity, ZeroVelocity
+export GaussianLμJSpatial, InitSpatial, ZeroSpatial
+export Explicit, Weighting
+export UniformField, ZeroField
+export UniformIonisation
+
 
 include("Utils.jl")
 
@@ -46,7 +56,7 @@ include("MC.jl")
 
 include("Processing.jl")
 
-export mc, MCPARAMS, saveBatch, saveDist
+export mc, saveBatch, saveDist
 
 macro jld2save(filename, vars...)
     # Copy paste
