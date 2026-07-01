@@ -63,6 +63,13 @@ end
     linear_interpolation((cbins, Rs), out, extrapolation_bc = Interpolations.Flat())
 end
 
+@inbounds function buildTDCS(σ::TripleDifferentialCrossSection, cbins = logrange(1.0e-2, 1.0e2, 41) .* eV)
+    # The TCDS will have the DCS within it
+    # The code will know the initial energy and scattering angle
+    # Need to create a 2D grid of probabilities based on the ejectect electron's angle and energy
+    # This will get VERY intense computationally.
+end
+
 function buildDCS(σ::T, cbins = logrange(1.0e-2, 1.0e2, 41) .* eV) where {T <: AbstractCrossSection}
     # Create a 2d matrix interpolation that takes ε and R as an input and returns χ
     return (ε, R) -> 1 - 2 * R
