@@ -4,7 +4,7 @@ function eventCollision!(dt::dt_EVENT, particle, model, params, meas_inner, new_
     new_particle = nothing
     cs_ind = getCollType(particle, model, params)
     energy_loss = 0.0
-    :SP in model.meas && sum(meas_inner.measg.coll_count) == 0 ? energy_loss = getEnergy(particle.v) : nothing
+    :SP in model.meas && meas_inner.measg.total_coll == 0 ? energy_loss = getEnergy(particle.v) : nothing
     #' @debug """
     #' Collision:
     #' $(cs_ind == 0 ? "NULL" : params.gas[cs_ind][1].type) $(dt.time)
@@ -29,9 +29,10 @@ function eventCollision!(dt::dt_EVENT, particle, model, params, meas_inner, new_
             elasticEnergyColl!(cs_ind, cs, mass, g, particle, model, params, meas_inner)
         end
         meas_inner.measg.coll_count[cs_ind] += 1
+        meas_inner.measg.total_coll += 1
     end
 
-    :SP in model.meas && sum(meas_inner.measg.coll_count) == 1 ? energy_loss -= getEnergy(particle.v) : nothing
+    :SP in model.meas && meas_inner.measg.total_coll == 1 ? energy_loss -= getEnergy(particle.v) : nothing
 
     measureCollision!(energy_loss, particle, model, params, meas_inner)
     updateCbin!(particle, params)

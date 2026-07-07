@@ -3,7 +3,7 @@
 #TODO: Tidy up measurement types...
 
 function step_particle!(p, model, params, meas, new_particles; coll_limit = Inf)
-    while p.alive && sum(meas.measg.coll_count) < coll_limit
+    while p.alive && meas.measg.total_coll < coll_limit
         dt = getDt(p, model, params)
 
         if :f in model.meas
@@ -188,7 +188,7 @@ function checkAliveModel(type::CELL, particle, model, meas_inner, params)
         particle.xbin == length(params.xbins) && @debug "Detected X"
     end
 
-    :SP in model.meas ? alive = alive && sum(meas_inner.measg.coll_count) == 0 : nothing
+    :SP in model.meas ? alive = alive && meas_inner.measg.total_count == 0 : nothing
 
     return alive && getEnergy(particle.v) > type.thresh #*params.energy_scale
 end
@@ -272,7 +272,7 @@ function measureDeath!(type::SWARM, particle, model, params, meas_inner)
 end
 
 function measureDeath!(type::LμJ, particle, model, params, meas_inner)
-    return if particle.rbin == length(params.rbins) && sum(meas_inner.measg.coll_count) != 0
+    return if particle.rbin == length(params.rbins) && meas_inner.measg.total_coll != 0
         :χ in model.meas ? meas_inner.measLμJ.χ[findMinInd(params.χbins, abs(atan(rad, particle.r[2], particle.r[3])))] += particle.weight : nothing
 
         if :εχ in model.meas
@@ -341,9 +341,9 @@ function measureDeath!(type::LμJ, particle, model, params, meas_inner)
                 inds_angle = findMinInd(params.χbins, angle_position - type.Δχ_detector / 2):findMinInd(params.χbins, angle_position + type.Δχ_detector / 2)
                 @debug "rejected"
             end
-            if sum(meas_inner.measg.coll_count) == 1
+            if meas_inner.measg.total_coll == 1
                 meas_inner.measLμJ.εχ[1][inds, inds_angle] .+= particle.weight
-            elseif sum(meas_inner.measg.coll_count) == 2
+            elseif meas_inner.measg.total_coll == 2
                 meas_inner.measLμJ.εχ[2][inds, inds_angle] .+= particle.weight
             else
                 meas_inner.measLμJ.εχ[3][inds, inds_angle] .+= particle.weight
@@ -372,7 +372,7 @@ function measureDeath!(type::CELL, particle, model, params, meas_inner)
 end
 
 function measureCollision!(energy_loss, particle, model, params, meas_inner)
-    return if :SP in model.meas && sum(meas_inner.measg.coll_count) == 1
+    return if :SP in model.meas && meas_inner.measg.total_coll == 1
         meas_inner.measg.SP_ε = energy_loss
         meas_inner.measg.SP_r = sqrt(dot(particle.r, particle.r)) # Assumes particle started at [0,0,0]
     end

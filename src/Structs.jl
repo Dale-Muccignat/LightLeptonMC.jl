@@ -513,6 +513,7 @@ end
 @AutoParm mutable struct MEASG
     coschi::AUTO = 0.0
     coll_count::AUTO = []
+    total_coll::AUTO = 0
     SP_ε::AUTO = nothing
     SP_r::AUTO = nothing
     SP_εs::AUTO = nothing
