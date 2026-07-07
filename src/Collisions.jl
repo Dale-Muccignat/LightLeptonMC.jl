@@ -142,7 +142,7 @@ function ionisationColl!(cs_no, cs, mass, ion_type, g, particle, model, params, 
         elseif ion_type.method == :EXPLICIT
             coschi2, sinchi2, phi2 = scatteringAngle(cs_no, cs, mass, g, particle, model, params)
             v2 = sqrt(2 * other_part_energy / me) * SArray{Tuple{3}, Float64, 1, 3}(cos(phi2) * sinchi2, sin(phi2) * sinchi2, coschi2)
-            new_particle = deepcopy(particle)
+            new_particle = copy_particle(particle)
             meas_inner.measg.coschi += dot(new_particle.v, v2) / (norm(v2) * norm(new_particle.v))
             new_particle.v = v2
             # @info debugParticle("other particle",new_particle)

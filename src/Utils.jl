@@ -18,6 +18,13 @@ function getDensity(particle, n0::CellDensity, params)
     return params.n0[particle.zbin]
 end
 
+function copy_particle(p::PART)
+    return PART(
+        p.type, p.alive, p.v, p.r, p.t, p.weight,
+        p.tbin, p.cbin, p.ebin, p.zbin, p.ybin, p.xbin, p.rbin
+    )
+end
+
 function debugParticle(header, particle)
     return """
     Particle $header: 
