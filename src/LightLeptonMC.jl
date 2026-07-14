@@ -16,8 +16,8 @@ module LightLeptonMC
 #TODO: Reform struct system into a generic Detector/Object system
 
 using LightLeptonTools
-using Distributed, Statistics, Unitful, Optim, AutoParameters, StaticArrays, LinearAlgebra, Random, Measurements, SparseArrays, QuadGK, Interpolations
-using DataFramesMeta, DataFrames
+using AutoParameters, Distributed, Interpolations, LinearAlgebra, Measurements, Optim, QuadGK, Random, SparseArrays, StaticArrays, Statistics, Unitful
+using DataFrames, DataFramesMeta
 
 Unitful.register(@__MODULE__)
 function __init__()
@@ -26,9 +26,21 @@ function __init__()
 end
 
 const electron_v2eV = 0.5 * me
+const uLr = typeof(1.0m̃)
+const uTr = typeof(1.0s̃)
 
 include("Structs.jl")
-export MCMODEL, initParams, CELL, LμJ, InitVelocity, InitSpatial, UniformDensity, UniformField, GaussianTemporal, UniformTemp
+export MCMODEL, MCPARAMS, initParams
+export CELL, LμJ, Swarm
+export LμJDensity, UniformDensity
+export GaussianTemporal
+export UniformTemp
+export GaussianDirectionVelocity, GaussianEnergyVelocity, InitVelocity, ZeroVelocity
+export GaussianLμJSpatial, InitSpatial, ZeroSpatial
+export Explicit, Weighting
+export UniformField, ZeroField
+export UniformIonisation
+
 
 include("Utils.jl")
 
@@ -36,11 +48,15 @@ include("Init.jl")
 
 include("TimeOfFlight.jl")
 
+include("Collisions.jl")
+
+include("Events.jl")
+
 include("MC.jl")
 
 include("Processing.jl")
 
-export mc, MCPARAMS, saveBatch, saveDist
+export mc, saveBatch, saveDist
 
 macro jld2save(filename, vars...)
     # Copy paste
@@ -309,10 +325,10 @@ function mcInitParticles(particles_og::Vector{<:PART}, model::MCMODEL, params::M
             particles[i].v = sample_particles[i].v
             particles[i].weight = sample_particles[i].weight
             particles[i].cbin = findMinInd(params.cbins, getEnergy(particles[i].v))
-            if params.ebins != nothing
+            if params.ebins |> !isempty
                 particles[i].ebin = findMinInd(params.ebins, getEnergy(particles[i].v))
             end
-            if params.zbins != nothing
+            if params.zbins |> !isempty
                 particles[i].zbin = findMinInd(params.zbins, particles[i].r[3])
             end
         end

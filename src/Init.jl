@@ -35,32 +35,62 @@ end
 
 #### DCS ####
 
-@inbounds function buildDCS(σ::DifferentialCrossSection, cbins = logrange(1.0e-2, 1.0e2, 41) .* eV)
-    # Create a 2d matrix interpolation that takes ε and R as an input and returns χ
-    Rs = range(0, 1, 25)
-    χs = range(0.0 * u"rad", π * u"rad", 25)
+function buildDCS(
+        σ::DifferentialCrossSection, cbins = logrange(1.0e-2, 1.0e2, 41) .* eV;
+        nχ = 200
+    )
+    # Build a 2D interpolation (ε, R) -> cos(χ), where χ is sampled from σ(ε, χ)
+    # via inverse-CDF sampling:  R = ∫₀^χ σ·sinχ' dχ' / ∫₀^π σ·sinχ' dχ'
+    Rs = range(0, 1, 1000)
+    χgrid = range(0.0u"rad", π * u"rad", nχ)
     out = Matrix{Float64}(undef, length(cbins), length(Rs))
-    c1, c2 = χs[1], χs[end]
-    spacing = χs[2] - χs[1]
-    # create a minimising function
-    last = 0.0
-    for i in eachindex(cbins)
-        function intχ(χ)
-            σ(cbins[i], χ) * sin(χ)
+
+    Threads.@threads for i in eachindex(cbins)
+        ε = cbins[i]
+        intχ(χ) = σ(ε, χ) * sin(χ)
+
+        # Cumulative CDF on a fixed grid — one integration pass instead of
+        # re-integrating from scratch for every trial angle.
+        cdf = Vector{typeof(1.0u"Å^2*rad")}(undef, nχ)
+        cdf[1] = 0.0u"Å^2*rad"
+        for k in 2:nχ
+            cdf[k] = cdf[k - 1] + quadgk(intχ, χgrid[k - 1], χgrid[k])[1]
         end
-        total = quadgk(intχ, c1, c2)[1]::typeof(1.0u"Å^2*rad")
-        for j in eachindex(Rs)
-            function L(χ)
-                partial = quadgk(intχ, c1, χ * u"rad")[1]::typeof(1.0u"Å^2*rad")
-                abs(Rs[j] - partial / total)
+        total = cdf[end]
+
+        if total == 0.0u"Å^2*rad"
+            # Whole energy bin is below threshold: σ ≡ 0 for all χ here.
+            # This only happens for the lowest energy bins.
+            out[i, :] .= 1.0  # cos(0): no scattering possible
+            continue
+        end
+
+        rcdf = ustrip.(cdf ./ total)
+
+        # σ(ε, ·) can be zero over one or more χ-ranges (not just at the
+        # start), which makes the CDF flat there. Strip every non-increasing
+        # point so the interpolation x-axis is strictly increasing, keeping
+        # the first point of each plateau (standard inverse-CDF convention:
+        # map R falling in a zero-probability gap to the smallest valid χ).
+        keep = Vector{Int}(undef, nχ)
+        keep[1] = 1
+        nkeep = 1
+        for k in 2:nχ
+            if rcdf[k] > rcdf[keep[nkeep]]
+                nkeep += 1
+                keep[nkeep] = k
             end
-            result = optimize(L, last, π)
-            last = Optim.minimizer(result)
-            out[i, j] = cos(last)
         end
-        last = 0.0
+        resize!(keep, nkeep)
+
+        invcdf = linear_interpolation(rcdf[keep], ustrip.(χgrid[keep]))
+
+        for j in eachindex(Rs)
+            out[i, j] = cos(invcdf(Rs[j]) * u"rad")
+        end
     end
-    linear_interpolation((cbins, Rs), out, extrapolation_bc = Interpolations.Flat())
+
+    return linear_interpolation((cbins, Rs), out, extrapolation_bc = Interpolations.Flat())
 end
 
 function buildDCS(σ::T, cbins = logrange(1.0e-2, 1.0e2, 41) .* eV) where {T <: AbstractCrossSection}
@@ -123,15 +153,15 @@ end
 
 function generateBins(model)
 
-    m = string.(model.meas)
+    m_bins = string.(model.meas)
 
-    tbins = 1 ∈ occursin.("t", m) ? buildTBins(model.type, model) : nothing
-    ebins = 1 ∈ occursin.("ε", m) ? buildEnBins(model.type, model) : nothing
-    zbins = 1 ∈ occursin.("z", m) ? buildZBins(model.type, model) : nothing
-    ybins = 1 ∈ occursin.("y", m) ? buildYBins(model.type, model) : nothing
-    xbins = 1 ∈ occursin.("x", m) ? buildXBins(model.type, model) : nothing
-    rbins = 1 ∈ occursin.("r", m) ? buildRBins(model.type, model, model.n0) : nothing
-    χbins = 1 ∈ occursin.("χ", m) ? buildχBins(model.type, model) : nothing
+    tbins = 1 ∈ occursin.("t", m_bins) ? buildTBins(model.type, model) : LinRange(0.0s, 0.0s, 0)
+    ebins = 1 ∈ occursin.("ε", m_bins) ? buildEnBins(model.type, model) : LinRange(0.0eV, 0.0eV, 0)
+    zbins = 1 ∈ occursin.("z", m_bins) ? buildZBins(model.type, model) : LinRange(0.0m, 0.0m, 0)
+    ybins = 1 ∈ occursin.("y", m_bins) ? buildYBins(model.type, model) : LinRange(0.0m, 0.0m, 0)
+    xbins = 1 ∈ occursin.("x", m_bins) ? buildXBins(model.type, model) : LinRange(0.0m, 0.0m, 0)
+    rbins = 1 ∈ occursin.("r", m_bins) ? buildRBins(model.type, model, model.n0) : LinRange(0.0m^2, 0.0m^2, 0)
+    χbins = 1 ∈ occursin.("χ", m_bins) ? buildχBins(model.type, model) : LinRange(0.0 * u"rad", 0.0 * u"rad", 0)
 
     return tbins, ebins, rbins, χbins, zbins, ybins, xbins
 
@@ -140,7 +170,7 @@ end
 # TODO: Combine these into one function per model
 
 function buildRBins(type::SWARM, model, n0::UniformDensity)
-    return LinRange(0m, 1.0e-6m, 10)
+    return LinRange(0m^2, 1.0e-6m^2, 10)
 end
 
 function buildEnBins(type::SWARM, model)
@@ -271,26 +301,26 @@ function PART(model, params)
     particle.v = upreferred.(initPartv(model.v_0, params)) #.*params.length_scale ./params.time_scale
     particle.t = upreferred.(initPartt(model.t_0, params))
     particle.cbin = findMinInd(params.cbins, getEnergy(particle.v))
-    if params.ebins != nothing
+    if params.ebins |> !isempty
         particle.ebin = findMinInd(params.ebins, getEnergy(particle.v))
     end
-    if params.tbins != nothing
+    if params.tbins |> !isempty
         particle.tbin = findMinInd(params.tbins, particle.t)
     end
 
-    if params.rbins != nothing
+    if params.rbins |> !isempty
         particle.rbin = findMinInd(params.rbins, dot(particle.r, particle.r))
     end
 
-    if params.zbins != nothing
+    if params.zbins |> !isempty
         particle.zbin = findMinInd(params.zbins, particle.r[3])
     end
 
-    if params.xbins != nothing
+    if params.xbins |> !isempty
         particle.xbin = findMinInd(params.xbins, particle.r[1])
     end
 
-    if params.ybins != nothing
+    if params.ybins |> !isempty
         particle.ybin = findMinInd(params.ybins, particle.r[2])
     end
 
@@ -305,7 +335,7 @@ function initPartr(r_0::ZeroSpatial, params)
     return r * m
 end
 function initPartr(r_0::InitSpatial, params)
-    return r = r_0.axis .* r_0.val
+    return r_0.axis .* r_0.val
 end
 function initPartr(r_0::FunctionalSpatial, params)
     return r_0.getAxis() .* r_0.getPosition(rand())
