@@ -520,7 +520,7 @@ end
 end
 
 function MEASG(model::MCMODEL, params::MCPARAMS)
-    coschi, coll_count, SP_ε, SP_r, SP_εs = 0.0, zeros(length(params.gas)), nothing, nothing, nothing
+    coschi, coll_count, total_coll, SP_ε, SP_r, SP_εs = 0.0, zeros(length(params.gas)), 0, nothing, nothing, nothing
     @debug coll_count
     #' if :SP ∈ model.meas
     #'     SP_ε = 0.0
@@ -529,7 +529,7 @@ function MEASG(model::MCMODEL, params::MCPARAMS)
     #' if :SP_z ∈ model.meas
     #'     SP_εs = zeros(length(params.zbins))
     #' end
-    return MEASG(coschi, coll_count, SP_ε, SP_r, SP_εs)
+    return MEASG(coschi, coll_count, total_coll, SP_ε, SP_r, SP_εs)
 end
 
 @AutoParm mutable struct MEAST
