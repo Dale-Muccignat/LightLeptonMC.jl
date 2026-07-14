@@ -35,32 +35,62 @@ end
 
 #### DCS ####
 
-@inbounds function buildDCS(σ::DifferentialCrossSection, cbins = logrange(1.0e-2, 1.0e2, 41) .* eV)
-    # Create a 2d matrix interpolation that takes ε and R as an input and returns χ
-    Rs = range(0, 1, 25)
-    χs = range(0.0 * u"rad", π * u"rad", 25)
+function buildDCS(
+        σ::DifferentialCrossSection, cbins = logrange(1.0e-2, 1.0e2, 41) .* eV;
+        nχ = 200
+    )
+    # Build a 2D interpolation (ε, R) -> cos(χ), where χ is sampled from σ(ε, χ)
+    # via inverse-CDF sampling:  R = ∫₀^χ σ·sinχ' dχ' / ∫₀^π σ·sinχ' dχ'
+    Rs = range(0, 1, 1000)
+    χgrid = range(0.0u"rad", π * u"rad", nχ)
     out = Matrix{Float64}(undef, length(cbins), length(Rs))
-    c1, c2 = χs[1], χs[end]
-    spacing = χs[2] - χs[1]
-    # create a minimising function
-    last = 0.0
-    for i in eachindex(cbins)
-        function intχ(χ)
-            σ(cbins[i], χ) * sin(χ)
+
+    Threads.@threads for i in eachindex(cbins)
+        ε = cbins[i]
+        intχ(χ) = σ(ε, χ) * sin(χ)
+
+        # Cumulative CDF on a fixed grid — one integration pass instead of
+        # re-integrating from scratch for every trial angle.
+        cdf = Vector{typeof(1.0u"Å^2*rad")}(undef, nχ)
+        cdf[1] = 0.0u"Å^2*rad"
+        for k in 2:nχ
+            cdf[k] = cdf[k - 1] + quadgk(intχ, χgrid[k - 1], χgrid[k])[1]
         end
-        total = quadgk(intχ, c1, c2)[1]::typeof(1.0u"Å^2*rad")
-        for j in eachindex(Rs)
-            function L(χ)
-                partial = quadgk(intχ, c1, χ * u"rad")[1]::typeof(1.0u"Å^2*rad")
-                abs(Rs[j] - partial / total)
+        total = cdf[end]
+
+        if total == 0.0u"Å^2*rad"
+            # Whole energy bin is below threshold: σ ≡ 0 for all χ here.
+            # This only happens for the lowest energy bins.
+            out[i, :] .= 1.0  # cos(0): no scattering possible
+            continue
+        end
+
+        rcdf = ustrip.(cdf ./ total)
+
+        # σ(ε, ·) can be zero over one or more χ-ranges (not just at the
+        # start), which makes the CDF flat there. Strip every non-increasing
+        # point so the interpolation x-axis is strictly increasing, keeping
+        # the first point of each plateau (standard inverse-CDF convention:
+        # map R falling in a zero-probability gap to the smallest valid χ).
+        keep = Vector{Int}(undef, nχ)
+        keep[1] = 1
+        nkeep = 1
+        for k in 2:nχ
+            if rcdf[k] > rcdf[keep[nkeep]]
+                nkeep += 1
+                keep[nkeep] = k
             end
-            result = optimize(L, last, π)
-            last = Optim.minimizer(result)
-            out[i, j] = cos(last)
         end
-        last = 0.0
+        resize!(keep, nkeep)
+
+        invcdf = linear_interpolation(rcdf[keep], ustrip.(χgrid[keep]))
+
+        for j in eachindex(Rs)
+            out[i, j] = cos(invcdf(Rs[j]) * u"rad")
+        end
     end
-    linear_interpolation((cbins, Rs), out, extrapolation_bc = Interpolations.Flat())
+
+    return linear_interpolation((cbins, Rs), out, extrapolation_bc = Interpolations.Flat())
 end
 
 function buildDCS(σ::T, cbins = logrange(1.0e-2, 1.0e2, 41) .* eV) where {T <: AbstractCrossSection}
