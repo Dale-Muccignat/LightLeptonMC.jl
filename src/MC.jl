@@ -35,7 +35,7 @@ function flight(particles::Vector{P}, model, params) where {P <: PART}
         measureTbin!(p, model, params, meas)
     end
 
-    new_particles = copy(particles)
+    new_particles = copy_particle.(particles)
 
     while !isempty(new_particles)
         p = popfirst!(new_particles)
