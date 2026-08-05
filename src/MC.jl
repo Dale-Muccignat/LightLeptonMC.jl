@@ -35,11 +35,13 @@ function flight(particles::Vector{P}, model, params) where {P <: PART}
         measureTbin!(p, model, params, meas)
     end
 
-    new_particles = copy(particles)
+    new_particles = copy_particle.(particles)
 
     while !isempty(new_particles)
-        p = popfirst!(new_particles)
+        p = new_particles[1]
         step_particle!(p, model, params, meas, new_particles)
+        new_particles[1] = new_particles[end]
+        pop!(new_particles)
     end
 
     return meas
